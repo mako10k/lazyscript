@@ -82,8 +82,8 @@ expr2:
     ;
 
 eappl:
-      expr4 efact { $$ = lsappl($1); lsappl_push_arg($$, $2); }
-    | eappl efact { $$ = $1; lsappl_push_arg($$, $2); }
+      expr4 expr4 { $$ = lsappl($1); lsappl_push_arg($$, $2); }
+    | eappl expr4 { $$ = $1; lsappl_push_arg($$, $2); }
     ;
 
 expr3:
@@ -147,7 +147,7 @@ pat2:
 
 palge:
       LSTSYMBOL { $$ = lspalge($1); }
-    | palge pat2 { $$ = $1; lspalge_push_arg($$, $2); }
+    | palge pat3 { $$ = $1; lspalge_push_arg($$, $2); }
     ;
 
 pat3:

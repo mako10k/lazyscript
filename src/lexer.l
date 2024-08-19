@@ -22,7 +22,8 @@
 %option noyywrap
 %option yylineno
 %option reentrant
-%option bison-bridge bison-locations
+%option bison-bridge
+%option bison-locations
 %option outfile="lexer.c"
 %option header-file="lexer.h"
 %option extra-type="lsscan_t *"
@@ -34,4 +35,5 @@
 \"([^\\\"]|\\.)*\" { yylval->lsstr = lsstr_parse(yytext + 1, yyleng - 2); return LSTSTR; }
 "->"       { return LSTARROW; }
 [\[\]\(\),:\{\}@\\] { return yytext[0]; }
-.*          { yyerror(yylloc, yyscanner, "unexpected character"); }
+
+%%

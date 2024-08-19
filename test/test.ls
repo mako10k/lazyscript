@@ -1,6 +1,5 @@
 \
 x
  ->
-  Cons
-   x
+  Cons x
     2
