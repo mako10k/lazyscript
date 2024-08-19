@@ -58,7 +58,8 @@ const lsarray_t *lsarray_const(const lsarray_t *array) {
 }
 
 void lsarray_free(lsarray_t *array) {
-  assert(array != NULL);
+  if (array == NULL)
+    return;
   if (array->ka_values != NULL)
     lsfree(array->ka_values);
   lsfree(array);
@@ -75,15 +76,15 @@ void lsarray_set(lsarray_t *array, unsigned int index, void *value) {
 }
 
 void *lsarray_get(const lsarray_t *array, unsigned int index) {
-  assert(array != NULL);
+  if (array == NULL)
+    return NULL;
   if (index >= array->ka_size)
     return NULL;
   return array->ka_values[index];
 }
 
 unsigned int lsarray_get_size(const lsarray_t *array) {
-  assert(array != NULL);
-  return array->ka_size;
+  return array == NULL ? 0 : array->ka_size;
 }
 
 void lsarray_set_size(lsarray_t *array, unsigned int new_size) {
@@ -130,7 +131,8 @@ void *lsarray_shift(lsarray_t *array) {
 }
 
 lsarray_t *lsarray_clone(const lsarray_t *array) {
-  assert(array != NULL);
+  if (array == NULL)
+    return NULL;
   lsarray_t *clone = lsarray(array->ka_size);
   for (unsigned int i = 0; i < array->ka_size; i++)
     lsarray_set(clone, i, lsarray_get(array, i));
@@ -138,8 +140,10 @@ lsarray_t *lsarray_clone(const lsarray_t *array) {
 }
 
 lsarray_t *lsarray_concat(lsarray_t *array1, const lsarray_t *array2) {
-  assert(array1 != NULL);
-  assert(array2 != NULL);
+  if (array2 == NULL)
+    return array1;
+  if (array1 == NULL)
+    return lsarray_clone(array2);
   lsarray_resize(array1, array1->ka_size + array2->ka_size);
   for (unsigned int i = 0; i < array2->ka_size; i++)
     lsarray_set(array1, array1->ka_size + i, lsarray_get(array2, i));

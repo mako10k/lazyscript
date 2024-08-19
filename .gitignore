@@ -14,12 +14,14 @@ Makefile
 Makefile.in
 stamp-h1
 
+m4/
 autom4te.cache/
 missing
 ylwrap
 
 src/lazyscript
 src/lexer.c
+src/lexer.h
 src/parser.c
 src/parser.h
 

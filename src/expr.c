@@ -4,9 +4,11 @@ struct lsexpr {
   lsetype_t type;
   union {
     lsealge_t *ealge;
-    lsappl_t *eappl;
+    lsappl_t *appl;
     lseref_t *eref;
-    const lsint_t *eint;
+    lslambda_t *lambda;
+    const lsint_t *intval;
+    const lsstr_t *strval;
   };
 };
 
@@ -20,7 +22,7 @@ lsexpr_t *lsexpr_alge(lsealge_t *ealge) {
 lsexpr_t *lsexpr_appl(lsappl_t *eappl) {
   lsexpr_t *expr = malloc(sizeof(lsexpr_t));
   expr->type = LSETYPE_APPL;
-  expr->eappl = eappl;
+  expr->appl = eappl;
   return expr;
 }
 
@@ -31,9 +33,23 @@ lsexpr_t *lsexpr_ref(lseref_t *eref) {
   return expr;
 }
 
-lsexpr_t *lsexpr_int(const lsint_t *eint) {
+lsexpr_t *lsexpr_int(const lsint_t *intval) {
   lsexpr_t *expr = malloc(sizeof(lsexpr_t));
   expr->type = LSETYPE_INT;
-  expr->eint = eint;
+  expr->intval = intval;
+  return expr;
+}
+
+lsexpr_t *lsexpr_str(const lsstr_t *strval) {
+  lsexpr_t *expr = malloc(sizeof(lsexpr_t));
+  expr->type = LSETYPE_STR;
+  expr->strval = strval;
+  return expr;
+}
+
+lsexpr_t *lsexpr_lambda(lslambda_t *lambda) {
+  lsexpr_t *expr = malloc(sizeof(lsexpr_t));
+  expr->type = LSETYPE_LAMBDA;
+  expr->lambda = lambda;
   return expr;
 }

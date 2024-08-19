@@ -34,4 +34,16 @@ AC_FUNC_MALLOC
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 
+AC_ARG_ENABLE([debug],
+  AS_HELP_STRING([--enable-debug], [Enable debugging]),
+  [debug=$enableval], [debug=no])
+
+if test "x$debug" = "xyes"; then
+    CFLAGS="$CFLAGS -g -O0"
+    YFLAGS="$YFLAGS -t"
+    AC_DEFINE([DEBUG], [1], [Define to 1 if debugging is enabled])
+fi
+
+AC_CONFIG_MACRO_DIRS([m4])
+
 AC_OUTPUT

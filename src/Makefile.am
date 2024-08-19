@@ -1,9 +1,11 @@
 bin_PROGRAMS = lazyscript
 
+CLEANFILES = parser.h parser.c lexer.c
+
 BUILT_SOURCES = lexer.c parser.h parser.c
 
-AM_CFLAGS = -Wall -Wextra -Werror
-AM_YFLAGS = -d
+AM_CFLAGS = -O0 -g -Wall -Wextra -Werror
+AM_YFLAGS = -d -Wcounterexamples
 
 lazyscript_CFLAGS = $(GC_CFLAGS)
 lazyscript_LDADD = $(GC_LIBS)
@@ -15,6 +17,8 @@ lazyscript_SOURCES = \
     appl.h \
     array.c \
     array.h \
+    as.c \
+    as.h \
     bind.c \
     bind.h \
     ealge.c \
@@ -36,8 +40,12 @@ lazyscript_SOURCES = \
     lexer.l \
     malloc.c \
     malloc.h \
+    palge.c \
+    palge.h \
+    parser.y \
+    pat.c \
+    pat.h \
     prog.c \
     prog.h \
     str.c \
-    str.h \
-    parser.y
+    str.h
