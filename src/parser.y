@@ -82,7 +82,7 @@ expr2:
     ;
 
 eappl:
-      expr4 expr4 { $$ = lsappl($1); lsappl_push_arg($$, $2); }
+      efact expr4 { $$ = lsappl($1); lsappl_push_arg($$, $2); }
     | eappl expr4 { $$ = $1; lsappl_push_arg($$, $2); }
     ;
 
@@ -92,12 +92,13 @@ expr3:
     ;
 
 ealge:
-      LSTSYMBOL { $$ = lsealge($1); }
+      LSTSYMBOL expr4 { $$ = lsealge($1); lsealge_push_arg($$, $2); }
     | ealge expr4 { $$ = $1; lsealge_push_arg($$, $2); }
     ;
 
 expr4:
       efact { $$ = $1; }
+    | LSTSYMBOL { $$ = lsexpr_alge(lsealge($1)); }
     ;
 
 efact:

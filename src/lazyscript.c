@@ -32,8 +32,19 @@ int main(int argc, char **argv) {
     lsparse_file(argv[i]);
 }
 
+static void lsprintloc(FILE *fp, const char *name, YYLTYPE *loc) {
+  if (loc->first_line == loc->last_line) {
+    if (loc->first_column == loc->last_column)
+      fprintf(fp, "%s:%d.%d: ", name, loc->first_line, loc->first_column);
+    else
+      fprintf(fp, "%s:%d.%d-%d: ", name, loc->first_line, loc->first_column,
+              loc->last_column);
+  } else
+    fprintf(fp, "%s:%d.%d-%d.%d: ", name, loc->first_line, loc->first_column,
+            loc->last_line, loc->last_column);
+}
+
 void yyerror(YYLTYPE *yylloc, yyscan_t scanner, const char *s) {
-  fprintf(stderr, "%s:%d.%d-%d.%d: E: %s\n", yyget_extra(scanner)->filename,
-          yylloc->first_line, yylloc->first_column, yylloc->last_line,
-          yylloc->last_column, s);
+  lsprintloc(stderr, yyget_extra(scanner)->filename, yylloc);
+  fprintf(stderr, "%s\n", s);
 }

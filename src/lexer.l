@@ -8,10 +8,8 @@
     yylloc->first_column = yylloc->last_column; \
     while (i < yyleng) { \
       char *c = memchr(yytext + i, '\n', yyleng - i); \
-      if (c == NULL) {\
-        i = yyleng; \
+      if (c == NULL) \
         break; \
-      } \
       yylloc->last_line ++; \
       yylloc->last_column = 1; \
       i = c - yytext + 1; \
@@ -34,6 +32,6 @@
 [a-zA-Z_][a-zA-Z0-9_]* { yylval->lsstr = lsstr_cstr(yytext); return LSTSYMBOL; }
 \"([^\\\"]|\\.)*\" { yylval->lsstr = lsstr_parse(yytext + 1, yyleng - 2); return LSTSTR; }
 "->"       { return LSTARROW; }
-[\[\]\(\),:\{\}@\\] { return yytext[0]; }
+[\[\]\(\),:\{\}@\\;] { return yytext[0]; }
 
 %%
