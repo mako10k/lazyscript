@@ -53,3 +53,28 @@ lsexpr_t *lsexpr_lambda(lslambda_t *lambda) {
   expr->lambda = lambda;
   return expr;
 }
+
+void lsexpr_print(FILE *fp, int prec, const lsexpr_t *expr) {
+  switch (expr->type) {
+  case LSETYPE_ALGE:
+    lsealge_print(fp, prec, expr->ealge);
+    break;
+  case LSETYPE_APPL:
+    lsappl_print(fp, prec, expr->appl);
+    break;
+  case LSETYPE_REF:
+    // TODO: Implement lseref_print
+    break;
+  case LSETYPE_INT:
+    lsint_print(fp, expr->intval);
+    break;
+  case LSETYPE_STR:
+    lsstr_print(fp, expr->strval);
+    break;
+  case LSETYPE_LAMBDA:
+    lslambda_print(fp, prec, expr->lambda);
+    break;
+  default:
+    fprintf(fp, "Unknown expression type\n");
+  }
+}

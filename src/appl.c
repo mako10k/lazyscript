@@ -1,4 +1,5 @@
 #include "appl.h"
+#include "lazyscript.h"
 #include "malloc.h"
 #include <assert.h>
 
@@ -44,4 +45,23 @@ unsigned int lsappl_get_argc(const lsappl_t *appl) {
 lsexpr_t *lsappl_get_arg(const lsappl_t *appl, unsigned int i) {
   assert(appl != NULL);
   return appl->args == NULL ? NULL : lsarray_get(appl->args, i);
+}
+
+void lsappl_print(FILE *fp, int prec, const lsappl_t *appl) {
+  assert(fp != NULL);
+  assert(appl != NULL);
+  if (appl->args == NULL || lsarray_get_size(appl->args) == 0) {
+    lsexpr_print(fp, prec, appl->func);
+    return;
+  }
+  if (prec > LSPREC_APPL)
+    fprintf(fp, "(");
+  lsexpr_print(fp, LSPREC_APPL + 1, appl->func);
+  for (unsigned int i = 0; i < lsarray_get_size(appl->args); i++) {
+    if (i > 0)
+      fprintf(fp, ", ");
+    lsexpr_print(fp, LSPREC_APPL + 1, lsarray_get(appl->args, i));
+  }
+  if (prec > LSPREC_APPL)
+    fprintf(fp, ")");
 }

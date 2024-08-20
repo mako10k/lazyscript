@@ -10,3 +10,7 @@ lsint_t *lsint(int intval) {
   eint->intval = intval;
   return eint;
 }
+
+void lsint_print(FILE *fp, const lsint_t *intval) {
+  fprintf(fp, "%d", intval->intval);
+}

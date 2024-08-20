@@ -37,3 +37,20 @@ lspat_t *lspat_str(const lsstr_t *strval) {
   pat->value.strval = strval;
   return pat;
 }
+
+void lspat_print(FILE *fp, int prec, const lspat_t *pat) {
+  switch (pat->type) {
+  case LSPTYPE_ALGE:
+    lspalge_print(fp, prec, pat->value.alge);
+    break;
+  case LSPTYPE_AS:
+    lsas_print(fp, prec, pat->value.as);
+    break;
+  case LSPTYPE_INT:
+    lsint_print(fp, pat->value.intval);
+    break;
+  case LSPTYPE_STR:
+    lsstr_print(fp, pat->value.strval);
+    break;
+  }
+}

@@ -1,5 +1,6 @@
 #include "alge.h"
 #include "array.h"
+#include "lazyscript.h"
 #include "malloc.h"
 #include <assert.h>
 
@@ -46,4 +47,24 @@ unsigned int lsalge_get_argc(const lsalge_t *alge) {
 void *lsalge_get_arg(const lsalge_t *alge, unsigned int i) {
   assert(alge != NULL);
   return alge->args == NULL ? NULL : lsarray_get(alge->args, i);
+}
+
+void lsalge_print(FILE *fp, int prec, const lsalge_t *alge,
+                  void (*lsprint)(FILE *, int, const void *)) {
+  assert(fp != NULL);
+  assert(alge != NULL);
+  assert(lsprint != NULL);
+  if (alge->args == NULL || lsarray_get_size(alge->args) == 0) {
+    lsstr_print_bare(fp, alge->constr);
+    return;
+  }
+  if (prec > LSPREC_APPL)
+    fprintf(fp, "(");
+  lsstr_print_bare(fp, alge->constr);
+  for (unsigned int i = 0; i < lsarray_get_size(alge->args); i++) {
+    fprintf(fp, " ");
+    lsprint(fp, LSPREC_APPL + 1, lsarray_get(alge->args, i));
+  }
+  if (prec > LSPREC_APPL)
+    fprintf(fp, "(");
 }

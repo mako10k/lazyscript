@@ -7,10 +7,10 @@
 #include <gc.h>
 #include <stdarg.h>
 
-void lsparse_file(const char *filename) {
+lsprog_t *lsparse_file(const char *filename) {
   yyscan_t scanner;
   yylex_init(&scanner);
-  lsscan_t lsscan = {filename};
+  lsscan_t lsscan = {filename, NULL};
   FILE *file = fopen(filename, "r");
   if (!file) {
     perror(filename);
@@ -19,8 +19,10 @@ void lsparse_file(const char *filename) {
   yyset_in(file, scanner);
   yyset_extra(&lsscan, scanner);
   yyparse(scanner);
+  lsprog_t *prog = lsscan.prog;
   yylex_destroy(scanner);
   fclose(file);
+  return prog;
 }
 
 int main(int argc, char **argv) {
@@ -28,8 +30,10 @@ int main(int argc, char **argv) {
   extern int yydebug;
   yydebug = 1;
 #endif
-  for (int i = 1; i < argc; i++)
-    lsparse_file(argv[i]);
+  for (int i = 1; i < argc; i++) {
+    lsprog_t *prog = lsparse_file(argv[i]);
+    lsprog_print(stdout, prog);
+  }
 }
 
 static void lsprintloc(FILE *fp, const char *name, YYLTYPE *loc) {

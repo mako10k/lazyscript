@@ -9,3 +9,7 @@ lsprog_t *lsprog(lsexpr_t *expr) {
   prog->expr = expr;
   return prog;
 }
+
+void lsprog_print(FILE *fp, const lsprog_t *prog) {
+  lsexpr_print(fp, 0, prog->expr);
+}

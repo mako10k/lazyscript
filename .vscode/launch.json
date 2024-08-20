@@ -9,7 +9,7 @@
             "program": "${workspaceRoot}/src/lazyscript",
             "name": "Launch lazyscript",
             "request": "launch",
-            "args": [],
+            "args": ["test/test.ls"],
             "cwd": "${workspaceRoot}",
         }
     ]

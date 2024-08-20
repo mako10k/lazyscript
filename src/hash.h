@@ -1,7 +1,8 @@
 #pragma once
 
-#include "str.h"
 typedef struct lshash lshash_t;
+
+#include "str.h"
 
 // *******************************
 // Hash table.
@@ -14,7 +15,7 @@ typedef struct lshash lshash_t;
  * @param capacity Initial capacity.
  * @return New hash table.
  */
-lshash_t *lshash_new(unsigned int capacity);
+lshash_t *lshash(unsigned int capacity);
 
 // -------------------------------
 // Accessors.

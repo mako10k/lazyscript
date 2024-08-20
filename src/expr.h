@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdio.h>
+
 typedef struct lsexpr lsexpr_t;
 
 #include "appl.h"
@@ -25,3 +27,5 @@ lsexpr_t *lsexpr_ref(lseref_t *eref);
 lsexpr_t *lsexpr_int(const lsint_t *eint);
 lsexpr_t *lsexpr_str(const lsstr_t *str);
 lsexpr_t *lsexpr_lambda(lslambda_t *lambda);
+
+void lsexpr_print(FILE *fp, int prec, const lsexpr_t *expr);

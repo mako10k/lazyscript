@@ -14,6 +14,7 @@
 #include "pat.h"
 #include "palge.h"
 typedef void *yyscan_t;
+lsscan_t *yyget_extra(yyscan_t yyscanner);
 }
 
 %union {
@@ -34,8 +35,8 @@ typedef void *yyscan_t;
 }
 
 %define api.pure full
-%parse-param {yyscan_t *p}
-%lex-param {yyscan_t *p}
+%parse-param {yyscan_t *yyscanner}
+%lex-param {yyscan_t *yyscanner}
 %header "parser.h"
 %output "parser.c"
 %locations
@@ -59,7 +60,7 @@ typedef void *yyscan_t;
 %%
 
 prog:
-      expr { $$ = lsprog($1); }
+      expr { $$ = lsprog($1); yyget_extra(yyscanner)->prog = $$; }
     ;
 
 expr:

@@ -42,7 +42,7 @@ struct lshash {
 // -------------------------------
 // Constructors.
 // -------------------------------
-lshash_t *lshash_new(unsigned int capacity) {
+lshash_t *lshash(unsigned int capacity) {
   assert(capacity > 0);
   lshash_t *hash = lsmalloc(sizeof(lshash_t));
   hash->kh_capacity = capacity;
@@ -56,26 +56,10 @@ lshash_t *lshash_new(unsigned int capacity) {
 // -------------------------------
 // Accessors.
 // -------------------------------
-/**
- * Calculates the hash value of a key.
- *
- * @param key The key to calculate the hash value.
- * @return The hash value of the key.
- */
-static unsigned int lscalc_hash(const lsstr_t *key) {
-  assert(key != NULL);
-  unsigned int hash = 0;
-  const char *key_str = lsstr_get_buf(key);
-  unsigned int key_len = lsstr_get_len(key);
-  for (unsigned int i = 0; i < key_len; i++)
-    hash = hash * 31 + (key_str[i] & 255);
-  return hash;
-}
-
 int lshash_get(lshash_t *hash, const lsstr_t *key, void **value) {
   assert(hash != NULL);
   assert(key != NULL);
-  int hash_value = lscalc_hash(key) % hash->kh_capacity;
+  int hash_value = lsstr_calc_hash(key) % hash->kh_capacity;
   lshash_entry_t *entry = hash->kh_entries[hash_value];
   while (entry != NULL) {
     if (lsstrcmp(entry->khe_key, key) == 0) {
@@ -152,7 +136,7 @@ static void lshash_rehash(lshash_t *hash, int new_capacity) {
   for (int i = 0; i < hash->kh_capacity; i++) {
     lshash_entry_t *entry = hash->kh_entries[i];
     while (entry != NULL) {
-      int hash_value = lscalc_hash(entry->khe_key) % new_capacity;
+      int hash_value = lsstr_calc_hash(entry->khe_key) % new_capacity;
       lshash_put_raw(&new_entries[hash_value], new_capacity, &hash->kh_size,
                      entry->khe_key, entry->khe_value, NULL);
       entry = entry->khe_next;
@@ -169,15 +153,15 @@ int lshash_put(lshash_t *hash, const lsstr_t *key, void *value,
   assert(key != NULL);
   if (hash->kh_size >= hash->kh_capacity * 0.75)
     lshash_rehash(hash, hash->kh_capacity * 2);
-  return lshash_put_raw(&hash->kh_entries[lscalc_hash(key) % hash->kh_capacity],
-                        hash->kh_capacity, &hash->kh_size, key, value,
-                        old_value);
+  return lshash_put_raw(
+      &hash->kh_entries[lsstr_calc_hash(key) % hash->kh_capacity],
+      hash->kh_capacity, &hash->kh_size, key, value, old_value);
 }
 
 int lshash_remove(lshash_t *hash, const lsstr_t *key, void **value) {
   assert(hash != NULL);
   assert(key != NULL);
-  int hash_value = lscalc_hash(key) % hash->kh_capacity;
+  int hash_value = lsstr_calc_hash(key) % hash->kh_capacity;
   lshash_entry_t **pentry = &hash->kh_entries[hash_value];
   while (*pentry != NULL) {
     if (lsstrcmp((*pentry)->khe_key, key) == 0) {
