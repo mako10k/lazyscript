@@ -18,9 +18,8 @@ lsappl_t *lsappl(const lsexpr_t *func) {
 
 void lsappl_push_arg(lsappl_t *appl, lsexpr_t *arg) {
   assert(appl != NULL);
-  if (appl->args == NULL) {
-    appl->args = lsarray(1);
-  }
+  if (appl->args == NULL)
+    appl->args = lsarray(0);
   lsarray_push(appl->args, arg);
 }
 

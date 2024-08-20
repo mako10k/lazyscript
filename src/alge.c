@@ -21,7 +21,7 @@ void lsalge_push_arg(lsalge_t *alge, void *arg) {
   assert(alge != NULL);
   assert(arg != NULL);
   if (alge->args == NULL)
-    alge->args = lsarray(1);
+    alge->args = lsarray(0);
   lsarray_push(alge->args, arg);
 }
 
@@ -54,6 +54,39 @@ void lsalge_print(FILE *fp, int prec, const lsalge_t *alge,
   assert(fp != NULL);
   assert(alge != NULL);
   assert(lsprint != NULL);
+  const lsstr_t *constr = lsalge_get_constr(alge);
+  if (lsstrcmp(constr, lsstr_cstr(",")) == 0) {
+    fprintf(fp, "(");
+    for (unsigned int i = 0; i < lsarray_get_size(alge->args); i++) {
+      if (i > 0)
+        fprintf(fp, ", ");
+      lsprint(fp, LSPREC_LOWEST, lsarray_get(alge->args, i));
+    }
+    fprintf(fp, ")");
+    return;
+  }
+  if (lsstrcmp(constr, lsstr_cstr("[]")) == 0) {
+    fprintf(fp, "[");
+    for (unsigned int i = 0; i < lsarray_get_size(alge->args); i++) {
+      if (i > 0)
+        fprintf(fp, ", ");
+      lsprint(fp, LSPREC_LOWEST, lsarray_get(alge->args, i));
+    }
+    fprintf(fp, "]");
+    return;
+  }
+  if (lsstrcmp(constr, lsstr_cstr(":")) == 0 &&
+      lsarray_get_size(alge->args) == 2) {
+    if (prec > LSPREC_CONS)
+      fprintf(fp, "(");
+    lsprint(fp, LSPREC_CONS + 1, lsarray_get(alge->args, 0));
+    fprintf(fp, " : ");
+    lsprint(fp, LSPREC_CONS, lsarray_get(alge->args, 1));
+    if (prec > LSPREC_CONS)
+      fprintf(fp, ")");
+    return;
+  }
+
   if (alge->args == NULL || lsarray_get_size(alge->args) == 0) {
     lsstr_print_bare(fp, alge->constr);
     return;
@@ -66,5 +99,5 @@ void lsalge_print(FILE *fp, int prec, const lsalge_t *alge,
     lsprint(fp, LSPREC_APPL + 1, lsarray_get(alge->args, i));
   }
   if (prec > LSPREC_APPL)
-    fprintf(fp, "(");
+    fprintf(fp, ")");
 }

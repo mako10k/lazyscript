@@ -15,6 +15,8 @@ int yylex(YYSTYPE *yylval, YYLTYPE *yylloc, yyscan_t scanner);
 void yyerror(YYLTYPE *yylloc, yyscan_t scanner, const char *s);
 
 enum {
-  LSPREC_APPL = 1,
+  LSPREC_LOWEST = 0,
+  LSPREC_CONS,
+  LSPREC_APPL,
   LSPREC_LAMBDA,
 };

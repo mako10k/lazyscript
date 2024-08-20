@@ -115,7 +115,7 @@ etuple:
     ;
 
 earray:
-      expr { $$ = lsarray(1); lsarray_push($$, $1); }
+      expr { $$ = lsarray(0); lsarray_push($$, $1); }
     | earray ',' expr { $$ = $1; lsarray_push($1, $3); }
     ;
 
@@ -165,7 +165,7 @@ ptuple:
     ;
 
 parray:
-      pat { $$ = lsarray(1); lsarray_push($$, $1); }
+      pat { $$ = lsarray(0); lsarray_push($$, $1); }
     | parray ',' pat { $$ = $1; lsarray_push($1, $3); }
     ;
 

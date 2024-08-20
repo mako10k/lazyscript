@@ -101,7 +101,6 @@ __attribute__((returns_nonnull, nonnull(1, 2),
                warn_unused_result)) static const lsstr_t **
 lsstr_ht_put_raw(lsstr_ht_t *str_ht, const char *buf, unsigned int len) {
   const lsstr_t **pstr = lsstr_ht_get_raw(str_ht, buf, len);
-  assert(*pstr == NULL);
   *pstr = lsstr_raw(buf, len);
   str_ht->size++;
   return pstr;

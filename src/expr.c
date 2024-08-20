@@ -1,4 +1,5 @@
 #include "expr.h"
+#include <assert.h>
 
 struct lsexpr {
   lsetype_t type;
@@ -55,6 +56,14 @@ lsexpr_t *lsexpr_lambda(lslambda_t *lambda) {
 }
 
 void lsexpr_print(FILE *fp, int prec, const lsexpr_t *expr) {
+#ifdef DEBUG
+  if (expr == NULL) {
+    fprintf(fp, "NULL");
+    return;
+  }
+#else
+  assert(expr != NULL);
+#endif
   switch (expr->type) {
   case LSETYPE_ALGE:
     lsealge_print(fp, prec, expr->ealge);
