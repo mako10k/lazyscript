@@ -19,6 +19,6 @@ void lsprintf(FILE *fp, int indent, const char *fmt, ...);
 enum {
   LSPREC_LOWEST = 0,
   LSPREC_CONS,
-  LSPREC_APPL,
   LSPREC_LAMBDA,
+  LSPREC_APPL,
 };

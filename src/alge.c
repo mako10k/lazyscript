@@ -21,7 +21,7 @@ void lsalge_push_arg(lsalge_t *alge, void *arg) {
   assert(alge != NULL);
   assert(arg != NULL);
   if (alge->args == NULL)
-    alge->args = lsarray(0);
+    alge->args = lsarray();
   lsarray_push(alge->args, arg);
 }
 

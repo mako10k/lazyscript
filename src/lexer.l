@@ -18,7 +18,8 @@
   }
 %}
 %option noyywrap
-%option yylineno
+%option noinput
+%option nounput
 %option reentrant
 %option bison-bridge
 %option bison-locations
@@ -32,6 +33,5 @@
 [a-zA-Z_][a-zA-Z0-9_]* { yylval->lsstr = lsstr_cstr(yytext); return LSTSYMBOL; }
 \"([^\\\"]|\\.)*\" { yylval->lsstr = lsstr_parse(yytext + 1, yyleng - 2); return LSTSTR; }
 "->"       { return LSTARROW; }
-[[\](),:;|{}@\\] { return yytext[0]; }
-
+. { return yytext[0]; }
 %%

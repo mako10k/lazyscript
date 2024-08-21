@@ -2,13 +2,13 @@
 #include "lazyscript.h"
 
 struct lsas {
-  const lsstr_t *name;
+  lspref_t *pref;
   const lspat_t *pat;
 };
 
-lsas_t *lsas(const lsstr_t *name, const lspat_t *pat) {
+lsas_t *lsas(lspref_t *pref, const lspat_t *pat) {
   lsas_t *as = malloc(sizeof(lsas_t));
-  as->name = name;
+  as->pref = pref;
   as->pat = pat;
   return as;
 }
@@ -16,7 +16,7 @@ lsas_t *lsas(const lsstr_t *name, const lspat_t *pat) {
 void lsas_print(FILE *fp, int prec, int indent, const lsas_t *as) {
   if (prec > LSPREC_APPL)
     lsprintf(fp, indent, "(");
-  lsstr_print_bare(fp, prec, indent, as->name);
+  lspref_print(fp, prec, indent, as->pref);
   lsprintf(fp, indent, "@");
   lspat_print(fp, LSPREC_APPL + 1, indent, as->pat);
   if (prec > LSPREC_APPL)

@@ -5,9 +5,10 @@ CLEANFILES = parser.h parser.c lexer.c
 BUILT_SOURCES = lexer.c parser.h parser.c
 
 AM_CFLAGS = -O0 -g -Wall -Wextra -Werror
-AM_YFLAGS = -d -Wcounterexamples
+#AM_YFLAGS = -d -Wcounterexamples
+AM_YFLAGS = -d
 
-lazyscript_CFLAGS = $(GC_CFLAGS)
+lazyscript_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
 lazyscript_LDADD = $(GC_LIBS)
 
 lazyscript_SOURCES = \
@@ -21,6 +22,8 @@ lazyscript_SOURCES = \
     as.h \
     bind.c \
     bind.h \
+    closure.c \
+    closure.h \
     ealge.c \
     ealge.h \
     eref.c \
@@ -45,6 +48,8 @@ lazyscript_SOURCES = \
     parser.y \
     pat.c \
     pat.h \
+    pref.c \
+    pref.h \
     prog.c \
     prog.h \
     str.c \

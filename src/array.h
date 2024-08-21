@@ -5,9 +5,7 @@ typedef struct lsarray lsarray_t;
 // *******************************
 // Array.
 // *******************************
-lsarray_t *lsarray(unsigned int capacity);
-
-const lsarray_t *lsarray_const(const lsarray_t *array);
+lsarray_t *lsarray(void);
 
 void lsarray_free(lsarray_t *array);
 

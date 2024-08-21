@@ -131,20 +131,21 @@ lsstr_ht_del_raw(lsstr_ht_t *str_ht, const char *buf, unsigned int len) {
   return str;
 }
 
-__attribute__((nonnull(1, 2), warn_unused_result)) static const lsstr_t *
+__attribute__((nonnull(1, 2), warn_unused_result,
+               unused)) static const lsstr_t *
 lsstr_hash_get(lsstr_ht_t *str_hash, const char *buf, unsigned int len) {
   assert(str_hash != NULL);
   return *lsstr_ht_get_raw(str_hash, buf, len);
 }
 
 __attribute__((nonnull(1, 2))) static const lsstr_t *
-lsstr_hash_put(lsstr_ht_t *str_hash, const lsstr_t *str) {
+lsstr_ht_put(lsstr_ht_t *str_hash, const char *buf, unsigned int len) {
   unsigned int cap = str_hash->cap;
   while ((str_hash->size + 1) * 2 >= cap)
     cap *= 2;
   if (cap != str_hash->cap)
     lsstr_ht_resize(str_hash, cap);
-  return *lsstr_ht_put_raw(str_hash, str->buf, str->len) = str;
+  return *lsstr_ht_put_raw(str_hash, buf, len);
 }
 
 __attribute__((nonnull(1, 2))) static const lsstr_t *
@@ -161,6 +162,7 @@ lsstr_ht_del(lsstr_ht_t *str_hash, const lsstr_t *str) {
 }
 
 __attribute__((nonnull(1))) static void lsstr_finalizer(void *ptr, void *data) {
+  (void)data;
   lsstr_t *str = ptr;
   const lsstr_t *str2 = lsstr_ht_del(&g_str_ht, str);
   assert(str == str2);
@@ -176,8 +178,7 @@ __attribute__((constructor)) static void lsstr_init(void) {
 
 const lsstr_t *lsstr(const char *buf, unsigned int len) {
   assert(buf != NULL);
-  lsstr_t slocal = {.buf = buf, .len = len, ._buf = {}};
-  const lsstr_t *str = *lsstr_ht_put_raw(&g_str_ht, buf, len);
+  const lsstr_t *str = lsstr_ht_put(&g_str_ht, buf, len);
   GC_REGISTER_FINALIZER((void *)str, lsstr_finalizer, NULL, NULL, NULL);
   return str;
 }
@@ -299,6 +300,7 @@ lsstr_parse_esc(const char *str, unsigned int *pi, unsigned int slen) {
   case 'x':
   case 'X':
     c = lsstr_parse_hex(str, pi, slen);
+    break;
   default:
     if ('0' <= c && c <= '7')
       c = lsstr_parse_oct(str, pi, slen, c);
@@ -338,6 +340,7 @@ const lsstr_t *lsstr_parse(const char *cstr, unsigned int slen) {
 void lsstr_print(FILE *fp, int prec, int indent, const lsstr_t *str) {
   assert(fp != NULL);
   assert(str != NULL);
+  (void)prec;
   lsprintf(fp, indent, "\"");
   const char *cstr = str->buf;
   unsigned int len = str->len;
@@ -387,5 +390,9 @@ void lsstr_print(FILE *fp, int prec, int indent, const lsstr_t *str) {
 }
 
 void lsstr_print_bare(FILE *fp, int prec, int indent, const lsstr_t *str) {
+  assert(fp != NULL);
+  assert(str != NULL);
+  (void)prec;
+  (void)indent;
   fwrite(str->buf, 1, str->len, fp);
 }

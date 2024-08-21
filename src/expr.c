@@ -9,6 +9,7 @@ struct lsexpr {
     lsappl_t *appl;
     lseref_t *eref;
     lslambda_t *lambda;
+    lsclosure_t *closure;
     const lsint_t *intval;
     const lsstr_t *strval;
   };
@@ -73,7 +74,7 @@ void lsexpr_print(FILE *fp, int prec, int indent, const lsexpr_t *expr) {
     lsappl_print(fp, prec, indent, expr->appl);
     break;
   case LSETYPE_REF:
-    // TODO: Implement lseref_print
+    lseref_print(fp, prec, indent, expr->eref);
     break;
   case LSETYPE_INT:
     lsint_print(fp, prec, indent, expr->intval);
@@ -84,7 +85,64 @@ void lsexpr_print(FILE *fp, int prec, int indent, const lsexpr_t *expr) {
   case LSETYPE_LAMBDA:
     lslambda_print(fp, prec, indent, expr->lambda);
     break;
+  case LSETYPE_CLOSURE:
+    lsclosure_print(fp, prec, indent, expr->closure);
+    break;
   default:
     lsprintf(fp, indent, "Unknown expression type\n");
   }
+}
+
+lsexpr_t *lsexpr_closure(lsclosure_t *closure) {
+  lsexpr_t *expr = malloc(sizeof(lsexpr_t));
+  expr->type = LSETYPE_CLOSURE;
+  expr->closure = closure;
+  return expr;
+}
+
+lsetype_t lsexpr_type(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  return expr->type;
+}
+
+lsealge_t *lsexpr_get_alge(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  assert(expr->type == LSETYPE_ALGE);
+  return expr->ealge;
+}
+
+lsappl_t *lsexpr_get_appl(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  assert(expr->type == LSETYPE_APPL);
+  return expr->appl;
+}
+
+lseref_t *lsexpr_get_ref(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  assert(expr->type == LSETYPE_REF);
+  return expr->eref;
+}
+
+const lsint_t *lsexpr_get_int(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  assert(expr->type == LSETYPE_INT);
+  return expr->intval;
+}
+
+const lsstr_t *lsexpr_get_str(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  assert(expr->type == LSETYPE_STR);
+  return expr->strval;
+}
+
+lslambda_t *lsexpr_get_lambda(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  assert(expr->type == LSETYPE_LAMBDA);
+  return expr->lambda;
+}
+
+lsclosure_t *lsexpr_get_closure(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  assert(expr->type == LSETYPE_CLOSURE);
+  return expr->closure;
 }

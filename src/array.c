@@ -6,54 +6,22 @@
 struct lsarray {
   void **ka_values;
   unsigned int ka_size;
-  size_t ka_capacity;
-  size_t ka_incr1;
-  size_t ka_incr2;
 };
 
 static void lsarray_resize(lsarray_t *array, unsigned int new_size) {
   assert(array != NULL);
-  if (new_size > array->ka_capacity) {
-    size_t new_capacity = array->ka_capacity;
-    size_t incr1 = array->ka_incr1;
-    size_t incr2 = array->ka_incr2;
-    while (new_capacity < new_size) {
-      new_capacity = incr1 + incr2;
-      incr1 = incr2;
-      incr2 = new_capacity;
-    }
-    array->ka_values =
-        lsrealloc(array->ka_values, new_capacity * sizeof(void *));
-    for (unsigned int i = array->ka_size; i < new_capacity; i++)
-      array->ka_values[i] = NULL;
-    array->ka_capacity = new_capacity;
-    array->ka_incr1 = incr1;
-    array->ka_incr2 = incr2;
-  } else {
-    for (unsigned int i = new_size; i < array->ka_size; i++)
+  if (new_size != array->ka_size) {
+    array->ka_values = lsrealloc(array->ka_values, new_size * sizeof(void *));
+    for (unsigned int i = array->ka_size; i < new_size; i++)
       array->ka_values[i] = NULL;
   }
   array->ka_size = new_size;
 }
 
-lsarray_t *lsarray(unsigned int size) {
+lsarray_t *lsarray() {
   lsarray_t *array = lsmalloc(sizeof(lsarray_t));
-  size_t capacity = 1;
-  size_t incr1 = 1;
-  size_t incr2 = 1;
   array->ka_values = NULL;
   array->ka_size = 0;
-  array->ka_capacity = 0;
-  array->ka_incr1 = incr1;
-  array->ka_incr2 = incr2;
-  lsarray_resize(array, size);
-  for (unsigned int i = 0; i < size; i++)
-    array->ka_values[i] = NULL;
-  return array;
-}
-
-const lsarray_t *lsarray_const(const lsarray_t *array) {
-  assert(array != NULL);
   return array;
 }
 
@@ -133,9 +101,11 @@ void *lsarray_shift(lsarray_t *array) {
 lsarray_t *lsarray_clone(const lsarray_t *array) {
   if (array == NULL)
     return NULL;
-  lsarray_t *clone = lsarray(array->ka_size);
+  lsarray_t *clone = lsmalloc(sizeof(lsarray_t));
+  clone->ka_values = lsmalloc(array->ka_size * sizeof(void *));
+  clone->ka_size = array->ka_size;
   for (unsigned int i = 0; i < array->ka_size; i++)
-    lsarray_set(clone, i, lsarray_get(array, i));
+    clone->ka_values[i] = array->ka_values[i];
   return clone;
 }
 
@@ -144,8 +114,11 @@ lsarray_t *lsarray_concat(lsarray_t *array1, const lsarray_t *array2) {
     return array1;
   if (array1 == NULL)
     return lsarray_clone(array2);
-  lsarray_resize(array1, array1->ka_size + array2->ka_size);
+  array1->ka_values = lsrealloc(
+      array1->ka_values, (array1->ka_size + array2->ka_size) * sizeof(void *));
+  array1->ka_size += array2->ka_size;
   for (unsigned int i = 0; i < array2->ka_size; i++)
-    lsarray_set(array1, array1->ka_size + i, lsarray_get(array2, i));
+    array1->ka_values[array1->ka_size + i] = array2->ka_values[i];
+  array1->ka_size += array2->ka_size;
   return array1;
 }

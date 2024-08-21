@@ -13,5 +13,7 @@ lsint_t *lsint(int intval) {
 }
 
 void lsint_print(FILE *fp, int prec, int indent, const lsint_t *intval) {
+  (void)prec;
+  (void)indent;
   lsprintf(fp, 0, "%d", intval->intval);
 }

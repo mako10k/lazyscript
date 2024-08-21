@@ -48,7 +48,7 @@ lshash_t *lshash(unsigned int capacity) {
   hash->kh_capacity = capacity;
   hash->kh_size = 0;
   hash->kh_entries = lsmalloc(capacity * sizeof(lshash_entry_t *));
-  for (int i = 0; i < capacity; i++)
+  for (unsigned int i = 0; i < capacity; i++)
     hash->kh_entries[i] = NULL;
   return hash;
 }
