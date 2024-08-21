@@ -27,7 +27,13 @@
 %option header-file="lexer.h"
 %option extra-type="lsscan_t *"
 
+%x COMMENT
+
 %%
+#.*            { /* ignore comment */ }
+\{-[^-]*       { BEGIN(COMMENT); }
+<COMMENT>.*-\} { BEGIN(INITIAL); }
+<COMMENT>.*    { /* ignore comment */ }
 [ \t\n]+    { /* ignore whitespace */ }
 [0-9]+      { yylval->lsint = lsint(atoi(yytext)); return LSTINT; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval->lsstr = lsstr_cstr(yytext); return LSTSYMBOL; }

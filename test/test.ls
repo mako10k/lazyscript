@@ -1,3 +1,7 @@
+# COMMENT
+{-
+
+- --}
 {
   \~args -> ~go ~args;
   ~go = \[] -> ~prelude exit 0 |
