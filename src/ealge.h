@@ -14,4 +14,4 @@ void lsealge_push_args(lsealge_t *alge, const lsarray_t *args);
 const lsstr_t *lsealge_get_constr(const lsealge_t *alge);
 unsigned int lsealge_get_argc(const lsealge_t *alge);
 lsexpr_t *lsealge_get_arg(const lsealge_t *alge, int i);
-void lsealge_print(FILE *fp, int prec, const lsealge_t *alge);
+void lsealge_print(FILE *fp, int prec, int indent, const lsealge_t *alge);

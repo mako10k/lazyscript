@@ -19,5 +19,5 @@ int lsstrcmp(const lsstr_t *str1, const lsstr_t *str2);
  */
 unsigned int lsstr_calc_hash(const lsstr_t *key);
 
-void lsstr_print(FILE *fp, const lsstr_t *str);
-void lsstr_print_bare(FILE *fp, const lsstr_t *str);
+void lsstr_print(FILE *fp, int prec, int indent, const lsstr_t *str);
+void lsstr_print_bare(FILE *fp, int prec, int indent, const lsstr_t *str);

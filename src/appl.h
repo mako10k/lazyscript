@@ -12,4 +12,4 @@ void lsappl_push_args(lsappl_t *appl, lsarray_t *args);
 const lsexpr_t *lsappl_get_func(const lsappl_t *appl);
 unsigned int lsappl_get_argc(const lsappl_t *appl);
 lsexpr_t *lsappl_get_arg(const lsappl_t *appl, unsigned int i);
-void lsappl_print(FILE *fp, int prec, const lsappl_t *appl);
+void lsappl_print(FILE *fp, int prec, int indent, const lsappl_t *appl);

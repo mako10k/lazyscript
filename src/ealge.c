@@ -34,6 +34,6 @@ lsexpr_t *lsealge_get_arg(const lsealge_t *alge, int i) {
   return lsalge_get_arg(alge->alge, i);
 }
 
-void lsealge_print(FILE *fp, int prec, const lsealge_t *alge) {
-  lsalge_print(fp, prec, alge->alge, (lsalge_print_t)lsexpr_print);
+void lsealge_print(FILE *fp, int prec, int indent, const lsealge_t *alge) {
+  lsalge_print(fp, prec, indent, alge->alge, (lsalge_print_t)lsexpr_print);
 }

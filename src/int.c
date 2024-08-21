@@ -1,4 +1,5 @@
 #include "int.h"
+#include "lazyscript.h"
 #include "malloc.h"
 
 struct lsint {
@@ -11,6 +12,6 @@ lsint_t *lsint(int intval) {
   return eint;
 }
 
-void lsint_print(FILE *fp, const lsint_t *intval) {
-  fprintf(fp, "%d", intval->intval);
+void lsint_print(FILE *fp, int prec, int indent, const lsint_t *intval) {
+  lsprintf(fp, 0, "%d", intval->intval);
 }

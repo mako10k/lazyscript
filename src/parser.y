@@ -23,6 +23,7 @@ lsscan_t *yyget_extra(yyscan_t yyscanner);
     lsealge_t *lsealge;
     lsappl_t *lsappl;
     lslambda_t *lslambda;
+    lslambda_ent_t *lslambda_ent;
     const lsint_t *lsint;
     const lsstr_t *lsstr;
     lsarray_t *lsarray;
@@ -43,7 +44,8 @@ lsscan_t *yyget_extra(yyscan_t yyscanner);
 
 %nterm <lsprog> prog
 %nterm <lsexpr> expr expr1 expr2 expr3 expr4 efact
-%nterm <lslambda> elambda
+%nterm <lslambda_ent> elambda_single
+%nterm <lslambda> elambda elambda_list
 %nterm <lsarray> earray parray
 %nterm <lsealge> ealge elist econs etuple
 %nterm <lsappl> eappl
@@ -60,7 +62,7 @@ lsscan_t *yyget_extra(yyscan_t yyscanner);
 %%
 
 prog:
-      expr { $$ = lsprog($1); yyget_extra(yyscanner)->prog = $$; }
+      expr ';' { $$ = lsprog($1); yyget_extra(yyscanner)->prog = $$; }
     ;
 
 expr:
@@ -124,8 +126,18 @@ elist:
     | '[' earray ']' { $$ = lsealge(lsstr_cstr("[]")); lsealge_push_args($$, $2); }
     ;
 
-elambda :
-      '\\' pat LSTARROW expr2 { $$ = lslambda($2, $4); }
+elambda:
+      elambda_single { $$ = lslambda(); lslambda_push($$, $1); }
+    | '{' elambda_list '}' { $$ = $2; }
+    ;
+
+elambda_list:
+      elambda_single { $$ = lslambda(); lslambda_push($$, $1); }
+    | elambda_list ';' elambda_single { $$ = $1; lslambda_push($1, $3); }
+    ;
+
+elambda_single:
+      '\\' pat LSTARROW expr2 { $$ = lslambda_ent($2, $4); }
     ;
 
 pat:

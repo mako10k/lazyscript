@@ -1,4 +1,5 @@
 #include "str.h"
+#include "lazyscript.h"
 #include "malloc.h"
 #include <assert.h>
 #include <gc.h>
@@ -334,57 +335,57 @@ const lsstr_t *lsstr_parse(const char *cstr, unsigned int slen) {
   return lsstr(strval, len);
 }
 
-void lsstr_print(FILE *fp, const lsstr_t *str) {
+void lsstr_print(FILE *fp, int prec, int indent, const lsstr_t *str) {
   assert(fp != NULL);
   assert(str != NULL);
-  fprintf(fp, "\"");
+  lsprintf(fp, indent, "\"");
   const char *cstr = str->buf;
   unsigned int len = str->len;
   for (unsigned int i = 0; i < len; i++) {
     switch (cstr[i]) {
     case '\n':
-      fprintf(fp, "\\n");
+      lsprintf(fp, indent, "\\n");
       break;
     case '\t':
-      fprintf(fp, "\\t");
+      lsprintf(fp, indent, "\\t");
       break;
     case '\r':
-      fprintf(fp, "\\r");
+      lsprintf(fp, indent, "\\r");
       break;
     case '\0':
-      fprintf(fp, "\\0");
+      lsprintf(fp, indent, "\\0");
       break;
     case '\\':
-      fprintf(fp, "\\\\");
+      lsprintf(fp, indent, "\\\\");
       break;
     case '"':
-      fprintf(fp, "\\\"");
+      lsprintf(fp, indent, "\\\"");
       break;
     case '\'':
-      fprintf(fp, "\\'");
+      lsprintf(fp, indent, "\\'");
       break;
     case '\a':
-      fprintf(fp, "\\a");
+      lsprintf(fp, indent, "\\a");
       break;
     case '\b':
-      fprintf(fp, "\\b");
+      lsprintf(fp, indent, "\\b");
       break;
     case '\f':
-      fprintf(fp, "\\f");
+      lsprintf(fp, indent, "\\f");
       break;
     case '\v':
-      fprintf(fp, "\\v");
+      lsprintf(fp, indent, "\\v");
       break;
     default:
       if (cstr[i] < 32 || cstr[i] >= 127)
-        fprintf(fp, "\\x%02x", cstr[i]);
+        lsprintf(fp, indent, "\\x%02x", cstr[i]);
       else
-        fprintf(fp, "%c", cstr[i]);
+        lsprintf(fp, indent, "%c", cstr[i]);
     }
   }
-  fprintf(fp, "\"");
+  lsprintf(fp, 0, "\"");
 }
 
-void lsstr_print_bare(FILE *fp, const lsstr_t *str) {
+void lsstr_print_bare(FILE *fp, int prec, int indent, const lsstr_t *str) {
   fwrite(str->buf, 1, str->len, fp);
 }

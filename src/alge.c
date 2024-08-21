@@ -49,55 +49,55 @@ void *lsalge_get_arg(const lsalge_t *alge, unsigned int i) {
   return alge->args == NULL ? NULL : lsarray_get(alge->args, i);
 }
 
-void lsalge_print(FILE *fp, int prec, const lsalge_t *alge,
-                  void (*lsprint)(FILE *, int, const void *)) {
+void lsalge_print(FILE *fp, int prec, int indent, const lsalge_t *alge,
+                  lsalge_print_t lsprint) {
   assert(fp != NULL);
   assert(alge != NULL);
   assert(lsprint != NULL);
   const lsstr_t *constr = lsalge_get_constr(alge);
   if (lsstrcmp(constr, lsstr_cstr(",")) == 0) {
-    fprintf(fp, "(");
+    lsprintf(fp, indent, "(");
     for (unsigned int i = 0; i < lsarray_get_size(alge->args); i++) {
       if (i > 0)
-        fprintf(fp, ", ");
-      lsprint(fp, LSPREC_LOWEST, lsarray_get(alge->args, i));
+        lsprintf(fp, indent, ", ");
+      lsprint(fp, LSPREC_LOWEST, indent, lsarray_get(alge->args, i));
     }
-    fprintf(fp, ")");
+    lsprintf(fp, indent, ")");
     return;
   }
   if (lsstrcmp(constr, lsstr_cstr("[]")) == 0) {
-    fprintf(fp, "[");
+    lsprintf(fp, indent, "[");
     for (unsigned int i = 0; i < lsarray_get_size(alge->args); i++) {
       if (i > 0)
-        fprintf(fp, ", ");
-      lsprint(fp, LSPREC_LOWEST, lsarray_get(alge->args, i));
+        lsprintf(fp, indent, ", ");
+      lsprint(fp, LSPREC_LOWEST, indent, lsarray_get(alge->args, i));
     }
-    fprintf(fp, "]");
+    lsprintf(fp, indent, "]");
     return;
   }
   if (lsstrcmp(constr, lsstr_cstr(":")) == 0 &&
       lsarray_get_size(alge->args) == 2) {
     if (prec > LSPREC_CONS)
-      fprintf(fp, "(");
-    lsprint(fp, LSPREC_CONS + 1, lsarray_get(alge->args, 0));
-    fprintf(fp, " : ");
-    lsprint(fp, LSPREC_CONS, lsarray_get(alge->args, 1));
+      lsprintf(fp, indent, "(");
+    lsprint(fp, LSPREC_CONS + 1, indent, lsarray_get(alge->args, 0));
+    lsprintf(fp, indent, " : ");
+    lsprint(fp, LSPREC_CONS, indent, lsarray_get(alge->args, 1));
     if (prec > LSPREC_CONS)
-      fprintf(fp, ")");
+      lsprintf(fp, indent, ")");
     return;
   }
 
   if (alge->args == NULL || lsarray_get_size(alge->args) == 0) {
-    lsstr_print_bare(fp, alge->constr);
+    lsstr_print_bare(fp, prec, indent, alge->constr);
     return;
   }
   if (prec > LSPREC_APPL)
-    fprintf(fp, "(");
-  lsstr_print_bare(fp, alge->constr);
+    lsprintf(fp, indent, "(");
+  lsstr_print_bare(fp, prec, indent, alge->constr);
   for (unsigned int i = 0; i < lsarray_get_size(alge->args); i++) {
-    fprintf(fp, " ");
-    lsprint(fp, LSPREC_APPL + 1, lsarray_get(alge->args, i));
+    lsprintf(fp, indent, " ");
+    lsprint(fp, LSPREC_APPL + 1, indent, lsarray_get(alge->args, i));
   }
   if (prec > LSPREC_APPL)
-    fprintf(fp, ")");
+    lsprintf(fp, indent, ")");
 }

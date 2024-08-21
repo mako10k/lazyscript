@@ -13,12 +13,12 @@ lsas_t *lsas(const lsstr_t *name, const lspat_t *pat) {
   return as;
 }
 
-void lsas_print(FILE *fp, int prec, const lsas_t *as) {
+void lsas_print(FILE *fp, int prec, int indent, const lsas_t *as) {
   if (prec > LSPREC_APPL)
-    fprintf(fp, "(");
-  lsstr_print_bare(fp, as->name);
-  fprintf(fp, "@");
-  lspat_print(fp, LSPREC_APPL + 1, as->pat);
+    lsprintf(fp, indent, "(");
+  lsstr_print_bare(fp, prec, indent, as->name);
+  lsprintf(fp, indent, "@");
+  lspat_print(fp, LSPREC_APPL + 1, indent, as->pat);
   if (prec > LSPREC_APPL)
-    fprintf(fp, ")");
+    lsprintf(fp, indent, ")");
 }

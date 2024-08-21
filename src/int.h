@@ -5,4 +5,4 @@ typedef struct lsint lsint_t;
 #include <stdio.h>
 
 lsint_t *lsint(int intval);
-void lsint_print(FILE *fp, const lsint_t *intval);
+void lsint_print(FILE *fp, int prec, int indent, const lsint_t *intval);

@@ -12,4 +12,4 @@ void lspalge_push_args(lspalge_t *alge, const lsarray_t *args);
 const lsstr_t *lspalge_get_constr(const lspalge_t *alge);
 unsigned int lspalge_get_argc(const lspalge_t *alge);
 lspat_t *lspalge_get_arg(const lspalge_t *alge, int i);
-void lspalge_print(FILE *fp, int prec, const lspalge_t *alge);
+void lspalge_print(FILE *fp, int prec, int indent, const lspalge_t *alge);

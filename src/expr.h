@@ -28,4 +28,4 @@ lsexpr_t *lsexpr_int(const lsint_t *eint);
 lsexpr_t *lsexpr_str(const lsstr_t *str);
 lsexpr_t *lsexpr_lambda(lslambda_t *lambda);
 
-void lsexpr_print(FILE *fp, int prec, const lsexpr_t *expr);
+void lsexpr_print(FILE *fp, int prec, int indent, const lsexpr_t *expr);

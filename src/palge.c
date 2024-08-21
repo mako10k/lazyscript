@@ -41,7 +41,7 @@ lspat_t *lspalge_get_arg(const lspalge_t *alge, int i) {
   return lsalge_get_arg(alge->alge, i);
 }
 
-void lspalge_print(FILE *fp, int prec, const lspalge_t *alge) {
+void lspalge_print(FILE *fp, int prec, int indent, const lspalge_t *alge) {
   assert(alge != NULL);
-  lsalge_print(fp, prec, alge->alge, (lsalge_print_t)lspat_print);
+  lsalge_print(fp, prec, indent, alge->alge, (lsalge_print_t)lspat_print);
 }

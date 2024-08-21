@@ -46,21 +46,21 @@ lsexpr_t *lsappl_get_arg(const lsappl_t *appl, unsigned int i) {
   return appl->args == NULL ? NULL : lsarray_get(appl->args, i);
 }
 
-void lsappl_print(FILE *fp, int prec, const lsappl_t *appl) {
+void lsappl_print(FILE *fp, int prec, int indent, const lsappl_t *appl) {
   assert(fp != NULL);
   assert(appl != NULL);
   if (appl->args == NULL || lsarray_get_size(appl->args) == 0) {
-    lsexpr_print(fp, prec, appl->func);
+    lsexpr_print(fp, prec, indent, appl->func);
     return;
   }
   if (prec > LSPREC_APPL)
-    fprintf(fp, "(");
-  lsexpr_print(fp, LSPREC_APPL + 1, appl->func);
+    lsprintf(fp, indent, "(");
+  lsexpr_print(fp, LSPREC_APPL + 1, indent, appl->func);
   for (unsigned int i = 0; i < lsarray_get_size(appl->args); i++) {
     if (i > 0)
-      fprintf(fp, ", ");
-    lsexpr_print(fp, LSPREC_APPL + 1, lsarray_get(appl->args, i));
+      lsprintf(fp, indent, ", ");
+    lsexpr_print(fp, LSPREC_APPL + 1, indent, lsarray_get(appl->args, i));
   }
   if (prec > LSPREC_APPL)
-    fprintf(fp, ")");
+    lsprintf(fp, indent, ")");
 }

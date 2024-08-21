@@ -14,6 +14,8 @@ typedef struct lsscan {
 int yylex(YYSTYPE *yylval, YYLTYPE *yylloc, yyscan_t scanner);
 void yyerror(YYLTYPE *yylloc, yyscan_t scanner, const char *s);
 
+void lsprintf(FILE *fp, int indent, const char *fmt, ...);
+
 enum {
   LSPREC_LOWEST = 0,
   LSPREC_CONS,

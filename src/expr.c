@@ -1,4 +1,5 @@
 #include "expr.h"
+#include "lazyscript.h"
 #include <assert.h>
 
 struct lsexpr {
@@ -55,10 +56,10 @@ lsexpr_t *lsexpr_lambda(lslambda_t *lambda) {
   return expr;
 }
 
-void lsexpr_print(FILE *fp, int prec, const lsexpr_t *expr) {
+void lsexpr_print(FILE *fp, int prec, int indent, const lsexpr_t *expr) {
 #ifdef DEBUG
   if (expr == NULL) {
-    fprintf(fp, "NULL");
+    lsprintf(fp, indent, "NULL");
     return;
   }
 #else
@@ -66,24 +67,24 @@ void lsexpr_print(FILE *fp, int prec, const lsexpr_t *expr) {
 #endif
   switch (expr->type) {
   case LSETYPE_ALGE:
-    lsealge_print(fp, prec, expr->ealge);
+    lsealge_print(fp, prec, indent, expr->ealge);
     break;
   case LSETYPE_APPL:
-    lsappl_print(fp, prec, expr->appl);
+    lsappl_print(fp, prec, indent, expr->appl);
     break;
   case LSETYPE_REF:
     // TODO: Implement lseref_print
     break;
   case LSETYPE_INT:
-    lsint_print(fp, expr->intval);
+    lsint_print(fp, prec, indent, expr->intval);
     break;
   case LSETYPE_STR:
-    lsstr_print(fp, expr->strval);
+    lsstr_print(fp, prec, indent, expr->strval);
     break;
   case LSETYPE_LAMBDA:
-    lslambda_print(fp, prec, expr->lambda);
+    lslambda_print(fp, prec, indent, expr->lambda);
     break;
   default:
-    fprintf(fp, "Unknown expression type\n");
+    lsprintf(fp, indent, "Unknown expression type\n");
   }
 }
