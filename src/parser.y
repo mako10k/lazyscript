@@ -20,20 +20,20 @@ lsscan_t *yyget_extra(yyscan_t yyscanner);
 }
 
 %union {
-    lsprog_t *lsprog;
-    lsexpr_t *lsexpr;
-    lsealge_t *lsealge;
-    lsappl_t *lsappl;
-    lslambda_t *lslambda;
-    lslambda_ent_t *lslambda_ent;
-    const lsint_t *lsint;
-    const lsstr_t *lsstr;
-    lsarray_t *lsarray;
-    lspat_t *lspat;
-    lspalge_t *lspalge;
-    lsbind_t *lsbind;
-    lsbind_ent_t *lsbind_ent;
-    lsclosure_t *lsclosure;
+    lsprog_t *prog;
+    lsexpr_t *expr;
+    lsealge_t *ealge;
+    lsappl_t *appl;
+    lslambda_t *lambda;
+    lslambda_ent_t *lambda_ent;
+    const lsint_t *intval;
+    const lsstr_t *strval;
+    lsarray_t *array;
+    lspat_t *pat;
+    lspalge_t *palge;
+    lsbind_t *bind;
+    lsbind_ent_t *bind_ent;
+    lsclosure_t *closure;
 }
 
 %code {
@@ -46,26 +46,28 @@ lsscan_t *yyget_extra(yyscan_t yyscanner);
 %header "parser.h"
 %output "parser.c"
 %locations
+%define parse.error verbose
+%define parse.lac full
 
 %expect 34
 
-%nterm <lsprog> prog
-%nterm <lsexpr> expr expr1 expr2 expr3 expr4 efact
-%nterm <lslambda_ent> elambda_single
-%nterm <lslambda> elambda elambda_list
-%nterm <lsarray> earray parray
-%nterm <lsealge> ealge elist econs etuple
-%nterm <lsappl> eappl
-%nterm <lspat> pat pat1 pat2 pat3
-%nterm <lspalge> palge plist pcons ptuple
-%nterm <lsbind> bind bind_list
-%nterm <lsbind_ent> bind_single
-%nterm <lsclosure> closure
+%nterm <prog> prog
+%nterm <expr> expr expr1 expr2 expr3 expr4 efact
+%nterm <lambda_ent> elambda_single
+%nterm <lambda> elambda elambda_list
+%nterm <array> earray parray
+%nterm <ealge> ealge elist econs etuple
+%nterm <appl> eappl
+%nterm <pat> pat pat1 pat2 pat3
+%nterm <palge> palge plist pcons ptuple
+%nterm <bind> bind bind_list
+%nterm <bind_ent> bind_single
+%nterm <closure> closure
 
 
-%token <lsint> LSTINT
-%token <lsstr> LSTSYMBOL
-%token <lsstr> LSTSTR
+%token <intval> LSTINT
+%token <strval> LSTSYMBOL
+%token <strval> LSTSTR
 %token LSTARROW
 %right ':'
 

@@ -96,15 +96,13 @@ int main(int argc, char **argv) {
 }
 
 static void lsprintloc(FILE *fp, const char *name, YYLTYPE *loc) {
+  lsprintf(fp, 0, "%s:%d.%d", name, loc->first_line, loc->first_column);
   if (loc->first_line == loc->last_line) {
-    if (loc->first_column == loc->last_column)
-      lsprintf(fp, 0, "%s:%d.%d: ", name, loc->first_line, loc->first_column);
-    else
-      lsprintf(fp, 0, "%s:%d.%d-%d: ", name, loc->first_line, loc->first_column,
-               loc->last_column);
+    if (loc->first_column != loc->last_column)
+      lsprintf(fp, 0, "-%d", loc->last_column);
   } else
-    lsprintf(fp, 0, "%s:%d.%d-%d.%d: ", name, loc->first_line,
-             loc->first_column, loc->last_line, loc->last_column);
+    lsprintf(fp, 0, "-%d.%d", loc->last_line, loc->last_column);
+  lsprintf(fp, 0, ": ");
 }
 
 void yyerror(YYLTYPE *yylloc, yyscan_t scanner, const char *s) {
