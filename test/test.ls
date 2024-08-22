@@ -1,7 +1,6 @@
-# COMMENT
+#!/usr/local/bin/lazyscript
 {-
-
-- --}
+-}
 {
   \~args -> ~go ~args;
   ~go = \[] -> ~prelude exit 0 |
