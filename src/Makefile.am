@@ -26,12 +26,16 @@ lazyscript_SOURCES = \
     closure.h \
     ealge.c \
     ealge.h \
+    env.c \
+    env.h \
     eref.c \
     eref.h \
     erref.c \
     erref.h \
     expr.c \
     expr.h \
+    eval.c \
+    eval.h \
     hash.c \
     hash.h \
     int.c \

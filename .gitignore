@@ -19,6 +19,8 @@ autom4te.cache/
 missing
 ylwrap
 
+lex.yy.c
+
 src/lazyscript
 src/lexer.c
 src/lexer.h

@@ -34,6 +34,20 @@ lsexpr_t *lsealge_get_arg(const lsealge_t *alge, int i) {
   return lsalge_get_arg(alge->alge, i);
 }
 
+static void lsexpr_print_callback(FILE *fp, int prec, int indent,
+                                  const void *expr) {
+  lsexpr_print(fp, prec, indent, expr);
+}
+
 void lsealge_print(FILE *fp, int prec, int indent, const lsealge_t *alge) {
-  lsalge_print(fp, prec, indent, alge->alge, (lsalge_print_t)lsexpr_print);
+  lsalge_print(fp, prec, indent, alge->alge, lsexpr_print_callback);
+}
+
+static int lsexpr_prepare_callback(void *expr, lsenv_t *env, lserref_t *erref) {
+  (void)erref;
+  return lsexpr_prepare(expr, env);
+}
+
+int lsealge_prepare(lsealge_t *alge, lsenv_t *env) {
+  return lsalge_prepare(alge->alge, env, NULL, lsexpr_prepare_callback);
 }

@@ -46,3 +46,18 @@ unsigned int lsbind_get_count(const lsbind_t *bind) {
   assert(bind != NULL);
   return lsarray_get_size(bind->ents);
 }
+
+lsbind_ent_t *lsbind_get_ent(const lsbind_t *bind, unsigned int i) {
+  assert(bind != NULL);
+  return lsarray_get(bind->ents, i);
+}
+
+lspat_t *lsbind_ent_get_pat(const lsbind_ent_t *ent) {
+  assert(ent != NULL);
+  return ent->pat;
+}
+
+lsexpr_t *lsbind_ent_get_expr(const lsbind_ent_t *ent) {
+  assert(ent != NULL);
+  return ent->expr;
+}

@@ -5,16 +5,21 @@
 struct lserref {
   lserrtype_t type;
   union {
-    lserrbind_t *bind;
-    lserrlambda_t *lambda;
+    lsbind_ent_t *bind_ent;
+    lslambda_ent_t *lambda_ent;
   };
 };
 
-struct lserrbind {
-  lsbind_t *bind;
-};
+lserref_t *lserref_bind_ent(lsbind_ent_t *ent) {
+  lserref_t *const erref = malloc(sizeof(lserref_t));
+  erref->type = LSERRTYPE_BINDING;
+  erref->bind_ent = ent;
+  return erref;
+}
 
-struct lserrlambda {
-  lslambda_t *lambda;
-};
-
+lserref_t *lserref_lambda_ent(lslambda_ent_t *ent) {
+  lserref_t *const erref = malloc(sizeof(lserref_t));
+  erref->type = LSERRTYPE_LAMBDA;
+  erref->lambda_ent = ent;
+  return erref;
+}

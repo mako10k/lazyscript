@@ -25,7 +25,7 @@ lshash_t *lshash(unsigned int capacity);
  * @param hash Hash table.
  * @param key Key.
  * @param value Pointer to the variable to store the value.
- * @return Number of entries.
+ * @return not found: 0, found: non-zero.
  */
 int lshash_get(lshash_t *hash, const lsstr_t *key, void **value);
 

@@ -15,3 +15,7 @@ void lsprog_print(FILE *fp, int prec, int indent, const lsprog_t *prog) {
   lsexpr_print(fp, prec, indent, prog->expr);
   lsprintf(fp, 0, ";\n");
 }
+
+int lsprog_prepare(lsprog_t *prog, lsenv_t *env) {
+  return lsexpr_prepare(prog->expr, env);
+}

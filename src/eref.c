@@ -39,3 +39,14 @@ void lseref_print(FILE *fp, int prec, int indent, const lseref_t *eref) {
   lsprintf(fp, indent, "~");
   lsstr_print_bare(fp, prec, indent, eref->name);
 }
+
+int lseref_prepare(lseref_t *eref, lsenv_t *env) {
+  assert(eref != NULL);
+  assert(env != NULL);
+  if (lsenv_get(env, eref->name) != NULL)
+    return 0;
+  lsprintf(stderr, 0, "error: undefined reference: ");
+  lseref_print(stderr, 0, 0, eref);
+  lsprintf(stderr, 0, "\n");
+  return -1;
+}

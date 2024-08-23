@@ -101,3 +101,15 @@ void lsalge_print(FILE *fp, int prec, int indent, const lsalge_t *alge,
   if (prec > LSPREC_APPL)
     lsprintf(fp, indent, ")");
 }
+
+int lsalge_prepare(lsalge_t *alge, lsenv_t *env, lserref_t *erref, lsalge_prepare_t lsprepare) {
+  assert(alge != NULL);
+  assert(env != NULL);
+  if (alge->args == NULL)
+    return 0;
+  for (unsigned int i = 0; i < lsarray_get_size(alge->args); i++) {
+    if (lsprepare(lsarray_get(alge->args, i), env, erref) != 0)
+      return -1;
+  }
+  return 0;
+}

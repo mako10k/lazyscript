@@ -63,3 +63,16 @@ void lsappl_print(FILE *fp, int prec, int indent, const lsappl_t *appl) {
   if (prec > LSPREC_APPL)
     lsprintf(fp, indent, ")");
 }
+
+int lsappl_prepare(lsappl_t *appl, lsenv_t *env) {
+  assert(appl != NULL);
+  assert(env != NULL);
+  if (appl->args == NULL)
+    return 0;
+  for (unsigned int i = 0; i < lsarray_get_size(appl->args); i++) {
+    lsexpr_t *arg = lsarray_get(appl->args, i);
+    if (lsexpr_prepare(arg, env) != 0)
+      return -1;
+  }
+  return 0;
+}

@@ -31,3 +31,23 @@ void lsclosure_print(FILE *fp, int prec, int indent, lsclosure_t *closure) {
   } else
     lsprintf(fp, indent, " }");
 }
+
+int lsclosure_prepare(lsclosure_t *closure, lsenv_t *env) {
+  unsigned int bcount = lsbind_get_count(closure->bind);
+  env = lsenv(env);
+  for (unsigned int i = 0; i < bcount; i++) {
+    lsbind_ent_t *bent = lsbind_get_ent(closure->bind, i);
+    lspat_t *pat = lsbind_ent_get_pat(bent);
+    int ret = lspat_prepare(pat, env, lserref_bind_ent(bent));
+    if (ret < 0)
+      return ret;
+  }
+  for (unsigned int i = 0; i < bcount; i++) {
+    lsbind_ent_t *bent = lsbind_get_ent(closure->bind, i);
+    lsexpr_t *expr = lsbind_ent_get_expr(bent);
+    int ret = lsexpr_prepare(expr, env);
+    if (ret < 0)
+      return ret;
+  }
+  return lsexpr_prepare(closure->expr, env);
+}

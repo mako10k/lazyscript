@@ -7,6 +7,7 @@ typedef struct lsexpr lsexpr_t;
 #include "appl.h"
 #include "closure.h"
 #include "ealge.h"
+#include "env.h"
 #include "eref.h"
 #include "int.h"
 #include "lambda.h"
@@ -38,5 +39,5 @@ const lsint_t *lsexpr_get_int(const lsexpr_t *expr);
 const lsstr_t *lsexpr_get_str(const lsexpr_t *expr);
 lslambda_t *lsexpr_get_lambda(const lsexpr_t *expr);
 lsclosure_t *lsexpr_get_closure(const lsexpr_t *expr);
-
 void lsexpr_print(FILE *fp, int prec, int indent, const lsexpr_t *expr);
+int lsexpr_prepare(lsexpr_t *expr, lsenv_t *env);

@@ -8,5 +8,6 @@ typedef struct lsas lsas_t;
 #include "pref.h"
 #include "str.h"
 
-lsas_t *lsas(lspref_t *pref, const lspat_t *pat);
-void lsas_print(FILE *fp, int prec, int indent, const lsas_t *as);
+lsas_t *lsas(lspref_t *pref, lspat_t *pat);
+void lsas_print(FILE *fp, int prec, int indent, lsas_t *as);
+int lsas_prepare(lsas_t *as, lsenv_t *env, lserref_t *erref);

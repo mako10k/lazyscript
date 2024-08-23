@@ -19,3 +19,14 @@ void lspref_print(FILE *fp, int prec, int indent, const lspref_t *ref) {
   lsprintf(fp, indent, "~");
   lsstr_print_bare(fp, prec, indent, ref->name);
 }
+
+int lspref_prepare(lspref_t *ref, lsenv_t *env, lserref_t *erref) {
+  if (lsenv_get_self(env, ref->name) != NULL) {
+    lsprintf(stderr, 0, "error: reference already defined: ");
+    lspref_print(stderr, 0, 0, ref);
+    lsprintf(stderr, 0, "\n");
+    return -1;
+  }
+  lsenv_put(env, ref->name, erref);
+  return 1;
+}

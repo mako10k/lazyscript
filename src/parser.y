@@ -15,6 +15,7 @@
 #include "palge.h"
 #include "bind.h"
 #include "closure.h"
+#include "lambda.h"
 typedef void *yyscan_t;
 lsscan_t *yyget_extra(yyscan_t yyscanner);
 }

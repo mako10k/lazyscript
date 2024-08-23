@@ -1,0 +1,63 @@
+{
+    "name": "Codespace for lazyscript",
+    "build": {
+        "dockerfile": "./Dockerfile",
+        "context": "."
+    },
+    "workspaceFolder": "/workspaces/lazyscript",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "username": "vscode"
+        },
+        "ghcr.io/devcontainers/features/sshd:1": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/git:1": {
+            "version": "latest",
+            "ppa": "false"
+        },
+        "ghcr.io/devcontainers/features/git-lfs:1": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/github-cli:1": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest"
+        }
+    },
+    "overrideFeatureInstallOrder": [
+        "ghcr.io/devcontainers/features/common-utils",
+        "ghcr.io/devcontainers/features/git",
+        "ghcr.io/devcontainers/features/sshd",
+        "ghcr.io/devcontainers/features/git-lfs",
+        "ghcr.io/devcontainers/features/github-cli",
+        "ghcr.io/devcontainers/features/docker-in-docker",
+        "./local-features/setup-user"
+    ],
+    "remoteUser": "vscode",
+    "containerUser": "vscode",
+    // Configure tool-specific properties.
+    "customizations": {
+        // Configure properties specific to VS Code.
+        "vscode": {
+            // Set *default* container specific settings.json values on container create.
+            "settings": {},
+            // Add the IDs of extensions you want installed when the container is created.
+            "extensions": [
+                "GitHub.vscode-pull-request-github",
+                "ms-azuretools.vscode-docker",
+                "GitHub.copilot",
+                "GitHub.codespaces",
+                "GitHub.remotehub",
+                "ms-vscode-remote.remote-containers",
+                "ms-vscode-remote.remote-ssh",
+                "ms-vscode-remote.remote-ssh-edit",
+                "ms-vscode.remote-server",
+                "ms-vscode-remote.vscode-remote-extensionpack",
+                "ms-vscode.remote-repositories",
+                "llvm-vs-code-extensions.vscode-clangd"
+            ]
+        }
+    }
+}

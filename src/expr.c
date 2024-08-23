@@ -146,3 +146,22 @@ lsclosure_t *lsexpr_get_closure(const lsexpr_t *expr) {
   assert(expr->type == LSETYPE_CLOSURE);
   return expr->closure;
 }
+
+int lsexpr_prepare(lsexpr_t *const expr, lsenv_t *const env) {
+  assert(expr != NULL);
+  assert(env != NULL);
+  switch (expr->type) {
+  case LSETYPE_ALGE:
+    return lsealge_prepare(expr->ealge, env);
+  case LSETYPE_APPL:
+    return lsappl_prepare(expr->appl, env);
+  case LSETYPE_REF:
+    return lseref_prepare(expr->eref, env);
+  case LSETYPE_LAMBDA:
+    return lslambda_prepare(expr->lambda, env);
+  case LSETYPE_CLOSURE:
+    return lsclosure_prepare(expr->closure, env);
+  default:
+    return 0;
+  }
+}

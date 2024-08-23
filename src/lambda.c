@@ -8,8 +8,8 @@ struct lslambda {
 };
 
 struct lslambda_ent {
-  const lspat_t *pat;
-  const lsexpr_t *expr;
+  lspat_t *pat;
+  lsexpr_t *expr;
 };
 
 lslambda_t *lslambda(void) {
@@ -23,7 +23,7 @@ lslambda_t *lslambda_push(lslambda_t *lambda, lslambda_ent_t *ent) {
   return lambda;
 }
 
-lslambda_ent_t *lslambda_ent(const lspat_t *pat, const lsexpr_t *expr) {
+lslambda_ent_t *lslambda_ent(lspat_t *pat, lsexpr_t *expr) {
   lslambda_ent_t *ent = malloc(sizeof(lslambda_ent_t));
   ent->pat = pat;
   ent->expr = expr;
@@ -53,4 +53,18 @@ void lslambda_ent_print(FILE *fp, int prec, int indent,
 unsigned int lslambda_get_count(const lslambda_t *lambda) {
   assert(lambda != NULL);
   return lsarray_get_size(lambda->ents);
+}
+
+int lslambda_prepare(lslambda_t *lambda, lsenv_t *env) {
+  unsigned int size = lsarray_get_size(lambda->ents);
+  for (size_t i = 0; i < size; i++)
+    if (lslambda_ent_prepare(lsarray_get(lambda->ents, i), env) != 0)
+      return -1;
+  return 0;
+}
+
+int lslambda_ent_prepare(lslambda_ent_t *ent, lsenv_t *env) {
+  env = lsenv(env);
+  lserref_t *erref = lserref_lambda_ent(ent);
+  return lspat_prepare(ent->pat, env, erref) || lsexpr_prepare(ent->expr, env);
 }

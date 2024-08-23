@@ -59,6 +59,11 @@ int main(int argc, char **argv) {
       char name[32];
       snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
       lsprog_t *prog = lsparse_string(name, optarg);
+      lsenv_t *env = lsenv(NULL);
+      int res = lsprog_prepare(prog, env);
+      if (res != 0) {
+        exit(1);
+      }
       if (prog != NULL)
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
       break;
@@ -90,6 +95,11 @@ int main(int argc, char **argv) {
     if (strcmp(filename, "-") == 0)
       filename = "/dev/stdin";
     lsprog_t *prog = lsparse_file(argv[i]);
+    lsenv_t *env = lsenv(NULL);
+    int res = lsprog_prepare(prog, env);
+    if (res != 0) {
+      exit(1);
+    }
     if (prog != NULL)
       lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
   }

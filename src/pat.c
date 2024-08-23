@@ -7,7 +7,7 @@ struct lspat {
     lsas_t *as;
     const lsint_t *intval;
     const lsstr_t *strval;
-    const lspref_t *pref;
+    lspref_t *pref;
   };
 };
 
@@ -59,9 +59,25 @@ void lspat_print(FILE *fp, int prec, int indent, const lspat_t *pat) {
   }
 }
 
-lspat_t *lspat_ref(const lspref_t *pref) {
+lspat_t *lspat_ref(lspref_t *pref) {
   lspat_t *pat = malloc(sizeof(lspat_t));
   pat->type = LSPTYPE_REF;
   pat->pref = pref;
   return pat;
+}
+
+int lspat_prepare(lspat_t *pat, lsenv_t *env, lserref_t *erref) {
+  switch (pat->type) {
+  case LSPTYPE_ALGE:
+    return lspalge_prepare(pat->alge, env, erref);
+  case LSPTYPE_AS:
+    return lsas_prepare(pat->as, env, erref);
+  case LSPTYPE_INT:
+    return 1;
+  case LSPTYPE_STR:
+    return 1;
+  case LSPTYPE_REF:
+    return lspref_prepare(pat->pref, env, erref);
+  }
+  return 0;
 }

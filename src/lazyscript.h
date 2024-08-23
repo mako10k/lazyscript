@@ -8,6 +8,13 @@ typedef struct lsscan {
   const char *filename;
   lsprog_t *prog;
 } lsscan_t;
+typedef struct lsloc {
+  const char *filename;
+  int first_line;
+  int first_column;
+  int last_line;
+  int last_column;
+} lsloc_t;
 
 #include "parser.h"
 
