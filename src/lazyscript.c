@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
       lsprog_t *prog = lsparse_string(name, optarg);
       lsenv_t *env = lsenv(NULL);
       int res = lsprog_prepare(prog, env);
-      if (res != 0) {
+      if (res < 0) {
         exit(1);
       }
       if (prog != NULL)
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
     lsprog_t *prog = lsparse_file(argv[i]);
     lsenv_t *env = lsenv(NULL);
     int res = lsprog_prepare(prog, env);
-    if (res != 0) {
+    if (res < 0) {
       exit(1);
     }
     if (prog != NULL)

@@ -71,8 +71,9 @@ int lsappl_prepare(lsappl_t *appl, lsenv_t *env) {
     return 0;
   for (unsigned int i = 0; i < lsarray_get_size(appl->args); i++) {
     lsexpr_t *arg = lsarray_get(appl->args, i);
-    if (lsexpr_prepare(arg, env) != 0)
-      return -1;
+    int res = lsexpr_prepare(arg, env);
+    if (res < 0)
+      return res;
   }
   return 0;
 }

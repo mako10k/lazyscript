@@ -28,5 +28,5 @@ int lspref_prepare(lspref_t *ref, lsenv_t *env, lserref_t *erref) {
     return -1;
   }
   lsenv_put(env, ref->name, erref);
-  return 1;
+  return 0;
 }

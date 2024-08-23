@@ -57,14 +57,19 @@ unsigned int lslambda_get_count(const lslambda_t *lambda) {
 
 int lslambda_prepare(lslambda_t *lambda, lsenv_t *env) {
   unsigned int size = lsarray_get_size(lambda->ents);
-  for (size_t i = 0; i < size; i++)
-    if (lslambda_ent_prepare(lsarray_get(lambda->ents, i), env) != 0)
-      return -1;
+  for (size_t i = 0; i < size; i++) {
+    int res = lslambda_ent_prepare(lsarray_get(lambda->ents, i), env);
+    if (res < 0)
+      return res;
+  }
   return 0;
 }
 
 int lslambda_ent_prepare(lslambda_ent_t *ent, lsenv_t *env) {
   env = lsenv(env);
   lserref_t *erref = lserref_lambda_ent(ent);
-  return lspat_prepare(ent->pat, env, erref) || lsexpr_prepare(ent->expr, env);
+  int res = lspat_prepare(ent->pat, env, erref);
+  if (res < 0)
+    return res;
+  return lsexpr_prepare(ent->expr, env);
 }

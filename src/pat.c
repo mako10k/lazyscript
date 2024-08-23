@@ -73,9 +73,9 @@ int lspat_prepare(lspat_t *pat, lsenv_t *env, lserref_t *erref) {
   case LSPTYPE_AS:
     return lsas_prepare(pat->as, env, erref);
   case LSPTYPE_INT:
-    return 1;
+    return 0;
   case LSPTYPE_STR:
-    return 1;
+    return 0;
   case LSPTYPE_REF:
     return lspref_prepare(pat->pref, env, erref);
   }
