@@ -21,6 +21,8 @@ ylwrap
 
 lex.yy.c
 
+src/.deps/
+
 src/lazyscript
 src/lexer.c
 src/lexer.h
@@ -29,5 +31,4 @@ src/parser.h
 
 *~
 *.o
-*.Po
 null.d
