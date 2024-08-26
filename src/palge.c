@@ -46,7 +46,7 @@ void lspalge_print(FILE *fp, int prec, int indent, const lspalge_t *alge) {
   lsalge_print(fp, prec, indent, alge->alge, (lsalge_print_t)lspat_print);
 }
 
-int lspalge_prepare(lspalge_t *alge, lsenv_t *env, lserref_wrapper_t *erref) {
+int lspalge_prepare(lspalge_t *alge, lseenv_t *env, lserref_wrapper_t *erref) {
   assert(alge != NULL);
   return lsalge_prepare(alge->alge, env, erref,
                         (lsalge_prepare_t)lspat_prepare);

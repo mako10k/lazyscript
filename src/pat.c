@@ -4,7 +4,7 @@ struct lspat {
   lsptype_t type;
   union {
     lspalge_t *alge;
-    lsas_t *as;
+    lspas_t *as;
     const lsint_t *intval;
     const lsstr_t *strval;
     lspref_t *pref;
@@ -18,7 +18,7 @@ lspat_t *lspat_alge(lspalge_t *alge) {
   return pat;
 }
 
-lspat_t *lspat_as(lsas_t *as) {
+lspat_t *lspat_as(lspas_t *as) {
   lspat_t *pat = malloc(sizeof(lspat_t));
   pat->type = LSPTYPE_AS;
   pat->as = as;
@@ -45,7 +45,7 @@ void lspat_print(FILE *fp, int prec, int indent, const lspat_t *pat) {
     lspalge_print(fp, prec, indent, pat->alge);
     break;
   case LSPTYPE_AS:
-    lsas_print(fp, prec, indent, pat->as);
+    lspas_print(fp, prec, indent, pat->as);
     break;
   case LSPTYPE_INT:
     lsint_print(fp, prec, indent, pat->intval);
@@ -66,12 +66,12 @@ lspat_t *lspat_ref(lspref_t *pref) {
   return pat;
 }
 
-int lspat_prepare(lspat_t *pat, lsenv_t *env, lserref_wrapper_t *erref) {
+int lspat_prepare(lspat_t *pat, lseenv_t *env, lserref_wrapper_t *erref) {
   switch (pat->type) {
   case LSPTYPE_ALGE:
     return lspalge_prepare(pat->alge, env, erref);
   case LSPTYPE_AS:
-    return lsas_prepare(pat->as, env, erref);
+    return lspas_prepare(pat->as, env, erref);
   case LSPTYPE_INT:
     return 0;
   case LSPTYPE_STR:

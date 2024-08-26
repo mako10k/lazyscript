@@ -103,7 +103,7 @@ void lsalge_print(FILE *fp, int prec, int indent, const lsalge_t *alge,
     lsprintf(fp, indent, ")");
 }
 
-int lsalge_prepare(lsalge_t *alge, lsenv_t *env, lserref_wrapper_t *erref,
+int lsalge_prepare(lsalge_t *alge, lseenv_t *env, lserref_wrapper_t *erref,
                    lsalge_prepare_t lsprepare) {
   assert(alge != NULL);
   assert(env != NULL);

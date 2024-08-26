@@ -1,16 +1,20 @@
 #include "expr.h"
 #include "io.h"
 #include "lazyscript.h"
+#include "talge.h"
+#include "tappl.h"
+#include "thunk.h"
+#include "tref.h"
 #include <assert.h>
 
 struct lsexpr {
   lsetype_t type;
   union {
     lsealge_t *ealge;
-    lsappl_t *appl;
+    lseappl_t *appl;
     lseref_t *eref;
-    lslambda_t *lambda;
-    lsclosure_t *closure;
+    lselambda_t *lambda;
+    lseclosure_t *closure;
     const lsint_t *intval;
     const lsstr_t *strval;
   };
@@ -23,7 +27,7 @@ lsexpr_t *lsexpr_alge(lsealge_t *ealge) {
   return expr;
 }
 
-lsexpr_t *lsexpr_appl(lsappl_t *eappl) {
+lsexpr_t *lsexpr_appl(lseappl_t *eappl) {
   lsexpr_t *expr = malloc(sizeof(lsexpr_t));
   expr->type = LSETYPE_APPL;
   expr->appl = eappl;
@@ -51,7 +55,7 @@ lsexpr_t *lsexpr_str(const lsstr_t *strval) {
   return expr;
 }
 
-lsexpr_t *lsexpr_lambda(lslambda_t *lambda) {
+lsexpr_t *lsexpr_lambda(lselambda_t *lambda) {
   lsexpr_t *expr = malloc(sizeof(lsexpr_t));
   expr->type = LSETYPE_LAMBDA;
   expr->lambda = lambda;
@@ -72,7 +76,7 @@ void lsexpr_print(FILE *fp, int prec, int indent, const lsexpr_t *expr) {
     lsealge_print(fp, prec, indent, expr->ealge);
     break;
   case LSETYPE_APPL:
-    lsappl_print(fp, prec, indent, expr->appl);
+    lseappl_print(fp, prec, indent, expr->appl);
     break;
   case LSETYPE_REF:
     lseref_print(fp, prec, indent, expr->eref);
@@ -84,17 +88,17 @@ void lsexpr_print(FILE *fp, int prec, int indent, const lsexpr_t *expr) {
     lsstr_print(fp, prec, indent, expr->strval);
     break;
   case LSETYPE_LAMBDA:
-    lslambda_print(fp, prec, indent, expr->lambda);
+    lselambda_print(fp, prec, indent, expr->lambda);
     break;
   case LSETYPE_CLOSURE:
-    lsclosure_print(fp, prec, indent, expr->closure);
+    lseclosure_print(fp, prec, indent, expr->closure);
     break;
   default:
     lsprintf(fp, indent, "Unknown expression type\n");
   }
 }
 
-lsexpr_t *lsexpr_closure(lsclosure_t *closure) {
+lsexpr_t *lsexpr_closure(lseclosure_t *closure) {
   lsexpr_t *expr = malloc(sizeof(lsexpr_t));
   expr->type = LSETYPE_CLOSURE;
   expr->closure = closure;
@@ -112,7 +116,7 @@ lsealge_t *lsexpr_get_alge(const lsexpr_t *expr) {
   return expr->ealge;
 }
 
-lsappl_t *lsexpr_get_appl(const lsexpr_t *expr) {
+lseappl_t *lsexpr_get_appl(const lsexpr_t *expr) {
   assert(expr != NULL);
   assert(expr->type == LSETYPE_APPL);
   return expr->appl;
@@ -136,33 +140,70 @@ const lsstr_t *lsexpr_get_str(const lsexpr_t *expr) {
   return expr->strval;
 }
 
-lslambda_t *lsexpr_get_lambda(const lsexpr_t *expr) {
+lselambda_t *lsexpr_get_lambda(const lsexpr_t *expr) {
   assert(expr != NULL);
   assert(expr->type == LSETYPE_LAMBDA);
   return expr->lambda;
 }
 
-lsclosure_t *lsexpr_get_closure(const lsexpr_t *expr) {
+lseclosure_t *lsexpr_get_closure(const lsexpr_t *expr) {
   assert(expr != NULL);
   assert(expr->type == LSETYPE_CLOSURE);
   return expr->closure;
 }
 
-int lsexpr_prepare(lsexpr_t *const expr, lsenv_t *const env) {
+int lsexpr_prepare(lsexpr_t *const expr, lseenv_t *const env) {
   assert(expr != NULL);
   assert(env != NULL);
   switch (expr->type) {
   case LSETYPE_ALGE:
     return lsealge_prepare(expr->ealge, env);
   case LSETYPE_APPL:
-    return lsappl_prepare(expr->appl, env);
+    return lseappl_prepare(expr->appl, env);
   case LSETYPE_REF:
     return lseref_prepare(expr->eref, env);
   case LSETYPE_LAMBDA:
-    return lslambda_prepare(expr->lambda, env);
+    return lselambda_prepare(expr->lambda, env);
   case LSETYPE_CLOSURE:
-    return lsclosure_prepare(expr->closure, env);
+    return lseclosure_prepare(expr->closure, env);
   default:
     return 0;
   }
+}
+
+int lsexpr_is_whnf(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  switch (expr->type) {
+  case LSETYPE_ALGE:
+  case LSETYPE_INT:
+  case LSETYPE_STR:
+  case LSETYPE_LAMBDA:
+  case LSETYPE_CLOSURE:
+    return 1;
+  case LSETYPE_APPL:
+  case LSETYPE_REF:
+  default:
+    return 0;
+  }
+}
+
+lsthunk_t *lsexpr_thunk(lstenv_t *tenv, const lsexpr_t *expr) {
+  assert(expr != NULL);
+  switch (expr->type) {
+  case LSETYPE_ALGE:
+    return lsthunk_alge(lstalge(tenv, expr->ealge));
+  case LSETYPE_APPL:
+    return lsthunk_appl(lstappl(tenv, expr->appl));
+  case LSETYPE_REF:
+    return lsthunk_ref(lstref(tenv, expr->eref));
+  case LSETYPE_LAMBDA:
+    return lsthunk_lambda(lstlambda(tenv, expr->lambda));
+  case LSETYPE_CLOSURE:
+    return lsthunk_closure(lstclosure(tenv, expr->closure));
+  case LSETYPE_INT:
+    return lsthunk_int(expr->intval);
+  case LSETYPE_STR:
+    return lsthunk_str(expr->strval);
+  }
+  assert(0);
 }

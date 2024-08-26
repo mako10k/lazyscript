@@ -1,4 +1,4 @@
-#include "env.h"
+#include "eenv.h"
 #include <string.h>
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
       char name[32];
       snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
       lsprog_t *prog = lsparse_string(name, optarg);
-      lsenv_t *env = lsenv(NULL);
+      lseenv_t *env = lseenv(NULL);
       int res = lsprog_prepare(prog, env);
       if (res < 0) {
         exit(1);
@@ -98,9 +98,9 @@ int main(int argc, char **argv) {
     if (strcmp(filename, "-") == 0)
       filename = "/dev/stdin";
     lsprog_t *prog = lsparse_file(argv[i]);
-    lsenv_t *env = lsenv(NULL);
+    lseenv_t *env = lseenv(NULL);
     int res = lsprog_prepare(prog, env);
-    if (res < 0 || lsenv_get_nerrors(env) > 0 || lsenv_get_nfatals(env) > 0) {
+    if (res < 0 || lseenv_get_nerrors(env) > 0 || lseenv_get_nfatals(env) > 0) {
       exit(1);
     }
     if (prog != NULL)

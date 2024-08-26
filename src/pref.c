@@ -35,11 +35,11 @@ void lspref_print(FILE *fp, int prec, int indent, const lspref_t *ref) {
   lsstr_print_bare(fp, prec, indent, ref->name);
 }
 
-int lspref_prepare(lspref_t *ref, lsenv_t *env, lserref_wrapper_t *erref) {
+int lspref_prepare(lspref_t *ref, lseenv_t *env, lserref_wrapper_t *erref) {
   assert(ref != NULL);
   assert(env != NULL);
   assert(erref != NULL);
-  lserref_t *erref_found = lsenv_get_self(env, ref->name);
+  lserref_t *erref_found = lseenv_get_self(env, ref->name);
   if (erref_found != NULL) {
     lspref_t *pref_found = lserref_get_pref(erref_found);
     lsprintf(stderr, 0, "E: ");
@@ -51,10 +51,10 @@ int lspref_prepare(lspref_t *ref, lsenv_t *env, lserref_wrapper_t *erref) {
     lsprintf(stderr, 0, "former reference: ");
     lspref_print(stderr, 0, 0, pref_found);
     lsprintf(stderr, 0, ")\n");
-    lsenv_incr_nerrors(env);
+    lseenv_incr_nerrors(env);
     return 0;
   }
-  erref_found = lsenv_get(env, ref->name);
+  erref_found = lseenv_get(env, ref->name);
   if (erref_found != NULL) {
     lspref_t *pref_found = lserref_get_pref(erref_found);
     lsprintf(stderr, 0, "W: ");
@@ -66,9 +66,9 @@ int lspref_prepare(lspref_t *ref, lsenv_t *env, lserref_wrapper_t *erref) {
     lsprintf(stderr, 0, "former reference: ");
     lspref_print(stderr, 0, 0, pref_found);
     lsprintf(stderr, 0, ")\n");
-    lsenv_incr_nwarnings(env);
+    lseenv_incr_nwarnings(env);
     return 0;
   }
-  lsenv_put(env, ref->name, lserref(erref, ref));
+  lseenv_put(env, ref->name, lserref(erref, ref));
   return 0;
 }

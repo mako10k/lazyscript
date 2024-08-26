@@ -1,20 +1,20 @@
-#include "as.h"
+#include "pas.h"
 #include "io.h"
 #include "lazyscript.h"
 
-struct lsas {
+struct lspas {
   lspref_t *pref;
   lspat_t *pat;
 };
 
-lsas_t *lsas(lspref_t *pref, lspat_t *pat) {
-  lsas_t *as = malloc(sizeof(lsas_t));
+lspas_t *lspas(lspref_t *pref, lspat_t *pat) {
+  lspas_t *as = malloc(sizeof(lspas_t));
   as->pref = pref;
   as->pat = pat;
   return as;
 }
 
-void lsas_print(FILE *fp, int prec, int indent, lsas_t *as) {
+void lspas_print(FILE *fp, int prec, int indent, lspas_t *as) {
   if (prec > LSPREC_APPL)
     lsprintf(fp, indent, "(");
   lspref_print(fp, prec, indent, as->pref);
@@ -24,7 +24,7 @@ void lsas_print(FILE *fp, int prec, int indent, lsas_t *as) {
     lsprintf(fp, indent, ")");
 }
 
-int lsas_prepare(lsas_t *as, lsenv_t *env, lserref_wrapper_t *erref) {
+int lspas_prepare(lspas_t *as, lseenv_t *env, lserref_wrapper_t *erref) {
   int res = lspat_prepare(as->pat, env, erref);
   if (res < 0)
     return res;

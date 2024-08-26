@@ -1,49 +1,49 @@
-#include "lambda.h"
+#include "elambda.h"
 #include "array.h"
 #include "io.h"
 #include "lazyscript.h"
 #include <assert.h>
 
-struct lslambda {
+struct lselambda {
   lsarray_t *ents;
 };
 
-struct lslambda_ent {
+struct lselambda_ent {
   lspat_t *pat;
   lsexpr_t *expr;
 };
 
-lslambda_t *lslambda(void) {
-  lslambda_t *lambda = malloc(sizeof(lslambda_t));
+lselambda_t *lselambda(void) {
+  lselambda_t *lambda = malloc(sizeof(lselambda_t));
   lambda->ents = lsarray();
   return lambda;
 }
 
-lslambda_t *lslambda_push(lslambda_t *lambda, lslambda_ent_t *ent) {
+lselambda_t *lselambda_push(lselambda_t *lambda, lselambda_ent_t *ent) {
   lsarray_push(lambda->ents, ent);
   return lambda;
 }
 
-lslambda_ent_t *lslambda_ent(lspat_t *pat, lsexpr_t *expr) {
-  lslambda_ent_t *ent = malloc(sizeof(lslambda_ent_t));
+lselambda_ent_t *lselambda_ent(lspat_t *pat, lsexpr_t *expr) {
+  lselambda_ent_t *ent = malloc(sizeof(lselambda_ent_t));
   ent->pat = pat;
   ent->expr = expr;
   return ent;
 }
 
-void lslambda_print(FILE *fp, int prec, int indent, const lslambda_t *lambda) {
+void lselambda_print(FILE *fp, int prec, int indent, const lselambda_t *lambda) {
   (void)prec;
   unsigned int size = lsarray_get_size(lambda->ents);
   for (size_t i = 0; i < size; i++) {
     if (i > 0)
       lsprintf(fp, indent, " |\n");
-    lslambda_ent_print(fp, LSPREC_LAMBDA + 1, indent,
+    lselambda_ent_print(fp, LSPREC_LAMBDA + 1, indent,
                        lsarray_get(lambda->ents, i));
   }
 }
 
-void lslambda_ent_print(FILE *fp, int prec, int indent,
-                        const lslambda_ent_t *ent) {
+void lselambda_ent_print(FILE *fp, int prec, int indent,
+                        const lselambda_ent_t *ent) {
   (void)prec;
   lsprintf(fp, indent, "\\");
   lspat_print(fp, LSPREC_APPL + 1, indent, ent->pat);
@@ -51,23 +51,23 @@ void lslambda_ent_print(FILE *fp, int prec, int indent,
   lsexpr_print(fp, LSPREC_LAMBDA + 1, indent, ent->expr);
 }
 
-unsigned int lslambda_get_count(const lslambda_t *lambda) {
+unsigned int lselambda_get_count(const lselambda_t *lambda) {
   assert(lambda != NULL);
   return lsarray_get_size(lambda->ents);
 }
 
-int lslambda_prepare(lslambda_t *lambda, lsenv_t *env) {
+int lselambda_prepare(lselambda_t *lambda, lseenv_t *env) {
   unsigned int size = lsarray_get_size(lambda->ents);
   for (size_t i = 0; i < size; i++) {
-    int res = lslambda_ent_prepare(lsarray_get(lambda->ents, i), env);
+    int res = lselambda_ent_prepare(lsarray_get(lambda->ents, i), env);
     if (res < 0)
       return res;
   }
   return 0;
 }
 
-int lslambda_ent_prepare(lslambda_ent_t *ent, lsenv_t *env) {
-  env = lsenv(env);
+int lselambda_ent_prepare(lselambda_ent_t *ent, lseenv_t *env) {
+  env = lseenv(env);
   lserref_wrapper_t *erref = lserref_wrapper_lambda_ent(ent);
   int res = lspat_prepare(ent->pat, env, erref);
   if (res < 0)

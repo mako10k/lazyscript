@@ -8,14 +8,14 @@ struct lsarray {
   unsigned int ka_size;
 };
 
-static void lsarray_resize(lsarray_t *array, unsigned int new_size) {
-  assert(array != NULL);
-  if (new_size != array->ka_size) {
-    array->ka_values = lsrealloc(array->ka_values, new_size * sizeof(void *));
-    for (unsigned int i = array->ka_size; i < new_size; i++)
-      array->ka_values[i] = NULL;
+static void lsarray_resize(lsarray_t *ary, unsigned int new_size) {
+  assert(ary != NULL);
+  if (new_size != ary->ka_size) {
+    ary->ka_values = lsrealloc(ary->ka_values, new_size * sizeof(void *));
+    for (unsigned int i = ary->ka_size; i < new_size; i++)
+      ary->ka_values[i] = NULL;
   }
-  array->ka_size = new_size;
+  ary->ka_size = new_size;
 }
 
 lsarray_t *lsarray() {
@@ -25,100 +25,100 @@ lsarray_t *lsarray() {
   return array;
 }
 
-void lsarray_free(lsarray_t *array) {
-  if (array == NULL)
+void lsarray_free(lsarray_t *ary) {
+  if (ary == NULL)
     return;
-  if (array->ka_values != NULL)
-    lsfree(array->ka_values);
-  lsfree(array);
+  if (ary->ka_values != NULL)
+    lsfree(ary->ka_values);
+  lsfree(ary);
 }
 
-void lsarray_set(lsarray_t *array, unsigned int index, void *value) {
-  assert(array != NULL);
-  if (index >= array->ka_size) {
-    unsigned int new_size = index + 1;
-    lsarray_resize(array, new_size);
-    array->ka_size = new_size;
+void lsarray_set(lsarray_t *ary, unsigned int i, void *val) {
+  assert(ary != NULL);
+  if (i >= ary->ka_size) {
+    unsigned int new_size = i + 1;
+    lsarray_resize(ary, new_size);
+    ary->ka_size = new_size;
   }
-  array->ka_values[index] = value;
+  ary->ka_values[i] = val;
 }
 
-void *lsarray_get(const lsarray_t *array, unsigned int index) {
-  if (array == NULL)
+void *lsarray_get(const lsarray_t *ary, unsigned int i) {
+  if (ary == NULL)
     return NULL;
-  if (index >= array->ka_size)
+  if (i >= ary->ka_size)
     return NULL;
-  return array->ka_values[index];
+  return ary->ka_values[i];
 }
 
-unsigned int lsarray_get_size(const lsarray_t *array) {
-  return array == NULL ? 0 : array->ka_size;
+unsigned int lsarray_get_size(const lsarray_t *ary) {
+  return ary == NULL ? 0 : ary->ka_size;
 }
 
-void lsarray_set_size(lsarray_t *array, unsigned int new_size) {
-  assert(array != NULL);
-  lsarray_resize(array, new_size);
-  array->ka_size = new_size;
+void lsarray_set_size(lsarray_t *ary, unsigned int new_size) {
+  assert(ary != NULL);
+  lsarray_resize(ary, new_size);
+  ary->ka_size = new_size;
 }
 
-void lsarray_push(lsarray_t *array, void *value) {
-  assert(array != NULL);
-  lsarray_set(array, array->ka_size, value);
+void lsarray_push(lsarray_t *ary, void *val) {
+  assert(ary != NULL);
+  lsarray_set(ary, ary->ka_size, val);
 }
 
-void *lsarray_pop(lsarray_t *array) {
-  assert(array != NULL);
-  if (array->ka_size == 0)
+void *lsarray_pop(lsarray_t *ary) {
+  assert(ary != NULL);
+  if (ary->ka_size == 0)
     return NULL;
-  void *value = lsarray_get(array, array->ka_size - 1);
-  lsarray_set_size(array, array->ka_size - 1);
+  void *value = lsarray_get(ary, ary->ka_size - 1);
+  lsarray_set_size(ary, ary->ka_size - 1);
   return value;
 }
 
-void lsarray_unshift(lsarray_t *array, void *value) {
-  assert(array != NULL);
-  if (array->ka_size == 0) {
-    lsarray_push(array, value);
+void lsarray_unshift(lsarray_t *ary, void *val) {
+  assert(ary != NULL);
+  if (ary->ka_size == 0) {
+    lsarray_push(ary, val);
     return;
   }
-  lsarray_set_size(array, array->ka_size + 1);
-  for (unsigned int i = array->ka_size - 1; i > 0; i--)
-    array->ka_values[i] = array->ka_values[i - 1];
-  array->ka_values[0] = value;
+  lsarray_set_size(ary, ary->ka_size + 1);
+  for (unsigned int i = ary->ka_size - 1; i > 0; i--)
+    ary->ka_values[i] = ary->ka_values[i - 1];
+  ary->ka_values[0] = val;
 }
 
-void *lsarray_shift(lsarray_t *array) {
-  assert(array != NULL);
-  if (array->ka_size == 0)
+void *lsarray_shift(lsarray_t *ary) {
+  assert(ary != NULL);
+  if (ary->ka_size == 0)
     return NULL;
-  void *value = lsarray_get(array, 0);
-  for (unsigned int i = 1; i < array->ka_size; i++)
-    array->ka_values[i - 1] = array->ka_values[i];
-  lsarray_set_size(array, array->ka_size - 1);
+  void *value = lsarray_get(ary, 0);
+  for (unsigned int i = 1; i < ary->ka_size; i++)
+    ary->ka_values[i - 1] = ary->ka_values[i];
+  lsarray_set_size(ary, ary->ka_size - 1);
   return value;
 }
 
-lsarray_t *lsarray_clone(const lsarray_t *array) {
-  if (array == NULL)
+lsarray_t *lsarray_clone(const lsarray_t *ary) {
+  if (ary == NULL)
     return NULL;
   lsarray_t *clone = lsmalloc(sizeof(lsarray_t));
-  clone->ka_values = lsmalloc(array->ka_size * sizeof(void *));
-  clone->ka_size = array->ka_size;
-  for (unsigned int i = 0; i < array->ka_size; i++)
-    clone->ka_values[i] = array->ka_values[i];
+  clone->ka_values = lsmalloc(ary->ka_size * sizeof(void *));
+  clone->ka_size = ary->ka_size;
+  for (unsigned int i = 0; i < ary->ka_size; i++)
+    clone->ka_values[i] = ary->ka_values[i];
   return clone;
 }
 
-lsarray_t *lsarray_concat(lsarray_t *array1, const lsarray_t *array2) {
-  if (array2 == NULL)
-    return array1;
-  if (array1 == NULL)
-    return lsarray_clone(array2);
-  array1->ka_values = lsrealloc(
-      array1->ka_values, (array1->ka_size + array2->ka_size) * sizeof(void *));
-  array1->ka_size += array2->ka_size;
-  for (unsigned int i = 0; i < array2->ka_size; i++)
-    array1->ka_values[array1->ka_size + i] = array2->ka_values[i];
-  array1->ka_size += array2->ka_size;
-  return array1;
+lsarray_t *lsarray_concat(lsarray_t *ary1, const lsarray_t *ary2) {
+  if (ary2 == NULL)
+    return ary1;
+  if (ary1 == NULL)
+    return lsarray_clone(ary2);
+  ary1->ka_values = lsrealloc(ary1->ka_values,
+                              (ary1->ka_size + ary2->ka_size) * sizeof(void *));
+  ary1->ka_size += ary2->ka_size;
+  for (unsigned int i = 0; i < ary2->ka_size; i++)
+    ary1->ka_values[ary1->ka_size + i] = ary2->ka_values[i];
+  ary1->ka_size += ary2->ka_size;
+  return ary1;
 }

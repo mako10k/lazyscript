@@ -14,36 +14,32 @@ lazyscript_LDADD = $(GC_LIBS)
 lazyscript_SOURCES = \
     alge.c \
     alge.h \
-    appl.c \
-    appl.h \
     array.c \
     array.h \
-    as.c \
-    as.h \
     bind.c \
     bind.h \
-    closure.c \
-    closure.h \
     ealge.c \
     ealge.h \
-    env.c \
-    env.h \
+    eappl.c \
+    eappl.h \
+    eclosure.c \
+    eclosure.h \
+    eenv.c \
+    eenv.h \
+    elambda.c \
+    elambda.h \
     eref.c \
     eref.h \
     erref.c \
     erref.h \
     expr.c \
     expr.h \
-    eval.c \
-    eval.h \
     hash.c \
     hash.h \
     int.c \
     int.h \
     io.c \
     io.h \
-    lambda.c \
-    lambda.h \
     lazyscript.c \
     lazyscript.h \
     lexer.l \
@@ -54,6 +50,8 @@ lazyscript_SOURCES = \
     palge.c \
     palge.h \
     parser.y \
+    pas.c \
+    pas.h \
     pat.c \
     pat.h \
     pref.c \
@@ -61,4 +59,20 @@ lazyscript_SOURCES = \
     prog.c \
     prog.h \
     str.c \
-    str.h
+    str.h \
+    talge.c \
+    talge.h \
+    tappl.c \
+    tappl.h \
+    tclosure.c \
+    tclosure.h \
+    tenv.c \
+    tenv.h \
+    thunk.c \
+    thunk.h \
+    tlambda.c \
+    tlambda.h \
+    tref.c \
+    tref.h \
+    trref.c \
+    trref.h

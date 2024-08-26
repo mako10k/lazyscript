@@ -7,7 +7,7 @@
 #include "prog.h"
 #include "expr.h"
 #include "ealge.h"
-#include "appl.h"
+#include "eappl.h"
 #include "int.h"
 #include "io.h"
 #include "str.h"
@@ -15,8 +15,8 @@
 #include "pat.h"
 #include "palge.h"
 #include "bind.h"
-#include "closure.h"
-#include "lambda.h"
+#include "eclosure.h"
+#include "elambda.h"
 #include "loc.h"
 typedef void *yyscan_t;
 lsscan_t *yyget_extra(yyscan_t yyscanner);
@@ -45,9 +45,9 @@ while (0)
     lsprog_t *prog;
     lsexpr_t *expr;
     lsealge_t *ealge;
-    lsappl_t *appl;
-    lslambda_t *lambda;
-    lslambda_ent_t *lambda_ent;
+    lseappl_t *eappl;
+    lselambda_t *elambda;
+    lselambda_ent_t *elambda_ent;
     const lsint_t *intval;
     const lsstr_t *strval;
     lsarray_t *array;
@@ -56,7 +56,7 @@ while (0)
     lspalge_t *palge;
     lsbind_t *bind;
     lsbind_ent_t *bind_ent;
-    lsclosure_t *closure;
+    lseclosure_t *eclosure;
 }
 
 %code {
@@ -81,17 +81,17 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 efact
-%nterm <lambda_ent> elambda_single
-%nterm <lambda> elambda elambda_list
+%nterm <elambda_ent> elambda_single
+%nterm <elambda> elambda elambda_list
 %nterm <array> earray parray
 %nterm <ealge> ealge elist econs etuple
-%nterm <appl> eappl
+%nterm <eappl> eappl
 %nterm <pat> pat pat1 pat2 pat3
 %nterm <pref> pref
 %nterm <palge> palge plist pcons ptuple
 %nterm <bind> bind bind_list
 %nterm <bind_ent> bind_single
-%nterm <closure> closure
+%nterm <eclosure> closure
 
 
 %token <intval> LSTINT
@@ -140,8 +140,8 @@ expr2:
     ;
 
 eappl:
-      efact expr4 { $$ = lsappl($1); lsappl_push_arg($$, $2); }
-    | eappl expr4 { $$ = $1; lsappl_push_arg($$, $2); }
+      efact expr4 { $$ = lseappl($1); lseappl_push_arg($$, $2); }
+    | eappl expr4 { $$ = $1; lseappl_push_arg($$, $2); }
     ;
 
 expr3:
@@ -171,7 +171,7 @@ efact:
     ;
 
 closure:
-      '{' expr bind '}' { $$ = lsclosure($2, $3); }
+      '{' expr bind '}' { $$ = lseclosure($2, $3); }
     ;
 
 
@@ -195,12 +195,12 @@ elambda:
     ;
 
 elambda_list:
-      elambda_single { $$ = lslambda(); lslambda_push($$, $1); }
-    | elambda_list '|' elambda_single { $$ = $1; lslambda_push($1, $3); }
+      elambda_single { $$ = lselambda(); lselambda_push($$, $1); }
+    | elambda_list '|' elambda_single { $$ = $1; lselambda_push($1, $3); }
     ;
 
 elambda_single:
-      '\\' pat LSTARROW expr { $$ = lslambda_ent($2, $4); }
+      '\\' pat LSTARROW expr { $$ = lselambda_ent($2, $4); }
     ;
 
 pat:
@@ -232,7 +232,7 @@ pat3:
     | LSTINT { $$ = lspat_int($1); }
     | LSTSTR { $$ = lspat_str($1); }
     | pref { $$ = lspat_ref($1); }
-    | pref '@' pat3 { $$ = lspat_as(lsas($1, $3)); }
+    | pref '@' pat3 { $$ = lspat_as(lspas($1, $3)); }
     ;
 
 pref:
