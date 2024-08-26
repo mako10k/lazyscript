@@ -1,5 +1,6 @@
 #include "closure.h"
 #include "expr.h"
+#include "io.h"
 #include "lazyscript.h"
 
 struct lsclosure {

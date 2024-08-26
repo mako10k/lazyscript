@@ -1,5 +1,5 @@
 #include "pref.h"
-#include "lazyscript.h"
+#include "io.h"
 #include "malloc.h"
 
 struct lspref {

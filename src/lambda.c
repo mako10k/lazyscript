@@ -1,5 +1,6 @@
 #include "lambda.h"
 #include "array.h"
+#include "io.h"
 #include "lazyscript.h"
 #include <assert.h>
 

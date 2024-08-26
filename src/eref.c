@@ -1,6 +1,6 @@
 #include "eref.h"
 #include "erref.h"
-#include "lazyscript.h"
+#include "io.h"
 #include "malloc.h"
 #include "str.h"
 #include <assert.h>
@@ -8,13 +8,16 @@
 struct lseref {
   const lsstr_t *name;
   lserref_t *erref;
+  lsloc_t loc;
 };
 
-lseref_t *lseref(const lsstr_t *name) {
+lseref_t *lseref(const lsstr_t *name, lsloc_t loc) {
   assert(name != NULL);
+  assert(loc.filename != NULL);
   lseref_t *eref = lsmalloc(sizeof(lseref_t));
   eref->name = name;
   eref->erref = NULL;
+  eref->loc = loc;
   return eref;
 }
 
@@ -33,6 +36,11 @@ lserref_t *lseref_get_erref(const lseref_t *eref) {
   return eref->erref;
 }
 
+lsloc_t lseref_get_loc(const lseref_t *eref) {
+  assert(eref != NULL);
+  return eref->loc;
+}
+
 void lseref_print(FILE *fp, int prec, int indent, const lseref_t *eref) {
   assert(fp != NULL);
   assert(eref != NULL);
@@ -45,7 +53,9 @@ int lseref_prepare(lseref_t *eref, lsenv_t *env) {
   assert(env != NULL);
   if (lsenv_get(env, eref->name) != NULL)
     return 0;
-  lsprintf(stderr, 0, "error: undefined reference: ");
+  lsprintf(stderr, 0, "error: ");
+  lsloc_print(stderr, lseref_get_loc(eref));
+  lsprintf(stderr, 0, "reference: ");
   lseref_print(stderr, 0, 0, eref);
   lsprintf(stderr, 0, "\n");
   return -1;

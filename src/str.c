@@ -1,5 +1,5 @@
 #include "str.h"
-#include "lazyscript.h"
+#include "io.h"
 #include "malloc.h"
 #include <assert.h>
 #include <gc.h>

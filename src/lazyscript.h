@@ -5,23 +5,9 @@
 #include <stdio.h>
 
 typedef struct lsscan {
-  const char *filename;
   lsprog_t *prog;
-} lsscan_t;
-typedef struct lsloc {
   const char *filename;
-  int first_line;
-  int first_column;
-  int last_line;
-  int last_column;
-} lsloc_t;
-
-#include "parser.h"
-
-int yylex(YYSTYPE *yylval, YYLTYPE *yylloc, yyscan_t scanner);
-void yyerror(YYLTYPE *yylloc, yyscan_t scanner, const char *s);
-
-void lsprintf(FILE *fp, int indent, const char *fmt, ...);
+} lsscan_t;
 
 enum {
   LSPREC_LOWEST = 0,

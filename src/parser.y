@@ -9,6 +9,7 @@
 #include "ealge.h"
 #include "appl.h"
 #include "int.h"
+#include "io.h"
 #include "str.h"
 #include "array.h"
 #include "pat.h"
@@ -16,8 +17,28 @@
 #include "bind.h"
 #include "closure.h"
 #include "lambda.h"
+#include "loc.h"
 typedef void *yyscan_t;
 lsscan_t *yyget_extra(yyscan_t yyscanner);
+# define YYLLOC_DEFAULT(Cur, Rhs, N)                      \
+do                                                        \
+  if (N)                                                  \
+    {                                                     \
+      (Cur).filename     = YYRHSLOC(Rhs, 1).filename;     \
+      (Cur).first_line   = YYRHSLOC(Rhs, 1).first_line;   \
+      (Cur).first_column = YYRHSLOC(Rhs, 1).first_column; \
+      (Cur).last_line    = YYRHSLOC(Rhs, N).last_line;    \
+      (Cur).last_column  = YYRHSLOC(Rhs, N).last_column;  \
+    }                                                     \
+  else                                                    \
+    {                                                     \
+      (Cur).filename     = YYRHSLOC(Rhs, 1).filename;     \
+      (Cur).first_line   = (Cur).last_line   =            \
+        YYRHSLOC(Rhs, 0).last_line;                       \
+      (Cur).first_column = (Cur).last_column =            \
+        YYRHSLOC(Rhs, 0).last_column;                     \
+    }                                                     \
+while (0)
 }
 
 %union {
@@ -38,17 +59,22 @@ lsscan_t *yyget_extra(yyscan_t yyscanner);
 }
 
 %code {
-
+int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 }
 
 %define api.pure full
-%parse-param {yyscan_t *yyscanner}
-%lex-param {yyscan_t *yyscanner}
+%define api.location.type {lsloc_t}
+%parse-param {yyscan_t yyscanner}
+%lex-param {yyscan_t yyscanner}
 %header "parser.h"
 %output "parser.c"
 %locations
 %define parse.error verbose
 %define parse.lac full
+
+%initial-action {
+  yylloc = lsloc(yyget_extra(yyscanner)->filename, 1, 1, 1, 1);
+}
 
 %expect 34
 
@@ -137,7 +163,7 @@ efact:
     | etuple { $$ = lsealge_get_argc($1) == 1 ? lsealge_get_arg($1, 0) : lsexpr_alge($1); }
     | elist { $$ = lsexpr_alge($1); }
     | closure { $$ = lsexpr_closure($1); }
-    | '~' LSTSYMBOL { $$ = lsexpr_ref(lseref($2)); }
+    | '~' LSTSYMBOL { $$ = lsexpr_ref(lseref($2, @$)); }
     | elambda { $$ = lsexpr_lambda($1); }
     | '{' expr '}' { $$ = $2; }
     ;

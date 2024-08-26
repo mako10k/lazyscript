@@ -40,11 +40,15 @@ lazyscript_SOURCES = \
     hash.h \
     int.c \
     int.h \
+    io.c \
+    io.h \
     lambda.c \
     lambda.h \
     lazyscript.c \
     lazyscript.h \
     lexer.l \
+    loc.c \
+    loc.h \
     malloc.c \
     malloc.h \
     palge.c \

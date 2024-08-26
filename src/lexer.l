@@ -1,21 +1,9 @@
 %{
 #include "lazyscript.h"
 #include "parser.h"
-#define YY_USER_ACTION \
-  { \
-    int i = 0; \
-    yylloc->first_line = yylloc->last_line; \
-    yylloc->first_column = yylloc->last_column; \
-    while (i < yyleng) { \
-      char *c = memchr(yytext + i, '\n', yyleng - i); \
-      if (c == NULL) \
-        break; \
-      yylloc->last_line ++; \
-      yylloc->last_column = 1; \
-      i = c - yytext + 1; \
-    } \
-    yylloc->last_column += yyleng - i; \
-  }
+#include "loc.h"
+#include "io.h"
+#define YY_USER_ACTION lsloc_update(yylloc, yytext, yyleng);
 %}
 %option noyywrap
 %option noinput

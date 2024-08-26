@@ -30,3 +30,4 @@ src/parser.h
 *~
 *.o
 *.Po
+null.d

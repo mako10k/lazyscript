@@ -1,4 +1,5 @@
 #include "as.h"
+#include "io.h"
 #include "lazyscript.h"
 
 struct lsas {

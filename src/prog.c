@@ -1,5 +1,5 @@
 #include "prog.h"
-#include "lazyscript.h"
+#include "io.h"
 
 struct lsprog {
   lsexpr_t *expr;

@@ -1,4 +1,5 @@
 #include "bind.h"
+#include "io.h"
 #include "lazyscript.h"
 #include <assert.h>
 
