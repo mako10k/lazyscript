@@ -26,7 +26,7 @@
   ~f = \~x -> \~x -> ~x;
   ~testList = \[~x, ~y, ~z] -> ~map (~add 1) [1, 2, 3, 4];
   ~testNil = \[] -> [];
-  ~testCons = \(~x : ~y : []) -> (((~x : ~y) : ~z) : []);
+  ~testCons = \(~x : ~y : ~z : []) -> (((~x : ~y) : ~z) : []);
   ~testTuple = \() -> () |
   \(~x) -> ~x |
   \(~x, ~y) -> (~x, ~y) |

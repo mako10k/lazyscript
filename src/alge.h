@@ -7,7 +7,7 @@ typedef struct lsalge lsalge_t;
 typedef void (*lsalge_print_t)(FILE *, int, int, const void *);
 
 #include "env.h"
-typedef int (*lsalge_prepare_t)(void *, lsenv_t *, lserref_t *);
+typedef int (*lsalge_prepare_t)(void *, lsenv_t *, lserref_wrapper_t *);
 
 #include "array.h"
 #include "str.h"
@@ -20,5 +20,5 @@ unsigned int lsalge_get_argc(const lsalge_t *alge);
 void *lsalge_get_arg(const lsalge_t *alge, unsigned int i);
 void lsalge_print(FILE *fp, int prec, int indent, const lsalge_t *alge,
                   lsalge_print_t lsprint);
-int lsalge_prepare(lsalge_t *alge, lsenv_t *env, lserref_t *erref,
+int lsalge_prepare(lsalge_t *alge, lsenv_t *env, lserref_wrapper_t *erref,
                    lsalge_prepare_t lsprepare);

@@ -39,7 +39,7 @@ int lsclosure_prepare(lsclosure_t *closure, lsenv_t *env) {
   for (unsigned int i = 0; i < bcount; i++) {
     lsbind_ent_t *bent = lsbind_get_ent(closure->bind, i);
     lspat_t *pat = lsbind_ent_get_pat(bent);
-    int res = lspat_prepare(pat, env, lserref_bind_ent(bent));
+    int res = lspat_prepare(pat, env, lserref_wrapper_bind_ent(bent));
     if (res < 0)
       return res;
   }

@@ -24,7 +24,7 @@ void lsas_print(FILE *fp, int prec, int indent, lsas_t *as) {
     lsprintf(fp, indent, ")");
 }
 
-int lsas_prepare(lsas_t *as, lsenv_t *env, lserref_t *erref) {
+int lsas_prepare(lsas_t *as, lsenv_t *env, lserref_wrapper_t *erref) {
   int res = lspat_prepare(as->pat, env, erref);
   if (res < 0)
     return res;

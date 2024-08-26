@@ -68,7 +68,7 @@ int lslambda_prepare(lslambda_t *lambda, lsenv_t *env) {
 
 int lslambda_ent_prepare(lslambda_ent_t *ent, lsenv_t *env) {
   env = lsenv(env);
-  lserref_t *erref = lserref_lambda_ent(ent);
+  lserref_wrapper_t *erref = lserref_wrapper_lambda_ent(ent);
   int res = lspat_prepare(ent->pat, env, erref);
   if (res < 0)
     return res;

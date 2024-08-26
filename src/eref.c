@@ -53,10 +53,11 @@ int lseref_prepare(lseref_t *eref, lsenv_t *env) {
   assert(env != NULL);
   if (lsenv_get(env, eref->name) != NULL)
     return 0;
-  lsprintf(stderr, 0, "error: ");
+  lsprintf(stderr, 0, "E: ");
   lsloc_print(stderr, lseref_get_loc(eref));
-  lsprintf(stderr, 0, "reference: ");
+  lsprintf(stderr, 0, "undefined reference: ");
   lseref_print(stderr, 0, 0, eref);
   lsprintf(stderr, 0, "\n");
-  return -1;
+  lsenv_incr_nerrors(env);
+  return 0;
 }

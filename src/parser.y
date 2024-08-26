@@ -52,6 +52,7 @@ while (0)
     const lsstr_t *strval;
     lsarray_t *array;
     lspat_t *pat;
+    lspref_t *pref;
     lspalge_t *palge;
     lsbind_t *bind;
     lsbind_ent_t *bind_ent;
@@ -86,6 +87,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %nterm <ealge> ealge elist econs etuple
 %nterm <appl> eappl
 %nterm <pat> pat pat1 pat2 pat3
+%nterm <pref> pref
 %nterm <palge> palge plist pcons ptuple
 %nterm <bind> bind bind_list
 %nterm <bind_ent> bind_single
@@ -229,8 +231,12 @@ pat3:
     | plist { $$ = lspat_alge($1); }
     | LSTINT { $$ = lspat_int($1); }
     | LSTSTR { $$ = lspat_str($1); }
-    | '~' LSTSYMBOL { $$ = lspat_ref(lspref($2)); }
-    | '~' LSTSYMBOL '@' pat3 { $$ = lspat_as(lsas(lspref($2), $4)); }
+    | pref { $$ = lspat_ref($1); }
+    | pref '@' pat3 { $$ = lspat_as(lsas($1, $3)); }
+    ;
+
+pref:
+      '~' LSTSYMBOL { $$ = lspref($2, @$); }
     ;
 
 ptuple:

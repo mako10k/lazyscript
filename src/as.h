@@ -10,4 +10,4 @@ typedef struct lsas lsas_t;
 
 lsas_t *lsas(lspref_t *pref, lspat_t *pat);
 void lsas_print(FILE *fp, int prec, int indent, lsas_t *as);
-int lsas_prepare(lsas_t *as, lsenv_t *env, lserref_t *erref);
+int lsas_prepare(lsas_t *as, lsenv_t *env, lserref_wrapper_t *erref);

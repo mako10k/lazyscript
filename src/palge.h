@@ -13,4 +13,4 @@ const lsstr_t *lspalge_get_constr(const lspalge_t *alge);
 unsigned int lspalge_get_argc(const lspalge_t *alge);
 lspat_t *lspalge_get_arg(const lspalge_t *alge, int i);
 void lspalge_print(FILE *fp, int prec, int indent, const lspalge_t *alge);
-int lspalge_prepare(lspalge_t *alge, lsenv_t *env, lserref_t *erref);
+int lspalge_prepare(lspalge_t *alge, lsenv_t *env, lserref_wrapper_t *erref);

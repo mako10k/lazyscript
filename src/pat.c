@@ -66,7 +66,7 @@ lspat_t *lspat_ref(lspref_t *pref) {
   return pat;
 }
 
-int lspat_prepare(lspat_t *pat, lsenv_t *env, lserref_t *erref) {
+int lspat_prepare(lspat_t *pat, lsenv_t *env, lserref_wrapper_t *erref) {
   switch (pat->type) {
   case LSPTYPE_ALGE:
     return lspalge_prepare(pat->alge, env, erref);

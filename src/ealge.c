@@ -43,7 +43,8 @@ void lsealge_print(FILE *fp, int prec, int indent, const lsealge_t *alge) {
   lsalge_print(fp, prec, indent, alge->alge, lsexpr_print_callback);
 }
 
-static int lsexpr_prepare_callback(void *expr, lsenv_t *env, lserref_t *erref) {
+static int lsexpr_prepare_callback(void *expr, lsenv_t *env,
+                                   lserref_wrapper_t *erref) {
   (void)erref;
   return lsexpr_prepare(expr, env);
 }
