@@ -5,50 +5,50 @@
 #include <assert.h>
 
 struct lserref {
-  lserrtype_t type;
-  lspref_t *pref;
+  lserrtype_t lerr_type;
+  lspref_t *lerr_pref;
   union {
-    lsbind_ent_t *bind_ent;
-    lselambda_ent_t *lambda_ent;
+    lsbind_entry_t *lerr_bind_entry;
+    lselambda_entry_t *lerr_lambda_entry;
   };
 };
 
 struct lserref_wrapper {
-  lserrtype_t type;
+  lserrtype_t lerrw_type;
   union {
-    lsbind_ent_t *bind_ent;
-    lselambda_ent_t *lambda_ent;
+    lsbind_entry_t *lerrw_bind_entry;
+    lselambda_entry_t *lerrw_lambda_entry;
   };
 };
 
-lserref_wrapper_t *lserref_wrapper_bind_ent(lsbind_ent_t *ent) {
-  assert(ent != NULL);
+lserref_wrapper_t *lserref_wrapper_bind_ent(lsbind_entry_t *bentry) {
+  assert(bentry != NULL);
   lserref_wrapper_t *const erref_wrapper = lsmalloc(sizeof(lserref_wrapper_t));
-  erref_wrapper->type = LSERRTYPE_BINDING;
-  erref_wrapper->bind_ent = ent;
+  erref_wrapper->lerrw_type = LSERRTYPE_BINDING;
+  erref_wrapper->lerrw_bind_entry = bentry;
   return erref_wrapper;
 }
 
-lserref_wrapper_t *lserref_wrapper_lambda_ent(lselambda_ent_t *ent) {
-  assert(ent != NULL);
+lserref_wrapper_t *lserref_wrapper_lambda_ent(lselambda_entry_t *lentry) {
+  assert(lentry != NULL);
   lserref_wrapper_t *const erref_wrapper = lsmalloc(sizeof(lserref_wrapper_t));
-  erref_wrapper->type = LSERRTYPE_LAMBDA;
-  erref_wrapper->lambda_ent = ent;
+  erref_wrapper->lerrw_type = LSERRTYPE_LAMBDA;
+  erref_wrapper->lerrw_lambda_entry = lentry;
   return erref_wrapper;
 }
 
-lserref_t *lserref(lserref_wrapper_t *erref_wrapper, lspref_t *pref) {
+lserref_t *lserref_new(lserref_wrapper_t *erref_wrapper, lspref_t *pref) {
   assert(erref_wrapper != NULL);
   assert(pref != NULL);
   lserref_t *const erref = lsmalloc(sizeof(lserref_t));
-  erref->type = erref_wrapper->type;
-  erref->pref = pref;
-  switch (erref->type) {
+  erref->lerr_type = erref_wrapper->lerrw_type;
+  erref->lerr_pref = pref;
+  switch (erref->lerr_type) {
   case LSERRTYPE_BINDING:
-    erref->bind_ent = erref_wrapper->bind_ent;
+    erref->lerr_bind_entry = erref_wrapper->lerrw_bind_entry;
     break;
   case LSERRTYPE_LAMBDA:
-    erref->lambda_ent = erref_wrapper->lambda_ent;
+    erref->lerr_lambda_entry = erref_wrapper->lerrw_lambda_entry;
     break;
   default:
     break;
@@ -58,28 +58,5 @@ lserref_t *lserref(lserref_wrapper_t *erref_wrapper, lspref_t *pref) {
 
 lspref_t *lserref_get_pref(const lserref_t *erref) {
   assert(erref != NULL);
-  return erref->pref;
-}
-
-static lsthunk_t *lsbind_ent_thunk(const lsbind_ent_t *ent) {
-  assert(ent != NULL);
-  
-  return NULL;
-}
-
-static lsthunk_t *lselambda_ent_thunk(const lselambda_ent_t *ent) {
-  assert(ent != NULL);
-  return NULL;
-}
-
-lsthunk_t *lserref_thunk(const lserref_t *erref) {
-  assert(erref != NULL);
-  switch (erref->type) {
-  case LSERRTYPE_BINDING:
-    return lsbind_ent_thunk(erref->bind_ent);
-  case LSERRTYPE_LAMBDA:
-    return lselambda_ent_thunk(erref->lambda_ent);
-  default:
-    assert(0);
-  }
+  return erref->lerr_pref;
 }

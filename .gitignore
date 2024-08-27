@@ -21,6 +21,8 @@ ylwrap
 
 lex.yy.c
 
+/doc/
+
 src/.deps/
 
 src/lazyscript

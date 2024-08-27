@@ -12,10 +12,10 @@ lazyscript_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
 lazyscript_LDADD = $(GC_LIBS)
 
 lazyscript_SOURCES = \
-    alge.c \
-    alge.h \
     array.c \
     array.h \
+    belist.c \
+    belist.h \
     bind.c \
     bind.h \
     ealge.c \
@@ -28,6 +28,8 @@ lazyscript_SOURCES = \
     eenv.h \
     elambda.c \
     elambda.h \
+    elist.c \
+    elist.h \
     eref.c \
     eref.h \
     erref.c \
@@ -45,6 +47,7 @@ lazyscript_SOURCES = \
     lexer.l \
     loc.c \
     loc.h \
+    lstypes.h \
     malloc.c \
     malloc.h \
     palge.c \
@@ -54,6 +57,8 @@ lazyscript_SOURCES = \
     pas.h \
     pat.c \
     pat.h \
+    plist.c \
+    plist.h \
     pref.c \
     pref.h \
     prog.c \
@@ -72,6 +77,8 @@ lazyscript_SOURCES = \
     thunk.h \
     tlambda.c \
     tlambda.h \
+    tlist.c \
+    tlist.h \
     tref.c \
     tref.h \
     trref.c \

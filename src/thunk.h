@@ -28,3 +28,14 @@ lsthunk_t *lsthunk_alge(lstalge_t *talge);
 lsthunk_t *lsthunk_lambda(lstlambda_t *tlambda);
 lsthunk_t *lsthunk_closure(lstclosure_t *tclosure);
 lsthunk_t *lsthunk_ref(lstref_t *tref);
+
+lsthunk_t *lsthunk_get_whnf(lsthunk_t *thunk);
+lsttype_t lsthunk_type(const lsthunk_t *thunk);
+
+lstalge_t *lsthunk_get_alge(const lsthunk_t *thunk);
+lstappl_t *lsthunk_get_appl(const lsthunk_t *thunk);
+const lsint_t *lsthunk_get_int(const lsthunk_t *thunk);
+const lsstr_t *lsthunk_get_str(const lsthunk_t *thunk);
+lstclosure_t *lsthunk_get_closure(const lsthunk_t *thunk);
+lstlambda_t *lsthunk_get_lambda(const lsthunk_t *thunk);
+lstref_t *lsthunk_get_ref(const lsthunk_t *thunk);

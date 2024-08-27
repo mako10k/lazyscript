@@ -1,35 +1,46 @@
 #include "pas.h"
 #include "io.h"
-#include "lazyscript.h"
+#include "lstypes.h"
+#include "malloc.h"
 
 struct lspas {
-  lspref_t *pref;
-  lspat_t *pat;
+  lspref_t *lpa_pref;
+  lspat_t *lpa_pat;
 };
 
-lspas_t *lspas(lspref_t *pref, lspat_t *pat) {
-  lspas_t *as = malloc(sizeof(lspas_t));
-  as->pref = pref;
-  as->pat = pat;
-  return as;
+lspas_t *lspas_new(lspref_t *pref, lspat_t *pat) {
+  lspas_t *pas = lsmalloc(sizeof(lspas_t));
+  pas->lpa_pref = pref;
+  pas->lpa_pat = pat;
+  return pas;
 }
 
-void lspas_print(FILE *fp, int prec, int indent, lspas_t *as) {
+void lspas_print(FILE *fp, int prec, int indent, lspas_t *pas) {
   if (prec > LSPREC_APPL)
     lsprintf(fp, indent, "(");
-  lspref_print(fp, prec, indent, as->pref);
+  lspref_print(fp, prec, indent, pas->lpa_pref);
   lsprintf(fp, indent, "@");
-  lspat_print(fp, LSPREC_APPL + 1, indent, as->pat);
+  lspat_print(fp, LSPREC_APPL + 1, indent, pas->lpa_pat);
   if (prec > LSPREC_APPL)
     lsprintf(fp, indent, ")");
 }
 
-int lspas_prepare(lspas_t *as, lseenv_t *env, lserref_wrapper_t *erref) {
-  int res = lspat_prepare(as->pat, env, erref);
-  if (res < 0)
+lspres_t lspas_prepare(lspas_t *pas, lseenv_t *env, lserref_wrapper_t *erref) {
+  lspres_t res = lspat_prepare(pas->lpa_pat, env, erref);
+  if (res != LSPRES_SUCCESS)
     return res;
-  res = lspref_prepare(as->pref, env, erref);
-  if (res < 0)
+  res = lspref_prepare(pas->lpa_pref, env, erref);
+  if (res != LSPRES_SUCCESS)
     return res;
-  return 0;
+  return LSPRES_SUCCESS;
+}
+
+lsmres_t lspas_match(lstenv_t *tenv, const lspas_t *pas, lsthunk_t *thunk) {
+  lsmres_t mres = lspat_match(tenv, pas->lpa_pat, thunk);
+  if (mres != LSMATCH_SUCCESS)
+    return mres;
+  mres = lspref_match(tenv, pas->lpa_pref, thunk);
+  if (mres != LSMATCH_SUCCESS)
+    return mres;
+  return LSMATCH_SUCCESS;
 }

@@ -1,81 +1,88 @@
 #include "eappl.h"
 #include "expr.h"
 #include "io.h"
-#include "lazyscript.h"
 #include "malloc.h"
 #include <assert.h>
 
 struct lseappl {
-  lsexpr_t *func;
-  lsarray_t *args;
+  lsexpr_t *leap_func;
+  const lselist_t *leap_args;
 };
 
-lseappl_t *lseappl(lsexpr_t *func) {
+lseappl_t *lseappl_new(lsexpr_t *func) {
   assert(func != NULL);
   lseappl_t *eappl = lsmalloc(sizeof(lseappl_t));
-  eappl->func = func;
-  eappl->args = NULL;
+  eappl->leap_func = func;
+  eappl->leap_args = lselist_new();
   return eappl;
 }
 
-void lseappl_push_arg(lseappl_t *eappl, lsexpr_t *arg) {
+void lseappl_add_arg(lseappl_t *eappl, lsexpr_t *arg) {
   assert(eappl != NULL);
-  if (eappl->args == NULL)
-    eappl->args = lsarray();
-  lsarray_push(eappl->args, arg);
+  eappl->leap_args = lselist_push(eappl->leap_args, arg);
 }
 
-void lseappl_push_args(lseappl_t *eappl, lsarray_t *args) {
+void lseappl_concat_args(lseappl_t *eappl, const lselist_t *args) {
   assert(eappl != NULL);
-  if (eappl->args == NULL) {
-    eappl->args = args;
-  } else
-    eappl->args = lsarray_concat(eappl->args, args);
+  eappl->leap_args = lselist_concat(eappl->leap_args, args);
+}
+
+const lselist_t *lseappl_get_args(const lseappl_t *eappl) {
+  assert(eappl != NULL);
+  return eappl->leap_args;
 }
 
 const lsexpr_t *lseappl_get_func(const lseappl_t *eappl) {
   assert(eappl != NULL);
-  return eappl->func;
+  return eappl->leap_func;
 }
 
-unsigned int lseappl_get_argc(const lseappl_t *eappl) {
+lssize_t lseappl_get_arg_count(const lseappl_t *eappl) {
   assert(eappl != NULL);
-  return eappl->args == NULL ? 0 : lsarray_get_size(eappl->args);
+  return eappl->leap_args == NULL ? 0 : lselist_count(eappl->leap_args);
 }
 
-lsexpr_t *lseappl_get_arg(const lseappl_t *eappl, unsigned int i) {
+lsexpr_t *lseappl_get_arg(const lseappl_t *eappl, lssize_t i) {
   assert(eappl != NULL);
-  return eappl->args == NULL ? NULL : lsarray_get(eappl->args, i);
+  return eappl->leap_args == NULL ? NULL : lselist_get(eappl->leap_args, i);
 }
 
-void lseappl_print(FILE *stream, int prec, int indent, const lseappl_t *eappl) {
+void lseappl_print(FILE *stream, lsprec_t prec, int indent,
+                   const lseappl_t *eappl) {
   assert(stream != NULL);
   assert(eappl != NULL);
-  if (eappl->args == NULL || lsarray_get_size(eappl->args) == 0) {
-    lsexpr_print(stream, prec, indent, eappl->func);
+  lssize_t argc = lselist_count(eappl->leap_args);
+  if (argc == 0) {
+    lsexpr_print(stream, prec, indent, eappl->leap_func);
     return;
   }
   if (prec > LSPREC_APPL)
     lsprintf(stream, indent, "(");
-  lsexpr_print(stream, LSPREC_APPL + 1, indent, eappl->func);
-  for (unsigned int i = 0; i < lsarray_get_size(eappl->args); i++) {
+  lsexpr_print(stream, LSPREC_APPL + 1, indent, eappl->leap_func);
+  for (const lselist_t *le = eappl->leap_args; le != NULL;
+       le = lselist_get_next(le)) {
     lsprintf(stream, indent, " ");
-    lsexpr_print(stream, LSPREC_APPL + 1, indent, lsarray_get(eappl->args, i));
+    lsexpr_print(stream, LSPREC_APPL + 1, indent, lselist_get(le, 0));
   }
   if (prec > LSPREC_APPL)
     lsprintf(stream, indent, ")");
 }
 
-int lseappl_prepare(lseappl_t *eappl, lseenv_t *eenv) {
+lspres_t lseappl_prepare(lseappl_t *eappl, lseenv_t *eenv) {
   assert(eappl != NULL);
   assert(eenv != NULL);
-  if (eappl->args == NULL)
-    return 0;
-  for (unsigned int i = 0; i < lsarray_get_size(eappl->args); i++) {
-    lsexpr_t *arg = lsarray_get(eappl->args, i);
-    int res = lsexpr_prepare(arg, eenv);
-    if (res < 0)
-      return res;
+  lspres_t pres = lsexpr_prepare(eappl->leap_func, eenv);
+  if (pres != LSPRES_SUCCESS)
+    return pres;
+  lssize_t argc = lselist_count(eappl->leap_args);
+  if (argc == 0)
+    return LSPRES_SUCCESS;
+  for (const lselist_t *le = eappl->leap_args; le != NULL;
+       le = lselist_get_next(le)) {
+    lsexpr_t *arg = lselist_get(le, 0);
+    lspres_t pres = lsexpr_prepare(arg, eenv);
+    if (pres != LSPRES_SUCCESS)
+      return pres;
   }
-  return 0;
+  return LSPRES_SUCCESS;
 }

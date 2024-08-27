@@ -1,7 +1,9 @@
 #pragma once
 
 typedef struct lshash lshash_t;
+typedef void *lshash_data_t;
 
+#include "lstypes.h"
 #include "str.h"
 
 // *******************************
@@ -15,7 +17,7 @@ typedef struct lshash lshash_t;
  * @param capacity Initial capacity.
  * @return New hash table.
  */
-lshash_t *lshash(unsigned int capacity);
+lshash_t *lshash_new(lssize_t capacity);
 
 // -------------------------------
 // Accessors.
@@ -27,7 +29,7 @@ lshash_t *lshash(unsigned int capacity);
  * @param value Pointer to the variable to store the value.
  * @return not found: 0, found: non-zero.
  */
-int lshash_get(lshash_t *hash, const lsstr_t *key, void **value);
+int lshash_get(lshash_t *hash, const lsstr_t *key, lshash_data_t *value);
 
 /**
  * Put a key-value pair into a hash table.
@@ -37,8 +39,8 @@ int lshash_get(lshash_t *hash, const lsstr_t *key, void **value);
  * @param old_value Pointer to the variable to store the old value.
  * @return 1 if the key already exists, 0 otherwise.
  */
-int lshash_put(lshash_t *hash, const lsstr_t *key, void *value,
-               void **old_value);
+int lshash_put(lshash_t *hash, const lsstr_t *key, lshash_data_t value,
+               lshash_data_t *old_value);
 
 /**
  * Remove a key-value pair from a hash table.
@@ -47,7 +49,7 @@ int lshash_put(lshash_t *hash, const lsstr_t *key, void *value,
  * @param value Pointer to the variable to store the value.
  * @return 1 if the key exists, 0 otherwise.
  */
-int lshash_remove(lshash_t *hash, const lsstr_t *key, void **value);
+int lshash_remove(lshash_t *hash, const lsstr_t *key, lshash_data_t *pvalue);
 
 /**
  * Iterate over the entries of a hash table.
@@ -56,5 +58,5 @@ int lshash_remove(lshash_t *hash, const lsstr_t *key, void **value);
  * @param data Data to be passed to the callback function.
  */
 void lshash_foreach(lshash_t *hash,
-                    void (*callback)(const lsstr_t *, void *, void *),
+                    void (*callback)(const lsstr_t *, lshash_data_t, void *),
                     void *data);

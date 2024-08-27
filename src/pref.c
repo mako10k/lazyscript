@@ -1,74 +1,76 @@
 #include "pref.h"
 #include "io.h"
+#include "lstypes.h"
 #include "malloc.h"
 #include <assert.h>
 #include <stdio.h>
 
 struct lspref {
-  const lsstr_t *name;
-  lsloc_t loc;
+  const lsstr_t *lpr_name;
+  lsloc_t lpr_loc;
 };
 
-lspref_t *lspref(const lsstr_t *name, lsloc_t loc) {
+lspref_t *lspref_new(const lsstr_t *name, lsloc_t loc) {
   assert(name != NULL);
   lspref_t *pref = lsmalloc(sizeof(lspref_t));
-  pref->name = name;
-  pref->loc = loc;
+  pref->lpr_name = name;
+  pref->lpr_loc = loc;
   return pref;
 }
 
-const lsstr_t *lspref_get_name(const lspref_t *ref) {
-  assert(ref != NULL);
-  return ref->name;
+const lsstr_t *lspref_get_name(const lspref_t *pref) {
+  assert(pref != NULL);
+  return pref->lpr_name;
 }
 
-lsloc_t lspref_get_loc(const lspref_t *ref) {
-  assert(ref != NULL);
-  return ref->loc;
+lsloc_t lspref_get_loc(const lspref_t *pref) {
+  assert(pref != NULL);
+  return pref->lpr_loc;
 }
 
-void lspref_print(FILE *fp, int prec, int indent, const lspref_t *ref) {
+void lspref_print(FILE *fp, lsprec_t prec, int indent, const lspref_t *pref) {
   assert(fp != NULL);
-  assert(ref != NULL);
+  assert(pref != NULL);
   (void)prec;
   lsprintf(fp, indent, "~");
-  lsstr_print_bare(fp, prec, indent, ref->name);
+  lsstr_print_bare(fp, prec, indent, pref->lpr_name);
 }
 
-int lspref_prepare(lspref_t *ref, lseenv_t *env, lserref_wrapper_t *erref) {
-  assert(ref != NULL);
-  assert(env != NULL);
+lspres_t lspref_prepare(lspref_t *pref, lseenv_t *eenv,
+                        lserref_wrapper_t *erref) {
+  assert(pref != NULL);
+  assert(eenv != NULL);
   assert(erref != NULL);
-  lserref_t *erref_found = lseenv_get_self(env, ref->name);
+  lserref_t *erref_found = lseenv_get_self(eenv, pref->lpr_name);
   if (erref_found != NULL) {
     lspref_t *pref_found = lserref_get_pref(erref_found);
     lsprintf(stderr, 0, "E: ");
-    lsloc_print(stderr, ref->loc);
+    lsloc_print(stderr, pref->lpr_loc);
     lsprintf(stderr, 0, "duplicated reference: ");
-    lspref_print(stderr, 0, 0, ref);
+    lspref_print(stderr, 0, 0, pref);
     lsprintf(stderr, 0, " (");
     lsloc_print(stderr, lspref_get_loc(pref_found));
     lsprintf(stderr, 0, "former reference: ");
     lspref_print(stderr, 0, 0, pref_found);
     lsprintf(stderr, 0, ")\n");
-    lseenv_incr_nerrors(env);
-    return 0;
+    lseenv_incr_nerrors(eenv);
+    return LSPRES_SUCCESS;
   }
-  erref_found = lseenv_get(env, ref->name);
+  erref_found = lseenv_get(eenv, pref->lpr_name);
   if (erref_found != NULL) {
     lspref_t *pref_found = lserref_get_pref(erref_found);
     lsprintf(stderr, 0, "W: ");
-    lsloc_print(stderr, ref->loc);
+    lsloc_print(stderr, pref->lpr_loc);
     lsprintf(stderr, 0, "overridden reference: ");
-    lspref_print(stderr, 0, 0, ref);
+    lspref_print(stderr, 0, 0, pref);
     lsprintf(stderr, 0, " (");
     lsloc_print(stderr, lspref_get_loc(pref_found));
     lsprintf(stderr, 0, "former reference: ");
     lspref_print(stderr, 0, 0, pref_found);
     lsprintf(stderr, 0, ")\n");
-    lseenv_incr_nwarnings(env);
-    return 0;
+    lseenv_incr_nwarnings(eenv);
+    return LSPRES_SUCCESS;
   }
-  lseenv_put(env, ref->name, lserref(erref, ref));
-  return 0;
+  lseenv_put(eenv, pref->lpr_name, lserref_new(erref, pref));
+  return LSPRES_SUCCESS;
 }

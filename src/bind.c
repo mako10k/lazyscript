@@ -1,64 +1,74 @@
 #include "bind.h"
+#include "belist.h"
 #include "io.h"
-#include "lazyscript.h"
+#include "malloc.h"
 #include <assert.h>
 
-struct lsbind {
-  lsarray_t *ents;
+struct lsbind_entry {
+  lspat_t *lbe_lhs;
+  lsexpr_t *lbe_rhs;
 };
 
-struct lsbind_ent {
-  lspat_t *pat;
-  lsexpr_t *expr;
-};
-
-lsbind_t *lsbind(void) {
-  lsbind_t *bind = malloc(sizeof(lsbind_t));
-  bind->ents = lsarray();
-  return bind;
-}
-void lsbind_push(lsbind_t *bind, lsbind_ent_t *ent) {
-  lsarray_push(bind->ents, ent);
-}
-
-lsbind_ent_t *lsbind_ent(lspat_t *pat, lsexpr_t *expr) {
-  lsbind_ent_t *ent = malloc(sizeof(lsbind_ent_t));
-  ent->pat = pat;
-  ent->expr = expr;
+lsbind_entry_t *lsbind_entry_new(lspat_t *lhs, lsexpr_t *rhs) {
+  lsbind_entry_t *ent = lsmalloc(sizeof(lsbind_entry_t));
+  ent->lbe_lhs = lhs;
+  ent->lbe_rhs = rhs;
   return ent;
 }
 
-void lsbind_print(FILE *fp, int prec, int indent, lsbind_t *bind) {
+void lsbind_entry_print(FILE *fp, lsprec_t prec, int indent,
+                        lsbind_entry_t *ent) {
+  lspat_print(fp, prec, indent, ent->lbe_lhs);
+  lsprintf(fp, indent, " = ");
+  lsexpr_print(fp, prec, indent, ent->lbe_rhs);
+}
+
+struct lsbind {
+  const lsbelist_t *lb_entries;
+};
+
+lsbind_t *lsbind_new(void) {
+  lsbind_t *bind = lsmalloc(sizeof(lsbind_t));
+  bind->lb_entries = lsbelist_new();
+  return bind;
+}
+
+void lsbind_push(lsbind_t *bind, lsbind_entry_t *ent) {
+  assert(bind != NULL);
+  assert(ent != NULL);
+  bind->lb_entries = lsbelist_push(bind->lb_entries, ent);
+}
+
+void lsbind_print(FILE *fp, lsprec_t prec, int indent, lsbind_t *bind) {
   (void)prec;
-  unsigned int size = lsarray_get_size(bind->ents);
-  for (unsigned int i = 0; i < size; i++) {
+  for (const lsbelist_t *le = bind->lb_entries; le != NULL;
+       le = lsbelist_get_next(le)) {
     lsprintf(fp, indent, ";\n");
-    lsbind_ent_print(fp, LSPREC_LOWEST, indent, lsarray_get(bind->ents, i));
+    lsbind_entry_print(fp, LSPREC_LOWEST, indent, lsbelist_get(le, 0));
   }
 }
 
-void lsbind_ent_print(FILE *fp, int prec, int indent, lsbind_ent_t *ent) {
-  lspat_print(fp, prec, indent, ent->pat);
-  lsprintf(fp, indent, " = ");
-  lsexpr_print(fp, prec, indent, ent->expr);
-}
-
-unsigned int lsbind_get_count(const lsbind_t *bind) {
+lssize_t lsbind_get_entry_count(const lsbind_t *bind) {
   assert(bind != NULL);
-  return lsarray_get_size(bind->ents);
+  return lsbelist_count(bind->lb_entries);
 }
 
-lsbind_ent_t *lsbind_get_ent(const lsbind_t *bind, unsigned int i) {
+lsbind_entry_t *lsbind_get_entry(const lsbind_t *bind, lssize_t i) {
   assert(bind != NULL);
-  return lsarray_get(bind->ents, i);
+  return lsbelist_get(bind->lb_entries, i);
 }
 
-lspat_t *lsbind_ent_get_pat(const lsbind_ent_t *ent) {
+lspat_t *lsbind_entry_get_lhs(const lsbind_entry_t *ent) {
   assert(ent != NULL);
-  return ent->pat;
+  return ent->lbe_lhs;
 }
 
-lsexpr_t *lsbind_ent_get_expr(const lsbind_ent_t *ent) {
+lsexpr_t *lsbind_entry_get_rhs(const lsbind_entry_t *ent) {
   assert(ent != NULL);
-  return ent->expr;
+  return ent->lbe_rhs;
+}
+
+const lsbelist_t *lsbind_get_entries(const lsbind_t *bind) {
+  assert(bind != NULL);
+  return bind->lb_entries;
 }

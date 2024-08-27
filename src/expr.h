@@ -25,14 +25,14 @@ typedef enum {
   LSETYPE_CLOSURE
 } lsetype_t;
 
-lsexpr_t *lsexpr_alge(lsealge_t *ealge);
-lsexpr_t *lsexpr_appl(lseappl_t *eappl);
-lsexpr_t *lsexpr_ref(lseref_t *eref);
-lsexpr_t *lsexpr_int(const lsint_t *eint);
-lsexpr_t *lsexpr_str(const lsstr_t *str);
-lsexpr_t *lsexpr_lambda(lselambda_t *elambda);
-lsexpr_t *lsexpr_closure(lseclosure_t *eclosure);
-lsetype_t lsexpr_type(const lsexpr_t *expr);
+lsexpr_t *lsexpr_new_alge(lsealge_t *ealge);
+lsexpr_t *lsexpr_new_appl(lseappl_t *eappl);
+lsexpr_t *lsexpr_new_ref(lseref_t *eref);
+lsexpr_t *lsexpr_new_int(const lsint_t *eint);
+lsexpr_t *lsexpr_new_str(const lsstr_t *str);
+lsexpr_t *lsexpr_new_lambda(lselambda_t *elambda);
+lsexpr_t *lsexpr_new_closure(lseclosure_t *eclosure);
+lsetype_t lsexpr_get_type(const lsexpr_t *expr);
 lsealge_t *lsexpr_get_alge(const lsexpr_t *expr);
 lseappl_t *lsexpr_get_appl(const lsexpr_t *expr);
 lseref_t *lsexpr_get_ref(const lsexpr_t *expr);
@@ -40,6 +40,6 @@ const lsint_t *lsexpr_get_int(const lsexpr_t *expr);
 const lsstr_t *lsexpr_get_str(const lsexpr_t *expr);
 lselambda_t *lsexpr_get_lambda(const lsexpr_t *expr);
 lseclosure_t *lsexpr_get_closure(const lsexpr_t *expr);
-void lsexpr_print(FILE *fp, int prec, int indent, const lsexpr_t *expr);
-int lsexpr_prepare(lsexpr_t *expr, lseenv_t *env);
+void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr);
+lspres_t lsexpr_prepare(lsexpr_t *expr, lseenv_t *env);
 lsthunk_t *lsexpr_thunk(lstenv_t *tenv, const lsexpr_t *expr);
