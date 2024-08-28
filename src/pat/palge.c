@@ -44,20 +44,58 @@ lspat_t *lspalge_get_arg(const lspalge_t *alge, int i) {
   return lsplist_get(alge->lpa_args, i);
 }
 
-void lspalge_print(FILE *fp, int prec, int indent, const lspalge_t *alge) {
-  assert(alge != NULL);
-  lssize_t argc = lsplist_count(alge->lpa_args);
+void lspalge_print(FILE *fp, int prec, int indent, const lspalge_t *palge) {
+  assert(palge != NULL);
+  static const lsstr_t *cons_constr = NULL;
+  static const lsstr_t *list_constr = NULL;
+  static const lsstr_t *tuple_constr = NULL;
+  if (cons_constr == NULL) {
+    cons_constr = lsstr_cstr(":");
+    list_constr = lsstr_cstr("[]");
+    tuple_constr = lsstr_cstr(",");
+  }
+  lssize_t argc = lsplist_count(palge->lpa_args);
+  if (lsstrcmp(palge->lpa_constr, cons_constr) == 0 && argc == 2) {
+    if (prec > LSPREC_CONS)
+      lsprintf(fp, indent, "(");
+    lspat_print(fp, LSPREC_CONS + 1, indent, lsplist_get(palge->lpa_args, 0));
+    lsprintf(fp, indent, " : ");
+    lspat_print(fp, LSPREC_CONS, indent, lsplist_get(palge->lpa_args, 1));
+    if (prec > LSPREC_CONS)
+      lsprintf(fp, indent, ")");
+    return;
+  }
+  if (lsstrcmp(palge->lpa_constr, list_constr) == 0) {
+    lsprintf(fp, indent, "[");
+    for (lssize_t i = 0; i < argc; i++) {
+      if (i > 0)
+        lsprintf(fp, indent, ", ");
+      lspat_print(fp, LSPREC_LOWEST, indent, lsplist_get(palge->lpa_args, i));
+    }
+    lsprintf(fp, indent, "]");
+    return;
+  }
+  if (lsstrcmp(palge->lpa_constr, tuple_constr) == 0) {
+    lsprintf(fp, indent, "(");
+    for (lssize_t i = 0; i < argc; i++) {
+      if (i > 0)
+        lsprintf(fp, indent, ", ");
+      lspat_print(fp, LSPREC_LOWEST, indent, lsplist_get(palge->lpa_args, i));
+    }
+    lsprintf(fp, indent, ")");
+    return;
+  }
+
   if (argc == 0) {
-    lsstr_print_bare(fp, prec, indent, alge->lpa_constr);
+    lsstr_print_bare(fp, prec, indent, palge->lpa_constr);
     return;
   }
   if (prec > LSPREC_APPL)
     lsprintf(fp, indent, "(");
-  lsstr_print_bare(fp, LSPREC_APPL + 1, indent, alge->lpa_constr);
+  lsstr_print_bare(fp, LSPREC_APPL + 1, indent, palge->lpa_constr);
   for (lssize_t i = 0; i < argc; i++) {
-    if (i > 0)
-      fprintf(fp, " ");
-    lspat_print(fp, LSPREC_APPL + 1, indent, lsplist_get(alge->lpa_args, i));
+    fprintf(fp, " ");
+    lspat_print(fp, LSPREC_APPL + 1, indent, lsplist_get(palge->lpa_args, i));
   }
   if (prec > LSPREC_APPL)
     lsprintf(fp, indent, ")");

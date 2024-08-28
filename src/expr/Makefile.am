@@ -7,6 +7,8 @@ liblsexpr_la_SOURCES = \
     ealge.h \
     eappl.c \
     eappl.h \
+    echoice.c \
+    echoice.h \
     eclosure.c \
     eclosure.h \
     eenv.c \

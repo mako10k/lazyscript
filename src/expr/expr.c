@@ -3,6 +3,7 @@
 #include "common/malloc.h"
 #include "expr/ealge.h"
 #include "expr/eappl.h"
+#include "expr/echoice.h"
 #include "expr/eclosure.h"
 #include "expr/elambda.h"
 #include "expr/eref.h"
@@ -16,6 +17,7 @@ struct lsexpr {
     lseref_t *le_ref;
     lselambda_t *le_lambda;
     lseclosure_t *le_closure;
+    lsechoice_t *le_choice;
     const lsint_t *le_intval;
     const lsstr_t *le_strval;
   };
@@ -63,6 +65,13 @@ lsexpr_t *lsexpr_new_lambda(lselambda_t *lambda) {
   return expr;
 }
 
+lsexpr_t *lsexpr_new_choice(lsechoice_t *echoice) {
+  lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
+  expr->le_type = LSETYPE_CHOICE;
+  expr->le_choice = echoice;
+  return expr;
+}
+
 void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr) {
 #ifdef DEBUG
   if (expr == NULL) {
@@ -75,28 +84,30 @@ void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr) {
   switch (expr->le_type) {
   case LSETYPE_ALGE:
     lsealge_print(fp, prec, indent, expr->le_alge);
-    break;
+    return;
   case LSETYPE_APPL:
     lseappl_print(fp, prec, indent, expr->le_appl);
-    break;
+    return;
   case LSETYPE_REF:
     lseref_print(fp, prec, indent, expr->le_ref);
-    break;
+    return;
   case LSETYPE_INT:
     lsint_print(fp, prec, indent, expr->le_intval);
-    break;
+    return;
   case LSETYPE_STR:
     lsstr_print(fp, prec, indent, expr->le_strval);
-    break;
+    return;
   case LSETYPE_LAMBDA:
     lselambda_print(fp, prec, indent, expr->le_lambda);
-    break;
+    return;
   case LSETYPE_CLOSURE:
     lseclosure_print(fp, prec, indent, expr->le_closure);
-    break;
-  default:
-    lsprintf(fp, indent, "Unknown expression type\n");
+    return;
+  case LSETYPE_CHOICE:
+    lsechoice_print(fp, prec, indent, expr->le_choice);
+    return;
   }
+  lsprintf(fp, indent, "Unknown expression type\n");
 }
 
 lsexpr_t *lsexpr_new_closure(lseclosure_t *closure) {
@@ -153,6 +164,12 @@ lseclosure_t *lsexpr_get_closure(const lsexpr_t *expr) {
   return expr->le_closure;
 }
 
+lsechoice_t *lsexpr_get_choice(const lsexpr_t *expr) {
+  assert(expr != NULL);
+  assert(expr->le_type == LSETYPE_CHOICE);
+  return expr->le_choice;
+}
+
 lspres_t lsexpr_prepare(lsexpr_t *const expr, lseenv_t *const env) {
   assert(expr != NULL);
   assert(env != NULL);
@@ -167,7 +184,11 @@ lspres_t lsexpr_prepare(lsexpr_t *const expr, lseenv_t *const env) {
     return lselambda_prepare(expr->le_lambda, env);
   case LSETYPE_CLOSURE:
     return lseclosure_prepare(expr->le_closure, env);
-  default:
+  case LSETYPE_CHOICE:
+    return lsechoice_prepare(expr->le_choice, env);
+  case LSETYPE_INT:
+  case LSETYPE_STR:
     return LSPRES_SUCCESS;
   }
+  assert(0);
 }

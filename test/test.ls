@@ -11,6 +11,7 @@
     ~x;
     ~x = ~f ~x
   };
+  ~prelude = prelude;
   ~chain = \~m -> \~f -> ~join (~fmap ~f ~m);
   ~fmap = \~f -> \~m -> ~chain ~m \~x -> ~return (~f ~x);
   ~pred = \(Cons ~x ~y) -> ~y;
@@ -23,8 +24,10 @@
       ~n_2 = ~pred ~n_1
     }
   };
+  ~add = \~x -> succ ~x;
   ~f = \~x -> \~x -> ~x;
-  ~testList = \[~x, ~y, ~z] -> ~map (~add 1) [1, 2, 3, 4];
+  ~return = \~x -> return ~x;
+  ~testList = \[~x, ~y, ~z] -> ~fmap (~add 1) [1, 2, 3, 4];
   ~testNil = \[] -> [];
   ~testCons = \(~x : ~y : ~z : []) -> (((~x : ~y) : ~z) : []);
   ~testTuple = \() -> () |

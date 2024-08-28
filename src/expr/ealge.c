@@ -45,7 +45,46 @@ lsexpr_t *lsealge_get_arg(const lsealge_t *ealge, int i) {
 void lsealge_print(FILE *fp, lsprec_t prec, int indent,
                    const lsealge_t *ealge) {
   assert(ealge != NULL);
+  static const lsstr_t *cons_constr = NULL;
+  static const lsstr_t *list_constr = NULL;
+  static const lsstr_t *tuple_constr = NULL;
+  if (cons_constr == NULL) {
+    cons_constr = lsstr_cstr(":");
+    list_constr = lsstr_cstr("[]");
+    tuple_constr = lsstr_cstr(",");
+  }
   lssize_t argc = lselist_count(ealge->lea_args);
+  if (lsstrcmp(ealge->lea_constr, cons_constr) == 0 && argc == 2) {
+    if (prec > LSPREC_CONS)
+      lsprintf(fp, indent, "(");
+    lsexpr_print(fp, LSPREC_CONS + 1, indent, lselist_get(ealge->lea_args, 0));
+    lsprintf(fp, indent, " : ");
+    lsexpr_print(fp, LSPREC_CONS, indent, lselist_get(ealge->lea_args, 1));
+    if (prec > LSPREC_CONS)
+      lsprintf(fp, indent, ")");
+    return;
+  }
+  if (lsstrcmp(ealge->lea_constr, list_constr) == 0) {
+    lsprintf(fp, indent, "[");
+    for (lssize_t i = 0; i < argc; i++) {
+      if (i > 0)
+        lsprintf(fp, indent, ", ");
+      lsexpr_print(fp, LSPREC_LOWEST, indent, lselist_get(ealge->lea_args, i));
+    }
+    lsprintf(fp, indent, "]");
+    return;
+  }
+  if (lsstrcmp(ealge->lea_constr, tuple_constr) == 0) {
+    lsprintf(fp, indent, "(");
+    for (lssize_t i = 0; i < argc; i++) {
+      if (i > 0)
+        lsprintf(fp, indent, ", ");
+      lsexpr_print(fp, LSPREC_LOWEST, indent, lselist_get(ealge->lea_args, i));
+    }
+    lsprintf(fp, indent, ")");
+    return;
+  }
+
   if (argc == 0) {
     lsstr_print_bare(fp, prec, indent, ealge->lea_constr);
     return;
@@ -54,8 +93,7 @@ void lsealge_print(FILE *fp, lsprec_t prec, int indent,
     lsprintf(fp, indent, "(");
   lsstr_print_bare(fp, LSPREC_APPL + 1, indent, ealge->lea_constr);
   for (lssize_t i = 0; i < argc; i++) {
-    if (i > 0)
-      fprintf(fp, " ");
+    fprintf(fp, " ");
     lsexpr_print(fp, LSPREC_APPL + 1, indent, lselist_get(ealge->lea_args, i));
   }
   if (prec > LSPREC_APPL)

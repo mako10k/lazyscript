@@ -27,9 +27,9 @@ lsthunk_t *lstlambda_apply(lstlambda_t *tlambda, lsarray_t *args) {
   lssize_t nlambda_ents = lselambda_get_entry_count(tlambda->elambda);
   lspat_t *param = lsarray_get(args, 0);
   for (lssize_t i = 0; i < nlambda_ents; i++) {
-    lselambda_entry_t *lambda_ent = lselambda_get_ent(tlambda->elambda, i);
-    lspat_t *arg = lselambda_entry_get_arg(lambda_ent);
-    lsexpr_t *body = lselambda_entry_get_body(lambda_ent);
+    lselambdambda_ent = lselambda_get_ent(tlambda->elambda, i);
+    lspat_t *arg = lselambda_get_arg(lambda_ent);
+    lsexpr_t *body = lselambda_get_body(lambda_ent);
     lstenv_t *tenv = lstenv(tlambda->env);
     if (lsthunk_match_pat(tenv, param, arg)) {
       lsthunk_subst(body, tenv);

@@ -17,22 +17,10 @@ lseclosure_t *lseclosure_new(lsexpr_t *expr, lsbind_t *bind) {
 
 void lseclosure_print(FILE *stream, lsprec_t prec, int indent,
                       lseclosure_t *eclosure) {
-  lssize_t lines = lsbind_get_entry_count(eclosure->lec_bind) + 1;
-  if (lsexpr_get_type(eclosure->lec_expr) == LSETYPE_LAMBDA)
-    lines +=
-        lselambda_get_entry_count(lsexpr_get_lambda(eclosure->lec_expr)) - 1;
-  if (lines > 1) {
-    indent++;
-    lsprintf(stream, indent, "{\n");
-  } else
-    lsprintf(stream, indent, "{ ");
-  lsexpr_print(stream, prec, indent, eclosure->lec_expr);
-  lsbind_print(stream, prec, indent, eclosure->lec_bind);
-  if (lines > 1) {
-    indent--;
-    lsprintf(stream, indent, "\n}");
-  } else
-    lsprintf(stream, indent, " }");
+  lsprintf(stream, indent+1, "{\n");
+  lsexpr_print(stream, prec, indent + 1, eclosure->lec_expr);
+  lsbind_print(stream, prec, indent + 1, eclosure->lec_bind);
+  lsprintf(stream, indent, "\n}");
 }
 
 lspres_t lseclosure_prepare(lseclosure_t *eclosure, lseenv_t *eenv) {

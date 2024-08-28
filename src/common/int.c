@@ -21,7 +21,7 @@ void lsint_print(FILE *fp, lsprec_t prec, int indent, const lsint_t *val) {
   (void)indent;
   assert(fp != NULL);
   assert(LSPREC_LOWEST <= prec && prec <= LSPREC_HIGHEST);
-  assert(indent > 0);
+  assert(indent >= 0);
   int intval = val == NULL ? 0 : val->li_val;
   lsprintf(fp, 0, "%d", intval);
 }

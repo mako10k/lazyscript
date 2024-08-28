@@ -49,7 +49,6 @@ while (0)
     lsealge_t *ealge;
     lseappl_t *eappl;
     lselambda_t *elambda;
-    lselambda_entry_t *elambda_ent;
     const lsint_t *intval;
     const lsstr_t *strval;
     lsarray_t *array;
@@ -81,12 +80,11 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 34
+%expect 32
 
 %nterm <prog> prog
-%nterm <expr> expr expr1 expr2 expr3 expr4 efact
-%nterm <elambda_ent> elambda_single
-%nterm <elambda> elambda elambda_list
+%nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact
+%nterm <elambda> elambda
 %nterm <elist> earray
 %nterm <plist> parray
 %nterm <ealge> ealge elist econs etuple
@@ -103,6 +101,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %token <strval> LSTSYMBOL
 %token <strval> LSTSTR
 %token LSTARROW
+%right '|'
 %right ':'
 
 %start prog
@@ -132,38 +131,43 @@ expr:
 
 expr1:
       expr2 { $$ = $1; }
+    | expr2 '|' expr1 { $$ = lsexpr_new_choice(lsechoice_new($1, $3)); }
+    ;
+
+expr2:
+      expr3 { $$ = $1; }
     | econs { $$ = lsexpr_new_alge($1);}
     ;
 
 econs:
-      expr1 ':' expr2 {
+      expr1 ':' expr3 {
         $$ = lsealge_new(lsstr_cstr(":"));
         lsealge_add_arg($$, $1);
         lsealge_add_arg($$, $3);
       }
     ;
 
-expr2:
-      expr3 { $$ = $1; }
+expr3:
+      expr4 { $$ = $1; }
     | eappl { $$ = lsexpr_new_appl($1); }
     ;
 
 eappl:
-      efact expr4 { $$ = lseappl_new($1); lseappl_add_arg($$, $2); }
-    | eappl expr4 { $$ = $1; lseappl_add_arg($$, $2); }
+      efact expr5 { $$ = lseappl_new($1); lseappl_add_arg($$, $2); }
+    | eappl expr5 { $$ = $1; lseappl_add_arg($$, $2); }
     ;
 
-expr3:
-      expr4 { $$ = $1; }
+expr4:
+      expr5 { $$ = $1; }
     | ealge { $$ = lsexpr_new_alge($1); }
     ;
 
 ealge:
-      LSTSYMBOL expr4 { $$ = lsealge_new($1); lsealge_add_arg($$, $2); }
-    | ealge expr4 { $$ = $1; lsealge_add_arg($$, $2); }
+      LSTSYMBOL expr5 { $$ = lsealge_new($1); lsealge_add_arg($$, $2); }
+    | ealge expr5 { $$ = $1; lsealge_add_arg($$, $2); }
     ;
 
-expr4:
+expr5:
       efact { $$ = $1; }
     | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1)); }
     ;
@@ -200,16 +204,7 @@ elist:
     ;
 
 elambda:
-      elambda_list { $$ = $1; }
-    ;
-
-elambda_list:
-      elambda_single { $$ = lselambda_new(); lselambda_push($$, $1); }
-    | elambda_list '|' elambda_single { $$ = $1; lselambda_push($1, $3); }
-    ;
-
-elambda_single:
-      '\\' pat LSTARROW expr { $$ = lselambda_entry_new($2, $4); }
+      '\\' pat LSTARROW expr3 { $$ = lselambda_new($2, $4); }
     ;
 
 pat:

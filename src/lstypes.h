@@ -2,6 +2,7 @@
 
 typedef enum lsprec {
   LSPREC_LOWEST,
+  LSPREC_CHOICE,
   LSPREC_CONS,
   LSPREC_LAMBDA,
   LSPREC_APPL,
