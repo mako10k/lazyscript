@@ -9,57 +9,57 @@
 #include <assert.h>
 
 struct lsexpr {
-  lsetype_t type;
+  lsetype_t le_type;
   union {
-    lsealge_t *ealge;
-    lseappl_t *appl;
-    lseref_t *eref;
-    lselambda_t *lambda;
-    lseclosure_t *closure;
-    const lsint_t *intval;
-    const lsstr_t *strval;
+    lsealge_t *le_alge;
+    lseappl_t *le_appl;
+    lseref_t *le_ref;
+    lselambda_t *le_lambda;
+    lseclosure_t *le_closure;
+    const lsint_t *le_intval;
+    const lsstr_t *le_strval;
   };
 };
 
 lsexpr_t *lsexpr_new_alge(lsealge_t *ealge) {
   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
-  expr->type = LSETYPE_ALGE;
-  expr->ealge = ealge;
+  expr->le_type = LSETYPE_ALGE;
+  expr->le_alge = ealge;
   return expr;
 }
 
 lsexpr_t *lsexpr_new_appl(lseappl_t *eappl) {
   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
-  expr->type = LSETYPE_APPL;
-  expr->appl = eappl;
+  expr->le_type = LSETYPE_APPL;
+  expr->le_appl = eappl;
   return expr;
 }
 
 lsexpr_t *lsexpr_new_ref(lseref_t *eref) {
   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
-  expr->type = LSETYPE_REF;
-  expr->eref = eref;
+  expr->le_type = LSETYPE_REF;
+  expr->le_ref = eref;
   return expr;
 }
 
 lsexpr_t *lsexpr_new_int(const lsint_t *intval) {
   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
-  expr->type = LSETYPE_INT;
-  expr->intval = intval;
+  expr->le_type = LSETYPE_INT;
+  expr->le_intval = intval;
   return expr;
 }
 
 lsexpr_t *lsexpr_new_str(const lsstr_t *strval) {
   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
-  expr->type = LSETYPE_STR;
-  expr->strval = strval;
+  expr->le_type = LSETYPE_STR;
+  expr->le_strval = strval;
   return expr;
 }
 
 lsexpr_t *lsexpr_new_lambda(lselambda_t *lambda) {
   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
-  expr->type = LSETYPE_LAMBDA;
-  expr->lambda = lambda;
+  expr->le_type = LSETYPE_LAMBDA;
+  expr->le_lambda = lambda;
   return expr;
 }
 
@@ -72,27 +72,27 @@ void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr) {
 #else
   assert(expr != NULL);
 #endif
-  switch (expr->type) {
+  switch (expr->le_type) {
   case LSETYPE_ALGE:
-    lsealge_print(fp, prec, indent, expr->ealge);
+    lsealge_print(fp, prec, indent, expr->le_alge);
     break;
   case LSETYPE_APPL:
-    lseappl_print(fp, prec, indent, expr->appl);
+    lseappl_print(fp, prec, indent, expr->le_appl);
     break;
   case LSETYPE_REF:
-    lseref_print(fp, prec, indent, expr->eref);
+    lseref_print(fp, prec, indent, expr->le_ref);
     break;
   case LSETYPE_INT:
-    lsint_print(fp, prec, indent, expr->intval);
+    lsint_print(fp, prec, indent, expr->le_intval);
     break;
   case LSETYPE_STR:
-    lsstr_print(fp, prec, indent, expr->strval);
+    lsstr_print(fp, prec, indent, expr->le_strval);
     break;
   case LSETYPE_LAMBDA:
-    lselambda_print(fp, prec, indent, expr->lambda);
+    lselambda_print(fp, prec, indent, expr->le_lambda);
     break;
   case LSETYPE_CLOSURE:
-    lseclosure_print(fp, prec, indent, expr->closure);
+    lseclosure_print(fp, prec, indent, expr->le_closure);
     break;
   default:
     lsprintf(fp, indent, "Unknown expression type\n");
@@ -101,72 +101,72 @@ void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr) {
 
 lsexpr_t *lsexpr_new_closure(lseclosure_t *closure) {
   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
-  expr->type = LSETYPE_CLOSURE;
-  expr->closure = closure;
+  expr->le_type = LSETYPE_CLOSURE;
+  expr->le_closure = closure;
   return expr;
 }
 
 lsetype_t lsexpr_get_type(const lsexpr_t *expr) {
   assert(expr != NULL);
-  return expr->type;
+  return expr->le_type;
 }
 
 lsealge_t *lsexpr_get_alge(const lsexpr_t *expr) {
   assert(expr != NULL);
-  assert(expr->type == LSETYPE_ALGE);
-  return expr->ealge;
+  assert(expr->le_type == LSETYPE_ALGE);
+  return expr->le_alge;
 }
 
 lseappl_t *lsexpr_get_appl(const lsexpr_t *expr) {
   assert(expr != NULL);
-  assert(expr->type == LSETYPE_APPL);
-  return expr->appl;
+  assert(expr->le_type == LSETYPE_APPL);
+  return expr->le_appl;
 }
 
 lseref_t *lsexpr_get_ref(const lsexpr_t *expr) {
   assert(expr != NULL);
-  assert(expr->type == LSETYPE_REF);
-  return expr->eref;
+  assert(expr->le_type == LSETYPE_REF);
+  return expr->le_ref;
 }
 
 const lsint_t *lsexpr_get_int(const lsexpr_t *expr) {
   assert(expr != NULL);
-  assert(expr->type == LSETYPE_INT);
-  return expr->intval;
+  assert(expr->le_type == LSETYPE_INT);
+  return expr->le_intval;
 }
 
 const lsstr_t *lsexpr_get_str(const lsexpr_t *expr) {
   assert(expr != NULL);
-  assert(expr->type == LSETYPE_STR);
-  return expr->strval;
+  assert(expr->le_type == LSETYPE_STR);
+  return expr->le_strval;
 }
 
 lselambda_t *lsexpr_get_lambda(const lsexpr_t *expr) {
   assert(expr != NULL);
-  assert(expr->type == LSETYPE_LAMBDA);
-  return expr->lambda;
+  assert(expr->le_type == LSETYPE_LAMBDA);
+  return expr->le_lambda;
 }
 
 lseclosure_t *lsexpr_get_closure(const lsexpr_t *expr) {
   assert(expr != NULL);
-  assert(expr->type == LSETYPE_CLOSURE);
-  return expr->closure;
+  assert(expr->le_type == LSETYPE_CLOSURE);
+  return expr->le_closure;
 }
 
 lspres_t lsexpr_prepare(lsexpr_t *const expr, lseenv_t *const env) {
   assert(expr != NULL);
   assert(env != NULL);
-  switch (expr->type) {
+  switch (expr->le_type) {
   case LSETYPE_ALGE:
-    return lsealge_prepare(expr->ealge, env);
+    return lsealge_prepare(expr->le_alge, env);
   case LSETYPE_APPL:
-    return lseappl_prepare(expr->appl, env);
+    return lseappl_prepare(expr->le_appl, env);
   case LSETYPE_REF:
-    return lseref_prepare(expr->eref, env);
+    return lseref_prepare(expr->le_ref, env);
   case LSETYPE_LAMBDA:
-    return lselambda_prepare(expr->lambda, env);
+    return lselambda_prepare(expr->le_lambda, env);
   case LSETYPE_CLOSURE:
-    return lseclosure_prepare(expr->closure, env);
+    return lseclosure_prepare(expr->le_closure, env);
   default:
     return LSPRES_SUCCESS;
   }

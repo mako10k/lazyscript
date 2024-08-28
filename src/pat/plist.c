@@ -3,8 +3,8 @@
 #include <assert.h>
 
 struct lsplist {
-  lspat_t *pat;
-  const lsplist_t *next;
+  lspat_t *lpl_pat;
+  const lsplist_t *lpl_next;
 };
 
 const lsplist_t *lsplist_new(void) { return (const lsplist_t *)lslist_new(); }

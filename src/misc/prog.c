@@ -4,31 +4,31 @@
 #include <assert.h>
 
 struct lsprog {
-  lsexpr_t *lprg_expr;
+  lsexpr_t *lp_expr;
 };
 
 struct lsscan {
-  lsprog_t *prog;
-  const char *filename;
+  lsprog_t *ls_prog;
+  const char *ls_filename;
 };
 
 lsprog_t *lsprog_new(lsexpr_t *expr) {
   lsprog_t *prog = lsmalloc(sizeof(lsprog_t));
-  prog->lprg_expr = expr;
+  prog->lp_expr = expr;
   return prog;
 }
 
 void lsprog_print(FILE *fp, int prec, int indent, const lsprog_t *prog) {
-  lsexpr_print(fp, prec, indent, prog->lprg_expr);
+  lsexpr_print(fp, prec, indent, prog->lp_expr);
   lsprintf(fp, 0, ";\n");
 }
 
 int lsprog_prepare(lsprog_t *prog, lseenv_t *env) {
-  return lsexpr_prepare(prog->lprg_expr, env);
+  return lsexpr_prepare(prog->lp_expr, env);
 }
 
 lsthunk_t *lsprog_thunk(lstenv_t *tenv, const lsprog_t *prog) {
-  return lsthunk_new_expr(tenv, prog->lprg_expr);
+  return lsthunk_new_expr(tenv, prog->lp_expr);
 }
 
 void yyerror(lsloc_t *loc, lsscan_t *scanner, const char *s) {
@@ -39,17 +39,17 @@ void yyerror(lsloc_t *loc, lsscan_t *scanner, const char *s) {
 
 lsscan_t *lsscan_new(const char *filename) {
   lsscan_t *scanner = lsmalloc(sizeof(lsscan_t));
-  scanner->prog = NULL;
-  scanner->filename = filename;
+  scanner->ls_prog = NULL;
+  scanner->ls_filename = filename;
   return scanner;
 }
 
-lsprog_t *lsscan_get_prog(const lsscan_t *scanner) { return scanner->prog; }
+lsprog_t *lsscan_get_prog(const lsscan_t *scanner) { return scanner->ls_prog; }
 
 void lsscan_set_prog(lsscan_t *scanner, lsprog_t *prog) {
-  scanner->prog = prog;
+  scanner->ls_prog = prog;
 }
 
 const char *lsscan_get_filename(const lsscan_t *scanner) {
-  return scanner->filename;
+  return scanner->ls_filename;
 }
