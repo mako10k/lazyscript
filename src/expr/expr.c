@@ -174,24 +174,3 @@ lspres_t lsexpr_prepare(lsexpr_t *const expr, lseenv_t *const env) {
     return LSPRES_SUCCESS;
   }
 }
-
-lsthunk_t *lsexpr_thunk(lstenv_t *tenv, const lsexpr_t *expr) {
-  assert(expr != NULL);
-  switch (expr->type) {
-  case LSETYPE_ALGE:
-    return lsthunk_alge(lstalge_new(tenv, expr->ealge));
-  case LSETYPE_APPL:
-    return lsthunk_appl(lstappl_new(tenv, expr->appl));
-  case LSETYPE_REF:
-    return lsthunk_ref(lstref_new(tenv, expr->eref));
-  case LSETYPE_LAMBDA:
-    return lsthunk_lambda(lstlambda_new(tenv, expr->lambda));
-  case LSETYPE_CLOSURE:
-    return lsthunk_closure(lstclosure_new(tenv, expr->closure));
-  case LSETYPE_INT:
-    return lsthunk_int(expr->intval);
-  case LSETYPE_STR:
-    return lsthunk_str(expr->strval);
-  }
-  assert(0);
-}

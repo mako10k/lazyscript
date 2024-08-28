@@ -16,7 +16,7 @@ lstalge_t *lstalge_new(lstenv_t *tenv, const lsealge_t *ealge) {
   for (const lselist_t *le = lsealge_get_args(ealge); le != NULL;
        le = lselist_get_next(le)) {
     lsexpr_t *arg = lselist_get(le, 0);
-    lstlist_push(alge->ltag_args, lsexpr_thunk(tenv, arg));
+    lstlist_push(alge->ltag_args, lsthunk_new_expr(tenv, arg));
   }
   return alge;
 }

@@ -58,5 +58,5 @@ lspres_t lseclosure_prepare(lseclosure_t *eclosure, lseenv_t *eenv) {
 }
 
 lsthunk_t *lseclosure_thunk(lstenv_t *tenv, const lseclosure_t *eclosure) {
-  return lsexpr_thunk(lstenv(tenv), eclosure->lec_expr);
+  return lsthunk_new_expr(lstenv(tenv), eclosure->lec_expr);
 }

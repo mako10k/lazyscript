@@ -42,4 +42,3 @@ lselambda_t *lsexpr_get_lambda(const lsexpr_t *expr);
 lseclosure_t *lsexpr_get_closure(const lsexpr_t *expr);
 void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr);
 lspres_t lsexpr_prepare(lsexpr_t *expr, lseenv_t *env);
-lsthunk_t *lsexpr_thunk(lstenv_t *tenv, const lsexpr_t *expr);

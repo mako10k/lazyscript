@@ -1,12 +1,8 @@
-noinst_LIBRARIES = liblsmisc.a
+noinst_LTLIBRARIES = liblsmisc.la
 
-AM_CFLAGS = -O0 -g -Wall -Wextra -Werror -I..
-#AM_YFLAGS = -d -Wcounterexamples
-AM_YFLAGS = -d
+liblsmisc_la_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS) -I..
 
-liblsmisc_a_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-
-liblsmisc_a_SOURCES = \
+liblsmisc_la_SOURCES = \
     belist.c \
     belist.h \
     bind.c \

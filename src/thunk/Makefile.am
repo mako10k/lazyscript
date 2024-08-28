@@ -1,10 +1,8 @@
-AM_CFLAGS = -O0 -g -Wall -Wextra -Werror -I..
+noinst_LTLIBRARIES = liblsthunk.la
 
-noinst_LIBRARIES = liblsthunk.a
+liblsthunk_la_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS) -I..
 
-liblsthunk_a_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-
-liblsthunk_a_SOURCES = \
+liblsthunk_la_SOURCES = \
     talge.c \
     talge.h \
     tappl.c \

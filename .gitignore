@@ -13,6 +13,8 @@ install-sh
 Makefile
 Makefile.in
 stamp-h1
+ltmain.sh
+libtool
 
 m4/
 autom4te.cache/
@@ -33,7 +35,9 @@ src/parser/parser.h
 
 *~
 *.o
+*.lo
 *.a
+*.la
 null.d
 
 /confdefs.h

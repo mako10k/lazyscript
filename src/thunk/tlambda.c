@@ -29,7 +29,7 @@ lsthunk_t *lstlambda_apply(lstlambda_t *tlambda, lsarray_t *args) {
     lstenv_t *tenv = lstenv(tlambda->env);
     if (lspat_match(tenv, param, arg)) {
       lsthunk_subst(body, tenv);
-      return lsexpr_thunk(tenv, expr);
+      return lsthunk_new_expr(tenv, expr);
     }
   }
   lspat_t * arg = lselambda_get_arg(tlambda->elambda);

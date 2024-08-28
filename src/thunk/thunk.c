@@ -128,3 +128,24 @@ lstref_t *lsthunk_get_ref(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_REF);
   return thunk->lt_ref;
 }
+
+lsthunk_t *lsthunk_new_expr(lstenv_t *tenv, const lsexpr_t *expr) {
+  assert(expr != NULL);
+  switch (lsexpr_get_type(expr)) {
+  case LSETYPE_ALGE:
+    return lsthunk_alge(lstalge_new(tenv, lsexpr_get_alge(expr)));
+  case LSETYPE_APPL:
+    return lsthunk_appl(lstappl_new(tenv, lsexpr_get_appl(expr)));
+  case LSETYPE_REF:
+    return lsthunk_ref(lstref_new(tenv, lsexpr_get_ref(expr)));
+  case LSETYPE_LAMBDA:
+    return lsthunk_lambda(lstlambda_new(tenv, lsexpr_get_lambda(expr)));
+  case LSETYPE_CLOSURE:
+    return lsthunk_closure(lstclosure_new(tenv, lsexpr_get_closure(expr)));
+  case LSETYPE_INT:
+    return lsthunk_int(lsexpr_get_int(expr));
+  case LSETYPE_STR:
+    return lsthunk_str(lsexpr_get_str(expr));
+  }
+  assert(0);
+}

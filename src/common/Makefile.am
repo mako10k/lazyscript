@@ -1,12 +1,8 @@
-noinst_LIBRARIES = liblscommon.a
+noinst_LTLIBRARIES = liblscommon.la
 
-AM_CFLAGS = -O0 -g -Wall -Wextra -Werror -I..
-#AM_YFLAGS = -d -Wcounterexamples
-AM_YFLAGS = -d
+liblscommon_la_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS) -I..
 
-liblscommon_a_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-
-liblscommon_a_SOURCES = \
+liblscommon_la_SOURCES = \
     array.c \
     array.h \
     hash.c \
@@ -17,5 +13,7 @@ liblscommon_a_SOURCES = \
     io.h \
     loc.c \
     loc.h \
+    malloc.c \
+    malloc.h \
     str.c \
     str.h

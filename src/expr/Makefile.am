@@ -1,10 +1,8 @@
-AM_CFLAGS = -O0 -g -Wall -Wextra -Werror -I..
+noinst_LTLIBRARIES = liblsexpr.la
 
-noinst_LIBRARIES = liblsexpr.a
+liblsexpr_la_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS) -I..
 
-liblsexpr_a_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-
-liblsexpr_a_SOURCES = \
+liblsexpr_la_SOURCES = \
     ealge.c \
     ealge.h \
     eappl.c \

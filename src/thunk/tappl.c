@@ -14,12 +14,12 @@ lstappl_t *lstappl_new(lstenv_t *tenv, const lseappl_t *eappl) {
   assert(tenv != NULL);
   assert(eappl != NULL);
   lstappl_t *tappl = lsmalloc(sizeof(lstappl_t));
-  tappl->ltap_func = lsexpr_thunk(tenv, lseappl_get_func(eappl));
+  tappl->ltap_func = lsthunk_new_expr(tenv, lseappl_get_func(eappl));
   tappl->ltap_args = lstlist_new();
   for (const lselist_t *le = lseappl_get_args(eappl); le != NULL;
        le = lselist_get_next(le)) {
     lsexpr_t *arg = lselist_get(le, 0);
-    lstlist_push(tappl->ltap_args, lsexpr_thunk(tenv, arg));
+    lstlist_push(tappl->ltap_args, lsthunk_new_expr(tenv, arg));
   }
   return tappl;
 }

@@ -5,6 +5,7 @@ AC_PREREQ([2.71])
 AC_INIT([lazyscript],[0.0.1],[mako10k@mk10.org])
 AC_CONFIG_SRCDIR([Makefile.am])
 AM_INIT_AUTOMAKE([foreign])
+LT_INIT
 
 # Checks for programs.
 AC_PROG_CC
@@ -17,7 +18,6 @@ else
 fi
 
 AC_PROG_LEX([noyywrap])
-AC_PROG_RANLIB
 
 # Checks for libraries.
 PKG_CHECK_MODULES([GC], [bdw-gc])

@@ -1,10 +1,8 @@
-AM_CFLAGS = -O0 -g -Wall -Wextra -Werror -I..
+noinst_LTLIBRARIES = liblspat.la
 
-noinst_LIBRARIES = liblspat.a
+liblspat_la_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS) -I..
 
-liblspat_a_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-
-liblspat_a_SOURCES = \
+liblspat_la_SOURCES = \
     palge.c \
     palge.h \
     pas.c \

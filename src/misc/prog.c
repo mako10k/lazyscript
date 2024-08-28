@@ -28,7 +28,7 @@ int lsprog_prepare(lsprog_t *prog, lseenv_t *env) {
 }
 
 lsthunk_t *lsprog_thunk(lstenv_t *tenv, const lsprog_t *prog) {
-  return lsexpr_thunk(tenv, prog->lprg_expr);
+  return lsthunk_new_expr(tenv, prog->lprg_expr);
 }
 
 void yyerror(lsloc_t *loc, lsscan_t *scanner, const char *s) {
