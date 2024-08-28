@@ -2,10 +2,10 @@
 
 typedef struct lseref lseref_t;
 
-#include "eenv.h"
-#include "erref.h"
-#include "loc.h"
-#include "str.h"
+#include "common/loc.h"
+#include "common/str.h"
+#include "expr/eenv.h"
+#include "expr/erref.h"
 
 lseref_t *lseref_new(const lsstr_t *name, lsloc_t loc);
 const lsstr_t *lseref_get_name(const lseref_t *eref);

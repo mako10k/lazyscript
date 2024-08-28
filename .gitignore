@@ -23,14 +23,18 @@ lex.yy.c
 
 /doc/
 
-src/.deps/
+.deps/
 
 src/lazyscript
-src/lexer.c
-src/lexer.h
-src/parser.c
-src/parser.h
+src/parser/lexer.c
+src/parser/lexer.h
+src/parser/parser.c
+src/parser/parser.h
 
 *~
 *.o
+*.a
 null.d
+
+/confdefs.h
+/conftest.h

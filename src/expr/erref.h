@@ -8,9 +8,9 @@ typedef enum {
   LSERRTYPE_LAMBDA,
 } lserrtype_t;
 
-#include "bind.h"
-#include "elambda.h"
-#include "pref.h"
+#include "expr/elambda.h"
+#include "misc/bind.h"
+#include "pat/pref.h"
 
 lserref_wrapper_t *lserref_wrapper_bind_ent(lsbind_entry_t *ent);
 lserref_wrapper_t *lserref_wrapper_lambda_ent(lselambda_entry_t *ent);

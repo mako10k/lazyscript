@@ -1,7 +1,7 @@
-#include "erref.h"
-#include "bind.h"
-#include "elambda.h"
-#include "malloc.h"
+#include "expr/erref.h"
+#include "common/malloc.h"
+#include "expr/elambda.h"
+#include "misc/bind.h"
 #include <assert.h>
 
 struct lserref {

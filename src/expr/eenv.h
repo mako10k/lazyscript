@@ -2,8 +2,8 @@
 
 typedef struct lseenv lseenv_t;
 
-#include "erref.h"
-#include "str.h"
+#include "common/str.h"
+#include "expr/erref.h"
 
 lseenv_t *lseenv_new(lseenv_t *parent);
 lserref_t *lseenv_get(const lseenv_t *eenv, const lsstr_t *name);

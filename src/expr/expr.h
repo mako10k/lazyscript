@@ -4,16 +4,16 @@
 
 typedef struct lsexpr lsexpr_t;
 
-#include "ealge.h"
-#include "eappl.h"
-#include "eclosure.h"
-#include "eenv.h"
-#include "elambda.h"
-#include "eref.h"
-#include "int.h"
-#include "str.h"
-#include "tenv.h"
-#include "thunk.h"
+#include "common/int.h"
+#include "common/str.h"
+#include "expr/ealge.h"
+#include "expr/eappl.h"
+#include "expr/eclosure.h"
+#include "expr/eenv.h"
+#include "expr/elambda.h"
+#include "expr/eref.h"
+#include "thunk/tenv.h"
+#include "thunk/thunk.h"
 
 typedef enum {
   LSETYPE_ALGE,

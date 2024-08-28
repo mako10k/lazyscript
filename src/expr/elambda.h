@@ -3,8 +3,8 @@
 typedef struct lselambda lselambda_t;
 typedef struct lselambda_entry lselambda_entry_t;
 
-#include "expr.h"
-#include "pat.h"
+#include "expr/expr.h"
+#include "pat/pat.h"
 #include <stdio.h>
 
 lselambda_entry_t *lselambda_entry_new(lspat_t *arg, lsexpr_t *body);

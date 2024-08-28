@@ -1,7 +1,7 @@
-#include "elambda.h"
-#include "array.h"
-#include "io.h"
-#include "malloc.h"
+#include "expr/elambda.h"
+#include "common/array.h"
+#include "common/io.h"
+#include "common/malloc.h"
 #include <assert.h>
 
 struct lselambda {

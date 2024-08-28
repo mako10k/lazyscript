@@ -1,15 +1,10 @@
-#include "eenv.h"
-#include <string.h>
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#else
-#define PACKAGE_VERSION "0.0.1"
-#define PACKAGE_NAME "lazyscript"
-#endif
 #include "lazyscript.h"
-#include "parser.h"
+#include "expr/eenv.h"
+#include "misc/prog.h"
+#include "parser/parser.h"
+#include <string.h>
 
-#include "lexer.h"
+#include "parser/lexer.h"
 #include <assert.h>
 #include <gc.h>
 #include <getopt.h>
@@ -19,11 +14,11 @@ static lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   assert(in_str != NULL);
   yyscan_t yyscanner;
   yylex_init(&yyscanner);
-  lsscan_t lsscan = {NULL, filename};
+  lsscan_t *lsscan = lsscan_new(filename);
   yyset_in(in_str, yyscanner);
-  yyset_extra(&lsscan, yyscanner);
+  yyset_extra(lsscan, yyscanner);
   int ret = yyparse(yyscanner);
-  lsprog_t *prog = ret == 0 ? lsscan.prog : NULL;
+  lsprog_t *prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
   yylex_destroy(yyscanner);
   return prog;
 }

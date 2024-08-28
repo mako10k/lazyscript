@@ -1,7 +1,7 @@
-#include "ealge.h"
-#include "elist.h"
-#include "io.h"
-#include "malloc.h"
+#include "expr/ealge.h"
+#include "common/io.h"
+#include "common/malloc.h"
+#include "expr/elist.h"
 #include <assert.h>
 
 struct lsealge {

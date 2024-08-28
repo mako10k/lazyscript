@@ -1,9 +1,9 @@
-#include "eref.h"
-#include "erref.h"
-#include "io.h"
+#include "expr/eref.h"
+#include "common/io.h"
+#include "common/malloc.h"
+#include "common/str.h"
+#include "expr/erref.h"
 #include "lstypes.h"
-#include "malloc.h"
-#include "str.h"
 #include <assert.h>
 
 struct lseref {

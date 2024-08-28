@@ -33,7 +33,14 @@ AC_CHECK_TYPES([ptrdiff_t])
 # Checks for library functions.
 AC_FUNC_MALLOC
 
-AC_CONFIG_FILES([Makefile src/Makefile src/expr/Makefile])
+AC_CONFIG_FILES([Makefile
+                 src/Makefile
+                 src/common/Makefile
+                 src/expr/Makefile
+                 src/misc/Makefile
+                 src/parser/Makefile
+                 src/pat/Makefile
+                 src/thunk/Makefile])
 
 AC_ARG_ENABLE([debug],
   AS_HELP_STRING([--enable-debug], [Enable debugging]),

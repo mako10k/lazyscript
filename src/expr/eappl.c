@@ -1,7 +1,7 @@
-#include "eappl.h"
-#include "expr.h"
-#include "io.h"
-#include "malloc.h"
+#include "expr/eappl.h"
+#include "common/io.h"
+#include "common/malloc.h"
+#include "expr/expr.h"
 #include <assert.h>
 
 struct lseappl {

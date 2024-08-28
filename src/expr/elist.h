@@ -3,7 +3,7 @@
 typedef struct lselist lselist_t;
 typedef struct lselistm lselistm_t;
 
-#include "expr.h"
+#include "expr/expr.h"
 
 lselistm_t *lselistm_new(void);
 void lselistm_push(lselistm_t **pelistm, lsexpr_t *expr);

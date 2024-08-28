@@ -3,12 +3,12 @@
 #include <stdio.h>
 typedef struct lseappl lseappl_t;
 
-#include "array.h"
-#include "eenv.h"
-#include "elist.h"
-#include "expr.h"
+#include "common/array.h"
+#include "expr/eenv.h"
+#include "expr/elist.h"
+#include "expr/expr.h"
 #include "lazyscript.h"
-#include "tenv.h"
+#include "thunk/tenv.h"
 
 lseappl_t *lseappl_new(lsexpr_t *func);
 void lseappl_add_arg(lseappl_t *eappl, lsexpr_t *arg);

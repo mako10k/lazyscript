@@ -1,9 +1,8 @@
 #pragma once
 
-#include "prog.h"
-#include <stdio.h>
-
-typedef struct lsscan {
-  lsprog_t *prog;
-  const char *filename;
-} lsscan_t;
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#else
+#define PACKAGE_VERSION "0.0.1"
+#define PACKAGE_NAME "lazyscript"
+#endif

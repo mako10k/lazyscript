@@ -4,13 +4,13 @@
 
 typedef struct lsealge lsealge_t;
 
-#include "array.h"
-#include "eenv.h"
-#include "elist.h"
-#include "expr.h"
+#include "common/array.h"
+#include "common/str.h"
+#include "expr/eenv.h"
+#include "expr/elist.h"
+#include "expr/expr.h"
 #include "lazyscript.h"
-#include "str.h"
-#include "tenv.h"
+#include "thunk/tenv.h"
 
 lsealge_t *lsealge_new(const lsstr_t *constr);
 void lsealge_add_arg(lsealge_t *ealge, lsexpr_t *arg);

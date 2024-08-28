@@ -2,10 +2,10 @@
 
 typedef struct lseclosure lseclosure_t;
 
-#include "bind.h"
-#include "expr.h"
-#include "tenv.h"
-#include "thunk.h"
+#include "expr/expr.h"
+#include "misc/bind.h"
+#include "thunk/tenv.h"
+#include "thunk/thunk.h"
 
 lseclosure_t *lseclosure_new(lsexpr_t *expr, lsbind_t *bind);
 void lseclosure_print(FILE *stream, lsprec_t prec, int indent,

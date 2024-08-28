@@ -1,7 +1,7 @@
-#include "eclosure.h"
-#include "expr.h"
-#include "io.h"
-#include "malloc.h"
+#include "expr/eclosure.h"
+#include "common/io.h"
+#include "common/malloc.h"
+#include "expr/expr.h"
 
 struct lseclosure {
   lsexpr_t *lec_expr;

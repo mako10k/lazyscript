@@ -1,6 +1,6 @@
-#include "eenv.h"
-#include "hash.h"
-#include "malloc.h"
+#include "expr/eenv.h"
+#include "common/hash.h"
+#include "common/malloc.h"
 #include <assert.h>
 
 struct lseenv {
