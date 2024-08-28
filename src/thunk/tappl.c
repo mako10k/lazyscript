@@ -30,7 +30,7 @@ lsthunk_t *lstappl_apply(lstappl_t *tappl, const lstlist_t *args) {
   lstappl_t *tappl2 = lsmalloc(sizeof(lstappl_t));
   tappl2->lta_func = tappl->lta_func;
   tappl2->lta_args = lstlist_concat(tappl->lta_args, args);
-  return lsthunk_appl(tappl2);
+  return lsthunk_new_appl(tappl2);
 }
 
 lsthunk_t *lstappl_eval(lstappl_t *tappl) {
@@ -38,7 +38,7 @@ lsthunk_t *lstappl_eval(lstappl_t *tappl) {
   lsthunk_t *func = lsthunk_get_whnf(tappl->lta_func);
   if (lstlist_count(tappl->lta_args) == 0)
     return func;
-  lsttype_t ttype = lsthunk_type(func);
+  lsttype_t ttype = lsthunk_get_type(func);
   assert(ttype != LSTTYPE_REF);
   switch (ttype) {
   case LSTTYPE_APPL:

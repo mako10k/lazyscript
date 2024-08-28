@@ -25,7 +25,7 @@ lsthunk_t *lstalge_apply(lstalge_t *talge, const lstlist_t *args) {
   assert(talge != NULL);
   talge->lta_constr = talge->lta_constr;
   talge->lta_args = lstlist_concat(talge->lta_args, args);
-  return lsthunk_alge(talge);
+  return lsthunk_new_alge(talge);
 }
 
 const lsstr_t *lstalge_get_constr(const lstalge_t *talge) {
