@@ -1,15 +1,18 @@
+SUBDIRS = expr
+
 bin_PROGRAMS = lazyscript
 
 CLEANFILES = parser.h parser.c lexer.c
 
 BUILT_SOURCES = lexer.c parser.h parser.c
 
-AM_CFLAGS = -O0 -g -Wall -Wextra -Werror
-#AM_YFLAGS = -d -Wcounterexamples
+AM_CFLAGS = -O0 -g -Wall -Wextra -Werror -Iexpr
+#AM_YFLAGS = -d -Wcounterexamples -Iexpr
 AM_YFLAGS = -d
 
 lazyscript_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-lazyscript_LDADD = $(GC_LIBS)
+lazyscript_LDFLAGS = -Lexpr
+lazyscript_LDADD = $(GC_LIBS) -llsexpr
 
 lazyscript_SOURCES = \
     array.c \
@@ -18,24 +21,6 @@ lazyscript_SOURCES = \
     belist.h \
     bind.c \
     bind.h \
-    ealge.c \
-    ealge.h \
-    eappl.c \
-    eappl.h \
-    eclosure.c \
-    eclosure.h \
-    eenv.c \
-    eenv.h \
-    elambda.c \
-    elambda.h \
-    elist.c \
-    elist.h \
-    eref.c \
-    eref.h \
-    erref.c \
-    erref.h \
-    expr.c \
-    expr.h \
     hash.c \
     hash.h \
     int.c \

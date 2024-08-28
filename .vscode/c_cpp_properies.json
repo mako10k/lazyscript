@@ -1,0 +1,9 @@
+{
+    "configurations": [
+        {
+            "includePath": [
+                "${workspaceFolder}/**"
+            ]
+        }
+    ]
+}
