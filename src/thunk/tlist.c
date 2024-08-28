@@ -15,7 +15,7 @@ const lstlist_t *lstlist_push(const lstlist_t *tlist, lsthunk_t *thunk) {
 
 const lstlist_t *lstlist_pop(const lstlist_t *tlist, lsthunk_t **pthunk) {
   return (const lstlist_t *)lslist_pop((const lslist_t *)tlist,
-                                       (lsdata_t *)pthunk);
+                                       (lslist_data_t *)pthunk);
 }
 
 const lstlist_t *lstlist_unshift(const lstlist_t *tlist, lsthunk_t *thunk) {
@@ -24,7 +24,7 @@ const lstlist_t *lstlist_unshift(const lstlist_t *tlist, lsthunk_t *thunk) {
 
 const lstlist_t *lstlist_shift(const lstlist_t *tlist, lsthunk_t **pthunk) {
   return (const lstlist_t *)lslist_shift((const lslist_t *)tlist,
-                                         (lsdata_t *)pthunk);
+                                         (lslist_data_t *)pthunk);
 }
 
 lssize_t lstlist_count(const lstlist_t *tlist) {

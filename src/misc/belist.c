@@ -18,7 +18,7 @@ const lsbelist_t *lsbelist_push(const lsbelist_t *belist, lsbind_entry_t *ent) {
 const lsbelist_t *lsbelist_pop(const lsbelist_t *belist,
                                lsbind_entry_t **pent) {
   return (const lsbelist_t *)lslist_pop((const lslist_t *)belist,
-                                        (lsdata_t *)pent);
+                                        (lslist_data_t *)pent);
 }
 
 const lsbelist_t *lsbelist_unshift(const lsbelist_t *belist,
@@ -29,7 +29,7 @@ const lsbelist_t *lsbelist_unshift(const lsbelist_t *belist,
 const lsbelist_t *lsbelist_shift(const lsbelist_t *belist,
                                  lsbind_entry_t **pent) {
   return (const lsbelist_t *)lslist_shift((const lslist_t *)belist,
-                                          (lsdata_t *)pent);
+                                          (lslist_data_t *)pent);
 }
 
 lssize_t lsbelist_count(const lsbelist_t *belist) {

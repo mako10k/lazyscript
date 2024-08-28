@@ -15,7 +15,7 @@ const lselist_t *lselist_push(const lselist_t *elist, lsexpr_t *expr) {
 
 const lselist_t *lselist_pop(const lselist_t *elist, lsexpr_t **pexpr) {
   return (const lselist_t *)lslist_pop((const lslist_t *)elist,
-                                       (lsdata_t *)pexpr);
+                                       (lslist_data_t *)pexpr);
 }
 
 const lselist_t *lselist_unshift(const lselist_t *elist, lsexpr_t *expr) {
@@ -24,7 +24,7 @@ const lselist_t *lselist_unshift(const lselist_t *elist, lsexpr_t *expr) {
 
 const lselist_t *lselist_shift(const lselist_t *elist, lsexpr_t **pexpr) {
   return (const lselist_t *)lslist_shift((const lslist_t *)elist,
-                                         (lsdata_t *)pexpr);
+                                         (lslist_data_t *)pexpr);
 }
 
 lssize_t lselist_count(const lselist_t *elist) {

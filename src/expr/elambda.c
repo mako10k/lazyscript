@@ -1,11 +1,11 @@
 #include "expr/elambda.h"
-#include "common/array.h"
 #include "common/io.h"
+#include "common/list.h"
 #include "common/malloc.h"
 #include <assert.h>
 
 struct lselambda {
-  lsarray_t *lel_ents;
+  const lslist_t *lel_ents;
 };
 
 struct lselambda_entry {
@@ -15,12 +15,12 @@ struct lselambda_entry {
 
 lselambda_t *lselambda_new(void) {
   lselambda_t *lambda = lsmalloc(sizeof(lselambda_t));
-  lambda->lel_ents = lsarray_new();
+  lambda->lel_ents = lslist_new();
   return lambda;
 }
 
 lselambda_t *lselambda_push(lselambda_t *lambda, lselambda_entry_t *ent) {
-  lsarray_push(lambda->lel_ents, ent);
+  lambda->lel_ents = lslist_push(lambda->lel_ents, ent);
   return lambda;
 }
 
@@ -34,12 +34,12 @@ lselambda_entry_t *lselambda_entry_new(lspat_t *arg, lsexpr_t *body) {
 void lselambda_print(FILE *fp, lsprec_t prec, int indent,
                      const lselambda_t *lambda) {
   (void)prec;
-  lssize_t size = lsarray_get_size(lambda->lel_ents);
+  lssize_t size = lslist_count(lambda->lel_ents);
   for (size_t i = 0; i < size; i++) {
     if (i > 0)
       lsprintf(fp, indent, " |\n");
     lselambda_entry_print(fp, LSPREC_LAMBDA + 1, indent,
-                          lsarray_get(lambda->lel_ents, i));
+                          lslist_get(lambda->lel_ents, i));
   }
 }
 
@@ -54,14 +54,14 @@ void lselambda_entry_print(FILE *fp, lsprec_t prec, int indent,
 
 lssize_t lselambda_get_entry_count(const lselambda_t *lambda) {
   assert(lambda != NULL);
-  return lsarray_get_size(lambda->lel_ents);
+  return lslist_count(lambda->lel_ents);
 }
 
 lspres_t lselambda_prepare(lselambda_t *lambda, lseenv_t *env) {
-  lssize_t size = lsarray_get_size(lambda->lel_ents);
+  lssize_t size = lslist_count(lambda->lel_ents);
   for (size_t i = 0; i < size; i++) {
     lspres_t res =
-        lselambda_entry_prepare(lsarray_get(lambda->lel_ents, i), env);
+        lselambda_entry_prepare(lslist_get(lambda->lel_ents, i), env);
     if (res != LSPRES_SUCCESS)
       return res;
   }

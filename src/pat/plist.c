@@ -15,7 +15,7 @@ const lsplist_t *lsplist_push(const lsplist_t *plist, lspat_t *pat) {
 
 const lsplist_t *lsplist_pop(const lsplist_t *plist, lspat_t **ppat) {
   return (const lsplist_t *)lslist_pop((const lslist_t *)plist,
-                                       (lsdata_t *)ppat);
+                                       (lslist_data_t *)ppat);
 }
 
 const lsplist_t *lsplist_unshift(const lsplist_t *plist, lspat_t *pat) {
@@ -24,7 +24,7 @@ const lsplist_t *lsplist_unshift(const lsplist_t *plist, lspat_t *pat) {
 
 const lsplist_t *lsplist_shift(const lsplist_t *plist, lspat_t **ppat) {
   return (const lsplist_t *)lslist_shift((const lslist_t *)plist,
-                                         (lsdata_t *)ppat);
+                                         (lslist_data_t *)ppat);
 }
 
 lssize_t lsplist_count(const lsplist_t *plist) {
