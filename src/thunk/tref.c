@@ -13,3 +13,7 @@ lstref_t *lstref_new(lstenv_t *tenv, const lseref_t *eref) {
   tref->ltrr_trref = lstrref_new(tenv, name, erref);
   return tref;
 }
+
+lsthunk_t *lstref_eval(lstref_t *tref) {
+  return lstrref_eval(tref->ltrr_trref); // TODO: implement
+}

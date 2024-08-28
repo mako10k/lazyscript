@@ -16,6 +16,10 @@ lstlambda_t *lstlambda_new(lstenv_t *tenv, const lselambda_t *elambda) {
   return tlambda;
 }
 
+lsthunk_t *lstlambda_apply(lstlambda_t *tlambda, const lstlist_t *args) {
+  return NULL; // TODO: implement
+}
+
 #if 0
 lsthunk_t *lstlambda_apply(lstlambda_t *tlambda, lsarray_t *args) {
   assert(tlambda != NULL);

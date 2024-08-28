@@ -15,3 +15,7 @@ lstrref_t *lstrref_new(lstenv_t *tenv, const lsstr_t *name,
   trref->tenv = tenv;
   return trref;
 }
+
+lsthunk_t *lstrref_eval(lstrref_t *trref) {
+  return NULL; // TODO: implement
+}

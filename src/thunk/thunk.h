@@ -4,9 +4,9 @@ typedef struct lsthunk lsthunk_t;
 
 #include "common/int.h"
 #include "common/str.h"
-#include "pat/pat.h"
 #include "pat/palge.h"
 #include "pat/pas.h"
+#include "pat/pat.h"
 #include "pat/pref.h"
 #include "thunk/talge.h"
 #include "thunk/tappl.h"
