@@ -1,10 +1,11 @@
 #pragma once
 
 typedef enum lsprec {
-  LSPREC_LOWEST = 0,
+  LSPREC_LOWEST,
   LSPREC_CONS,
   LSPREC_LAMBDA,
   LSPREC_APPL,
+  LSPREC_HIGHEST,
 } lsprec_t;
 
 typedef enum lspres {

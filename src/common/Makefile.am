@@ -9,6 +9,8 @@ liblscommon_la_SOURCES = \
     hash.h \
     int.c \
     int.h \
+    list.c \
+    list.h \
     io.c \
     io.h \
     loc.c \

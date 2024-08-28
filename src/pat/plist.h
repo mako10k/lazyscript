@@ -1,19 +1,8 @@
 #pragma once
 
 typedef struct lsplist lsplist_t;
-typedef struct lsplistm lsplistm_t;
 
 #include "pat/pat.h"
-
-lsplistm_t *lsplistm_new(void);
-void lsplistm_push(lsplistm_t **pplistm, lspat_t *pat);
-lspat_t *lsplistm_pop(lsplistm_t **pplistm);
-void lsplistm_unshift(lsplistm_t **pplistm, lspat_t *pat);
-lspat_t *lsplistm_shift(lsplistm_t **pplistm);
-lssize_t lsplistm_count(const lsplistm_t *plistm);
-lspat_t *lsplistm_get(const lsplistm_t *plist, lssize_t i);
-lsplistm_t *lsplistm_clone(const lsplistm_t *plistm);
-void lsplistm_concat(lsplistm_t **pplistm, lsplist_t *plistm);
 
 const lsplist_t *lsplist_new(void);
 const lsplist_t *lsplist_push(const lsplist_t *plist, lspat_t *pat);

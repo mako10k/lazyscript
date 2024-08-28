@@ -23,7 +23,7 @@
 <COMMENT>.*-\} { BEGIN(INITIAL); }
 <COMMENT>.*    { /* ignore comment */ }
 [ \t\n]+    { /* ignore whitespace */ }
-[0-9]+      { yylval->intval = lsint(atoi(yytext)); return LSTINT; }
+[0-9]+      { yylval->intval = lsint_new(atoi(yytext)); return LSTINT; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext); return LSTSYMBOL; }
 \"([^\\\"]|\\.)*\" { yylval->strval = lsstr_parse(yytext + 1, yyleng - 2); return LSTSTR; }
 "->"       { return LSTARROW; }

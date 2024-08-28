@@ -26,6 +26,7 @@ lex.yy.c
 /doc/
 
 .deps/
+.libs/
 
 src/lazyscript
 src/parser/lexer.c
