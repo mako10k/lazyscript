@@ -4,6 +4,10 @@ typedef struct lsthunk lsthunk_t;
 
 #include "common/int.h"
 #include "common/str.h"
+#include "pat/pat.h"
+#include "pat/palge.h"
+#include "pat/pas.h"
+#include "pat/pref.h"
 #include "thunk/talge.h"
 #include "thunk/tappl.h"
 #include "thunk/tclosure.h"
@@ -40,3 +44,11 @@ const lsstr_t *lsthunk_get_str(const lsthunk_t *thunk);
 lstclosure_t *lsthunk_get_closure(const lsthunk_t *thunk);
 lstlambda_t *lsthunk_get_lambda(const lsthunk_t *thunk);
 lstref_t *lsthunk_get_ref(const lsthunk_t *thunk);
+
+lsmres_t lsthunk_match_pat(lstenv_t *tenv, const lspat_t *pat,
+                           lsthunk_t *thunk);
+lsmres_t lsthunk_match_alge(lstenv_t *tenv, const lspalge_t *alge,
+                            lsthunk_t *thunk);
+lsmres_t lsthunk_match_as(lstenv_t *tenv, const lspas_t *pas, lsthunk_t *thunk);
+lsmres_t lsthunk_match_ref(lstenv_t *tenv, const lspref_t *pref,
+                           lsthunk_t *thunk);

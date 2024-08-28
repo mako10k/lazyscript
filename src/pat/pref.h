@@ -13,4 +13,3 @@ lsloc_t lspref_get_loc(const lspref_t *pref);
 void lspref_print(FILE *fp, lsprec_t prec, int indent, const lspref_t *pref);
 lspres_t lspref_prepare(lspref_t *pref, lseenv_t *eenv,
                         lserref_wrapper_t *erref);
-lsmres_t lspref_match(lstenv_t *tenv, const lspref_t *pref, lsthunk_t *thunk);

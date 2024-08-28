@@ -35,12 +35,6 @@ lspres_t lspas_prepare(lspas_t *pas, lseenv_t *env, lserref_wrapper_t *erref) {
   return LSPRES_SUCCESS;
 }
 
-lsmres_t lspas_match(lstenv_t *tenv, const lspas_t *pas, lsthunk_t *thunk) {
-  lsmres_t mres = lspat_match(tenv, pas->lpa_pat, thunk);
-  if (mres != LSMATCH_SUCCESS)
-    return mres;
-  mres = lspref_match(tenv, pas->lpa_pref, thunk);
-  if (mres != LSMATCH_SUCCESS)
-    return mres;
-  return LSMATCH_SUCCESS;
-}
+lspref_t *lspas_get_pref(const lspas_t *pas) { return pas->lpa_pref; }
+
+lspat_t *lspas_get_pat(const lspas_t *pas) { return pas->lpa_pat; }

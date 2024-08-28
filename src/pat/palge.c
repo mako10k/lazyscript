@@ -3,7 +3,6 @@
 #include "common/malloc.h"
 #include "common/str.h"
 #include "pat/plist.h"
-#include "thunk/thunk.h"
 #include <assert.h>
 
 struct lspalge {
@@ -75,30 +74,6 @@ lspres_t lspalge_prepare(lspalge_t *alge, lseenv_t *env,
       return res;
   }
   return LSPRES_SUCCESS;
-}
-
-lsmres_t lspalge_match(lstenv_t *tenv, const lspalge_t *palge,
-                       lsthunk_t *thunk) {
-  assert(palge != NULL);
-  lsthunk_t *thunk_whnf = lsthunk_get_whnf(thunk);
-  lsttype_t ttype = lsthunk_type(thunk_whnf);
-  if (ttype != LSTTYPE_ALGE)
-    return LSMATCH_FAILURE;
-  lstalge_t *talge = lsthunk_get_alge(thunk_whnf);
-  const lsstr_t *tconstr = lstalge_get_constr(talge);
-  if (lsstrcmp(palge->lpal_constr, tconstr) != 0)
-    return LSMATCH_FAILURE;
-  lssize_t pargc = lsplist_count(palge->lpal_args);
-  lssize_t targc = lstalge_get_argc(talge);
-  if (pargc != targc)
-    return LSMATCH_FAILURE;
-  for (lssize_t i = 0; i < pargc; i++) {
-    lspat_t *parg = lsplist_get(palge->lpal_args, i);
-    lsthunk_t *targ = lstalge_get_arg(talge, i);
-    if (lspat_match(tenv, parg, targ) < 0)
-      return LSMATCH_FAILURE;
-  }
-  return LSMATCH_SUCCESS;
 }
 
 const lsplist_t *lspalge_get_args(const lspalge_t *alge) {

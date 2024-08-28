@@ -149,3 +149,84 @@ lsthunk_t *lsthunk_new_expr(lstenv_t *tenv, const lsexpr_t *expr) {
   }
   assert(0);
 }
+
+static lsmres_t lsthunk_match_int(lstenv_t *tenv, const lsint_t *intval,
+                                  lsthunk_t *thunk) {
+  (void)tenv;
+  lsttype_t ttype = lsthunk_type(thunk);
+  if (ttype != LSTTYPE_INT)
+    return LSMATCH_FAILURE;
+  const lsint_t *tintval = lsthunk_get_int(thunk);
+  return lsint_eq(intval, tintval) ? LSMATCH_SUCCESS : LSMATCH_FAILURE;
+}
+
+static lsmres_t lsthunk_match_str(lstenv_t *tenv, const lsstr_t *strval,
+                                  lsthunk_t *thunk) {
+  (void)tenv;
+  lsttype_t ttype = lsthunk_type(thunk);
+  if (ttype != LSTTYPE_STR)
+    return LSMATCH_FAILURE;
+  const lsstr_t *tstrval = lsthunk_get_str(thunk);
+  return lsstrcmp(strval, tstrval) == 0 ? LSMATCH_SUCCESS : LSMATCH_FAILURE;
+}
+
+lsmres_t lsthunk_match_pat(lstenv_t *tenv, const lspat_t *pat,
+                           lsthunk_t *thunk) {
+  switch (lspat_get_type(pat)) {
+  case LSPTYPE_ALGE:
+    return lsthunk_match_alge(tenv, lspat_get_alge(pat), thunk);
+  case LSPTYPE_AS:
+    return lsthunk_match_as(tenv, lspat_get_as(pat), thunk);
+  case LSPTYPE_INT:
+    return lsthunk_match_int(tenv, lspat_get_int(pat), thunk);
+  case LSPTYPE_STR:
+    return lsthunk_match_str(tenv, lspat_get_str(pat), thunk);
+  case LSPTYPE_REF:
+    return lsthunk_match_ref(tenv, lspat_get_ref(pat), thunk);
+  }
+  return LSMATCH_FAILURE;
+}
+
+lsmres_t lsthunk_match_alge(lstenv_t *tenv, const lspalge_t *palge,
+                            lsthunk_t *thunk) {
+  assert(palge != NULL);
+  lsthunk_t *thunk_whnf = lsthunk_get_whnf(thunk);
+  lsttype_t ttype = lsthunk_type(thunk_whnf);
+  if (ttype != LSTTYPE_ALGE)
+    return LSMATCH_FAILURE;
+  lstalge_t *talge = lsthunk_get_alge(thunk_whnf);
+  const lsstr_t *tconstr = lstalge_get_constr(talge);
+  const lsstr_t *pconstr = lspalge_get_constr(palge);
+  if (lsstrcmp(pconstr, tconstr) != 0)
+    return LSMATCH_FAILURE;
+  const lsplist_t *pargs = lspalge_get_args(palge);
+  lssize_t pargc = lspalge_get_arg_count(palge);
+  lssize_t targc = lstalge_get_arg_count(talge);
+  if (pargc != targc)
+    return LSMATCH_FAILURE;
+  for (lssize_t i = 0; i < pargc; i++) {
+    lspat_t *parg = lsplist_get(pargs, i);
+    lsthunk_t *targ = lstalge_get_arg(talge, i);
+    if (lsthunk_match_pat(tenv, parg, targ) < 0)
+      return LSMATCH_FAILURE;
+  }
+  return LSMATCH_SUCCESS;
+}
+
+lsmres_t lsthunk_match_as(lstenv_t *tenv, const lspas_t *pas,
+                          lsthunk_t *thunk) {
+  lspref_t *pref = lspas_get_pref(pas);
+  lspat_t *pat = lspas_get_pat(pas);
+  lsmres_t mres = lsthunk_match_pat(tenv, pat, thunk);
+  if (mres != LSMATCH_SUCCESS)
+    return mres;
+  mres = lsthunk_match_ref(tenv, pref, thunk);
+  if (mres != LSMATCH_SUCCESS)
+    return mres;
+  return LSMATCH_SUCCESS;
+}
+
+lsmres_t lsthunk_match_ref(lstenv_t *tenv, const lspref_t *pref,
+                           lsthunk_t *thunk) {
+  return LSMATCH_FAILURE; // TODO: implement
+}

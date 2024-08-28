@@ -6,9 +6,6 @@
 #include "expr/eclosure.h"
 #include "expr/elambda.h"
 #include "expr/eref.h"
-#include "thunk/talge.h"
-#include "thunk/tappl.h"
-#include "thunk/tref.h"
 #include <assert.h>
 
 struct lsexpr {

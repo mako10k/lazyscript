@@ -27,3 +27,18 @@ lsthunk_t *lstalge_apply(lstalge_t *talge, const lstlist_t *args) {
   talge->ltag_args = lstlist_concat(talge->ltag_args, args);
   return lsthunk_alge(talge);
 }
+
+lssize_t lstalge_get_arg_count(const lstalge_t *talge) {
+  assert(talge != NULL);
+  return lstlist_count(talge->ltag_args);
+}
+
+lsthunk_t *lstalge_get_arg(const lstalge_t *talge, int i) {
+  assert(talge != NULL);
+  return lstlist_get(talge->ltag_args, i);
+}
+
+const lstlist_t *lstalge_get_args(const lstalge_t *talge) {
+  assert(talge != NULL);
+  return talge->ltag_args;
+}

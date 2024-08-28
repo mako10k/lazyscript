@@ -1,7 +1,6 @@
 #include "pat/pat.h"
 #include "common/malloc.h"
 #include "lstypes.h"
-#include "thunk/thunk.h"
 
 struct lspat {
   lsptype_t lp_type;
@@ -41,6 +40,18 @@ lspat_t *lspat_new_str(const lsstr_t *val) {
   pat->lp_str = val;
   return pat;
 }
+
+lsptype_t lspat_get_type(const lspat_t *pat) { return pat->lp_type; }
+
+lspalge_t *lspat_get_alge(const lspat_t *pat) { return pat->lp_alge; }
+
+lspas_t *lspat_get_as(const lspat_t *pat) { return pat->lp_as; }
+
+const lsint_t *lspat_get_int(const lspat_t *pat) { return pat->lp_int; }
+
+const lsstr_t *lspat_get_str(const lspat_t *pat) { return pat->lp_str; }
+
+lspref_t *lspat_get_ref(const lspat_t *pat) { return pat->lp_ref; }
 
 void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat) {
   switch (pat->lp_type) {
@@ -83,40 +94,4 @@ lspres_t lspat_prepare(lspat_t *pat, lseenv_t *env, lserref_wrapper_t *erref) {
     return lspref_prepare(pat->lp_ref, env, erref);
   }
   return LSPRES_SUCCESS;
-}
-
-static lsmres_t lsint_match(lstenv_t *tenv, const lsint_t *intval,
-                            lsthunk_t *thunk) {
-  (void)tenv;
-  lsttype_t ttype = lsthunk_type(thunk);
-  if (ttype != LSTTYPE_INT)
-    return LSMATCH_FAILURE;
-  const lsint_t *tintval = lsthunk_get_int(thunk);
-  return lsint_eq(intval, tintval) ? LSMATCH_SUCCESS : LSMATCH_FAILURE;
-}
-
-static lsmres_t lsstr_match(lstenv_t *tenv, const lsstr_t *strval,
-                            lsthunk_t *thunk) {
-  (void)tenv;
-  lsttype_t ttype = lsthunk_type(thunk);
-  if (ttype != LSTTYPE_STR)
-    return LSMATCH_FAILURE;
-  const lsstr_t *tstrval = lsthunk_get_str(thunk);
-  return lsstrcmp(strval, tstrval) == 0 ? LSMATCH_SUCCESS : LSMATCH_FAILURE;
-}
-
-lsmres_t lspat_match(lstenv_t *tenv, const lspat_t *pat, lsthunk_t *thunk) {
-  switch (pat->lp_type) {
-  case LSPTYPE_ALGE:
-    return lspalge_match(tenv, pat->lp_alge, thunk);
-  case LSPTYPE_AS:
-    return lspas_match(tenv, pat->lp_as, thunk);
-  case LSPTYPE_INT:
-    return lsint_match(tenv, pat->lp_int, thunk);
-  case LSPTYPE_STR:
-    return lsstr_match(tenv, pat->lp_str, thunk);
-  case LSPTYPE_REF:
-    return lspref_match(tenv, pat->lp_ref, thunk);
-  }
-  return LSMATCH_FAILURE;
 }
