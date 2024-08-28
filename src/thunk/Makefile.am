@@ -7,6 +7,8 @@ liblsthunk_la_SOURCES = \
     talge.h \
     tappl.c \
     tappl.h \
+    tchoice.c \
+    tchoice.h \
     tclosure.c \
     tclosure.h \
     tenv.c \

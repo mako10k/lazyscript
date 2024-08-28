@@ -10,6 +10,7 @@ typedef struct lsthunk lsthunk_t;
 #include "pat/pref.h"
 #include "thunk/talge.h"
 #include "thunk/tappl.h"
+#include "thunk/tchoice.h"
 #include "thunk/tclosure.h"
 #include "thunk/tenv.h"
 #include "thunk/tlambda.h"
@@ -21,6 +22,7 @@ typedef enum lsttype {
   LSTTYPE_INT,
   LSTTYPE_STR,
   LSTTYPE_CLOSURE,
+  LSTTYPE_CHOICE,
   LSTTYPE_LAMBDA,
   LSTTYPE_REF
 } lsttype_t;
@@ -32,6 +34,7 @@ lsthunk_t *lsthunk_new_alge(lstalge_t *talge);
 lsthunk_t *lsthunk_new_lambda(lstlambda_t *tlambda);
 lsthunk_t *lsthunk_new_closure(lstclosure_t *tclosure);
 lsthunk_t *lsthunk_new_ref(lstref_t *tref);
+lsthunk_t *lsthunk_new_choice(lstchoice_t *tchoice);
 lsthunk_t *lsthunk_new_expr(lstenv_t *tenv, const lsexpr_t *expr);
 
 lsthunk_t *lsthunk_get_whnf(lsthunk_t *thunk);
@@ -44,6 +47,7 @@ const lsstr_t *lsthunk_get_str(const lsthunk_t *thunk);
 lstclosure_t *lsthunk_get_closure(const lsthunk_t *thunk);
 lstlambda_t *lsthunk_get_lambda(const lsthunk_t *thunk);
 lstref_t *lsthunk_get_ref(const lsthunk_t *thunk);
+lstchoice_t *lsthunk_get_choice(const lsthunk_t *thunk);
 
 lsmres_t lsthunk_match_pat(lstenv_t *tenv, const lspat_t *pat,
                            lsthunk_t *thunk);
@@ -53,3 +57,5 @@ lsmres_t lsthunk_match_pat_as(lstenv_t *tenv, const lspas_t *pas,
                               lsthunk_t *thunk);
 lsmres_t lsthunk_match_pat_ref(lstenv_t *tenv, const lspref_t *pref,
                                lsthunk_t *thunk);
+
+lsthunk_t *lsthunk_apply(lsthunk_t *func, const lstlist_t *args);

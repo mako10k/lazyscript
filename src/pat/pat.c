@@ -1,6 +1,7 @@
 #include "pat/pat.h"
 #include "common/malloc.h"
 #include "lstypes.h"
+#include <assert.h>
 
 struct lspat {
   lsptype_t lp_type;
@@ -71,6 +72,7 @@ void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat) {
     lspref_print(fp, prec, indent, pat->lp_ref);
     break;
   }
+  assert(0);
 }
 
 lspat_t *lspat_new_ref(lspref_t *pref) {

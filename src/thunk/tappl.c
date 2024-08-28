@@ -57,6 +57,15 @@ lsthunk_t *lstappl_eval(lstappl_t *tappl) {
     exit(1);
   case LSTTYPE_REF:
     assert(0);
+  case LSTTYPE_CHOICE: {
+    lstchoice_t *choice = lsthunk_get_choice(func);
+    lsthunk_t *tleft = lstchoice_get_left(choice);
+    lsthunk_t *tres = lsthunk_apply(tleft, tappl->lta_args);
+    if (tres != NULL)
+      return tres;
+    lsthunk_t *tright = lstchoice_get_right(choice);
+    return lsthunk_apply(tright, tappl->lta_args);
+  }
   }
   assert(0);
 }

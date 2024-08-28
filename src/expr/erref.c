@@ -46,14 +46,12 @@ lserref_t *lserref_new(lserref_wrapper_t *erref_wrapper, lspref_t *pref) {
   switch (erref->lerr_type) {
   case LSERRTYPE_BINDING:
     erref->lerr_bind_entry = erref_wrapper->lerrw_bind_entry;
-    break;
+    return erref;
   case LSERRTYPE_LAMBDA:
     erref->lerr_lambda = erref_wrapper->lerrw_lambda;
-    break;
-  default:
-    break;
+    return erref;
   }
-  return erref;
+  assert(0);
 }
 
 lspref_t *lserref_get_pref(const lserref_t *erref) {

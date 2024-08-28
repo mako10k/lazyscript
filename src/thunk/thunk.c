@@ -1,4 +1,5 @@
 #include "thunk/thunk.h"
+#include "common/io.h"
 #include "common/malloc.h"
 #include "thunk/talge.h"
 #include "thunk/tclosure.h"
@@ -15,6 +16,7 @@ struct lsthunk {
     lstref_t *lt_ref;
     lstlambda_t *lt_lambda;
     lstclosure_t *lt_closure;
+    lstchoice_t *lt_choice;
   };
   lsthunk_t *lt_whnf;
 };
@@ -31,7 +33,7 @@ lsthunk_t *lsthunk_new_alge(lstalge_t *talge) {
   lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type = LSTTYPE_ALGE;
   thunk->lt_alge = talge;
-  thunk->lt_whnf = NULL;
+  thunk->lt_whnf = thunk;
   return thunk;
 }
 
@@ -63,7 +65,7 @@ lsthunk_t *lsthunk_new_lambda(lstlambda_t *tlambda) {
   lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type = LSTTYPE_LAMBDA;
   thunk->lt_lambda = tlambda;
-  thunk->lt_whnf = NULL;
+  thunk->lt_whnf = thunk;
   return thunk;
 }
 
@@ -71,6 +73,14 @@ lsthunk_t *lsthunk_new_closure(lstclosure_t *tclosure) {
   lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type = LSTTYPE_CLOSURE;
   thunk->lt_closure = tclosure;
+  thunk->lt_whnf = NULL;
+  return thunk;
+}
+
+lsthunk_t *lsthunk_new_choice(lstchoice_t *tchoice) {
+  lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
+  thunk->lt_type = LSTTYPE_CHOICE;
+  thunk->lt_choice = tchoice;
   thunk->lt_whnf = NULL;
   return thunk;
 }
@@ -128,6 +138,10 @@ lstref_t *lsthunk_get_ref(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_REF);
   return thunk->lt_ref;
 }
+lstchoice_t *lsthunk_get_choice(const lsthunk_t *thunk) {
+  assert(thunk->lt_type == LSTTYPE_CHOICE);
+  return thunk->lt_choice;
+}
 
 lsthunk_t *lsthunk_new_expr(lstenv_t *tenv, const lsexpr_t *expr) {
   assert(expr != NULL);
@@ -146,6 +160,8 @@ lsthunk_t *lsthunk_new_expr(lstenv_t *tenv, const lsexpr_t *expr) {
     return lsthunk_new_int(lsexpr_get_int(expr));
   case LSETYPE_STR:
     return lsthunk_new_str(lsexpr_get_str(expr));
+  case LSETYPE_CHOICE:
+    return lsthunk_new_choice(lstchoice_new(tenv, lsexpr_get_choice(expr)));
   }
   assert(0);
 }
@@ -229,4 +245,29 @@ lsmres_t lsthunk_match_pat_as(lstenv_t *tenv, const lspas_t *pas,
 lsmres_t lsthunk_match_pat_ref(lstenv_t *tenv, const lspref_t *pref,
                                lsthunk_t *thunk) {
   return LSMATCH_FAILURE; // TODO: implement
+}
+
+lsthunk_t *lsthunk_apply(lsthunk_t *func, const lstlist_t *args) {
+  assert(func != NULL);
+  assert(args != NULL);
+  switch (lsthunk_get_type(func)) {
+  case LSTTYPE_ALGE:
+    return lstalge_apply(lsthunk_get_alge(func), args);
+  case LSTTYPE_CLOSURE:
+    return lstclosure_apply(lsthunk_get_closure(func), args);
+  case LSTTYPE_LAMBDA:
+    return lstlambda_apply(lsthunk_get_lambda(func), args);
+  case LSTTYPE_REF:
+    return lstref_apply(lsthunk_get_ref(func), args);
+  case LSTTYPE_CHOICE:
+    return lstchoice_apply(lsthunk_get_choice(func), args);
+  case LSTTYPE_INT:
+    lsprintf(stderr, 0, "F: cannot apply for integer\n");
+    exit(1);
+  case LSTTYPE_STR:
+    lsprintf(stderr, 0, "F: cannot apply for string\n");
+    exit(1);
+  case LSTTYPE_APPL:
+    assert(0); // TODO: IMPLEMENT
+  }
 }
