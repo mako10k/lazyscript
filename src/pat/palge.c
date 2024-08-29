@@ -101,7 +101,7 @@ void lspalge_print(FILE *fp, int prec, int indent, const lspalge_t *palge) {
     lsprintf(fp, indent, ")");
 }
 
-lspres_t lspalge_prepare(lspalge_t *alge, lseenv_t *env,
+lspres_t lspalge_prepare(const lspalge_t *alge, lseenv_t *env,
                          const lserref_base_t *erref) {
   assert(alge != NULL);
   lssize_t argc = lsplist_count(alge->lpa_args);

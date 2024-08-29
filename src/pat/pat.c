@@ -6,36 +6,36 @@
 struct lspat {
   lsptype_t lp_type;
   union {
-    lspalge_t *lp_alge;
-    lspas_t *lp_as;
+    const lspalge_t *lp_alge;
+    const lspas_t *lp_as;
     const lsint_t *lp_int;
     const lsstr_t *lp_str;
-    lspref_t *lp_ref;
+    const lspref_t *lp_ref;
   };
 };
 
-lspat_t *lspat_new_alge(lspalge_t *palge) {
+const lspat_t *lspat_new_alge(const lspalge_t *palge) {
   lspat_t *pat = lsmalloc(sizeof(lspat_t));
   pat->lp_type = LSPTYPE_ALGE;
   pat->lp_alge = palge;
   return pat;
 }
 
-lspat_t *lspat_new_as(lspas_t *pas) {
+const lspat_t *lspat_new_as(const lspas_t *pas) {
   lspat_t *pat = lsmalloc(sizeof(lspat_t));
   pat->lp_type = LSPTYPE_AS;
   pat->lp_as = pas;
   return pat;
 }
 
-lspat_t *lspat_new_int(const lsint_t *val) {
+const lspat_t *lspat_new_int(const lsint_t *val) {
   lspat_t *pat = lsmalloc(sizeof(lspat_t));
   pat->lp_type = LSPTYPE_INT;
   pat->lp_int = val;
   return pat;
 }
 
-lspat_t *lspat_new_str(const lsstr_t *val) {
+const lspat_t *lspat_new_str(const lsstr_t *val) {
   lspat_t *pat = lsmalloc(sizeof(lspat_t));
   pat->lp_type = LSPTYPE_STR;
   pat->lp_str = val;
@@ -44,15 +44,15 @@ lspat_t *lspat_new_str(const lsstr_t *val) {
 
 lsptype_t lspat_get_type(const lspat_t *pat) { return pat->lp_type; }
 
-lspalge_t *lspat_get_alge(const lspat_t *pat) { return pat->lp_alge; }
+const lspalge_t *lspat_get_alge(const lspat_t *pat) { return pat->lp_alge; }
 
-lspas_t *lspat_get_as(const lspat_t *pat) { return pat->lp_as; }
+const lspas_t *lspat_get_as(const lspat_t *pat) { return pat->lp_as; }
 
 const lsint_t *lspat_get_int(const lspat_t *pat) { return pat->lp_int; }
 
 const lsstr_t *lspat_get_str(const lspat_t *pat) { return pat->lp_str; }
 
-lspref_t *lspat_get_ref(const lspat_t *pat) { return pat->lp_ref; }
+const lspref_t *lspat_get_ref(const lspat_t *pat) { return pat->lp_ref; }
 
 void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat) {
   switch (pat->lp_type) {
@@ -75,7 +75,7 @@ void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat) {
   assert(0);
 }
 
-lspat_t *lspat_new_ref(lspref_t *pref) {
+const lspat_t *lspat_new_ref(const lspref_t *pref) {
   lspat_t *pat = lsmalloc(sizeof(lspat_t));
   pat->lp_type = LSPTYPE_REF;
   pat->lp_ref = pref;

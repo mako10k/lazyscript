@@ -9,7 +9,7 @@ struct lsbind_entry {
   lsexpr_t *lbe_rhs;
 };
 
-lsbind_entry_t *lsbind_entry_new(const lspat_t *lhs, lsexpr_t *rhs) {
+const lsbind_entry_t *lsbind_entry_new(const lspat_t *lhs, lsexpr_t *rhs) {
   lsbind_entry_t *ent = lsmalloc(sizeof(lsbind_entry_t));
   ent->lbe_lhs = lhs;
   ent->lbe_rhs = rhs;
@@ -17,7 +17,7 @@ lsbind_entry_t *lsbind_entry_new(const lspat_t *lhs, lsexpr_t *rhs) {
 }
 
 void lsbind_entry_print(FILE *fp, lsprec_t prec, int indent,
-                        lsbind_entry_t *ent) {
+                        const lsbind_entry_t *ent) {
   lspat_print(fp, prec, indent, ent->lbe_lhs);
   lsprintf(fp, indent, " = ");
   lsexpr_print(fp, prec, indent, ent->lbe_rhs);
@@ -33,7 +33,7 @@ lsbind_t *lsbind_new(void) {
   return bind;
 }
 
-void lsbind_push(lsbind_t *bind, lsbind_entry_t *ent) {
+void lsbind_push(lsbind_t *bind, const lsbind_entry_t *ent) {
   assert(bind != NULL);
   assert(ent != NULL);
   bind->lb_entries = lsbelist_push(bind->lb_entries, ent);
@@ -53,7 +53,7 @@ lssize_t lsbind_get_entry_count(const lsbind_t *bind) {
   return lsbelist_count(bind->lb_entries);
 }
 
-lsbind_entry_t *lsbind_get_entry(const lsbind_t *bind, lssize_t i) {
+const lsbind_entry_t *lsbind_get_entry(const lsbind_t *bind, lssize_t i) {
   assert(bind != NULL);
   return lsbelist_get(bind->lb_entries, i);
 }

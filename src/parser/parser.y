@@ -51,12 +51,11 @@ while (0)
     lselambda_t *elambda;
     const lsint_t *intval;
     const lsstr_t *strval;
-    lsarray_t *array;
-    lspat_t *pat;
-    lspref_t *pref;
+    const lspat_t *pat;
+    const lspref_t *pref;
     lspalge_t *palge;
     lsbind_t *bind;
-    lsbind_entry_t *bind_ent;
+    const lsbind_entry_t *bind_ent;
     lseclosure_t *eclosure;
     const lselist_t *elist;
     const lsplist_t *plist;
