@@ -14,7 +14,6 @@ struct lseref {
 
 lseref_t *lseref_new(const lsstr_t *name, lsloc_t loc) {
   assert(name != NULL);
-  assert(loc.filename != NULL);
   lseref_t *eref = lsmalloc(sizeof(lseref_t));
   eref->ler_name = name;
   eref->ler_erref = NULL;
