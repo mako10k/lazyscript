@@ -28,5 +28,5 @@ const lsint_t *lspat_get_int(const lspat_t *pat);
 const lsstr_t *lspat_get_str(const lspat_t *pat);
 lspref_t *lspat_get_ref(const lspat_t *pat);
 void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat);
-lspres_t lspat_prepare(lspat_t *pat, lseenv_t *env,
+lspres_t lspat_prepare(const lspat_t *pat, lseenv_t *env,
                        const lserref_base_t *erref);

@@ -82,7 +82,7 @@ lspat_t *lspat_new_ref(lspref_t *pref) {
   return pat;
 }
 
-lspres_t lspat_prepare(lspat_t *pat, lseenv_t *env,
+lspres_t lspat_prepare(const lspat_t *pat, lseenv_t *env,
                        const lserref_base_t *erref) {
   switch (pat->lp_type) {
   case LSPTYPE_ALGE:
