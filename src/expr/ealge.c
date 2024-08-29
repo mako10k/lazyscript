@@ -17,7 +17,7 @@ lsealge_t *lsealge_new(const lsstr_t *constr) {
   return ealge;
 }
 
-void lsealge_add_arg(lsealge_t *ealge, lsexpr_t *arg) {
+void lsealge_add_arg(lsealge_t *ealge, const lsexpr_t *arg) {
   assert(ealge != NULL);
   ealge->lea_args = lselist_push(ealge->lea_args, arg);
 }
@@ -37,7 +37,7 @@ lssize_t lsealge_get_arg_count(const lsealge_t *ealge) {
   return lselist_count(ealge->lea_args);
 }
 
-lsexpr_t *lsealge_get_arg(const lsealge_t *ealge, int i) {
+const lsexpr_t *lsealge_get_arg(const lsealge_t *ealge, int i) {
   assert(ealge != NULL);
   return lselist_get(ealge->lea_args, i);
 }
@@ -100,11 +100,11 @@ void lsealge_print(FILE *fp, lsprec_t prec, int indent,
     lsprintf(fp, indent, ")");
 }
 
-lspres_t lsealge_prepare(lsealge_t *ealge, lseenv_t *env) {
+lspres_t lsealge_prepare(const lsealge_t *ealge, lseenv_t *env) {
   assert(ealge != NULL);
   lssize_t argc = lselist_count(ealge->lea_args);
   for (lssize_t i = 0; i < argc; i++) {
-    lsexpr_t *arg = lselist_get(ealge->lea_args, i);
+    const lsexpr_t *arg = lselist_get(ealge->lea_args, i);
     lspres_t pres = lsexpr_prepare(arg, env);
     if (pres != LSPRES_SUCCESS)
       return pres;

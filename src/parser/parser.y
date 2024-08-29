@@ -44,11 +44,11 @@ while (0)
 }
 
 %union {
-    lsprog_t *prog;
-    lsexpr_t *expr;
+    const lsprog_t *prog;
+    const lsexpr_t *expr;
     lsealge_t *ealge;
     lseappl_t *eappl;
-    lselambda_t *elambda;
+    const lselambda_t *elambda;
     const lsint_t *intval;
     const lsstr_t *strval;
     const lspat_t *pat;
@@ -56,7 +56,7 @@ while (0)
     lspalge_t *palge;
     lsbind_t *bind;
     const lsbind_entry_t *bind_ent;
-    lseclosure_t *eclosure;
+    const lseclosure_t *eclosure;
     const lselist_t *elist;
     const lsplist_t *plist;
 }

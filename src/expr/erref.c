@@ -8,7 +8,7 @@ struct lserref_base {
   lserrtype_t lerrw_type;
   union {
     const lsbind_entry_t *lerrw_bind_entry;
-    lselambda_t *lerrw_lambda;
+    const lselambda_t *lerrw_lambda;
   };
 };
 
@@ -21,7 +21,7 @@ lserref_base_new_bind_entry(const lsbind_entry_t *bentry) {
   return erref_base;
 }
 
-const lserref_base_t *lserref_base_new_lambda(lselambda_t *elambda) {
+const lserref_base_t *lserref_base_new_lambda(const lselambda_t *elambda) {
   assert(elambda != NULL);
   lserref_base_t *const erref_base = lsmalloc(sizeof(lserref_base_t));
   erref_base->lerrw_type = LSERRTYPE_LAMBDA;
@@ -29,7 +29,7 @@ const lserref_base_t *lserref_base_new_lambda(lselambda_t *elambda) {
   return erref_base;
 }
 
-lselambda_t *lserref_base_get_lambda(const lserref_base_t *erref_base) {
+const lselambda_t *lserref_base_get_lambda(const lserref_base_t *erref_base) {
   assert(erref_base != NULL);
   assert(erref_base->lerrw_type == LSERRTYPE_LAMBDA);
   return erref_base->lerrw_lambda;
@@ -73,7 +73,7 @@ const lsbind_entry_t *lserref_get_bind_entry(const lserref_t *erref) {
   return erref->lerr_base->lerrw_bind_entry;
 }
 
-lselambda_t *lserref_get_lambda(const lserref_t *erref) {
+const lselambda_t *lserref_get_lambda(const lserref_t *erref) {
   assert(erref != NULL);
   assert(erref->lerr_base->lerrw_type == LSERRTYPE_LAMBDA);
   return erref->lerr_base->lerrw_lambda;

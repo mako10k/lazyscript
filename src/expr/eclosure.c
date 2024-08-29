@@ -4,11 +4,11 @@
 #include "expr/expr.h"
 
 struct lseclosure {
-  lsexpr_t *lec_expr;
+  const lsexpr_t *lec_expr;
   const lsbind_t *lec_bind;
 };
 
-lseclosure_t *lseclosure_new(lsexpr_t *expr, const lsbind_t *bind) {
+const lseclosure_t *lseclosure_new(const lsexpr_t *expr, const lsbind_t *bind) {
   lseclosure_t *eclosure = lsmalloc(sizeof(lseclosure_t));
   eclosure->lec_expr = expr;
   eclosure->lec_bind = bind;
@@ -16,14 +16,14 @@ lseclosure_t *lseclosure_new(lsexpr_t *expr, const lsbind_t *bind) {
 }
 
 void lseclosure_print(FILE *stream, lsprec_t prec, int indent,
-                      lseclosure_t *eclosure) {
+                      const lseclosure_t *eclosure) {
   lsprintf(stream, indent + 1, "{\n");
   lsexpr_print(stream, prec, indent + 1, eclosure->lec_expr);
   lsbind_print(stream, prec, indent + 1, eclosure->lec_bind);
   lsprintf(stream, indent, "\n}");
 }
 
-lspres_t lseclosure_prepare(lseclosure_t *eclosure, lseenv_t *eenv) {
+lspres_t lseclosure_prepare(const lseclosure_t *eclosure, lseenv_t *eenv) {
   eenv = lseenv_new(eenv);
   for (const lsbelist_t *le = lsbind_get_entries(eclosure->lec_bind);
        le != NULL; le = lsbelist_get_next(le)) {
@@ -37,7 +37,7 @@ lspres_t lseclosure_prepare(lseclosure_t *eclosure, lseenv_t *eenv) {
   for (const lsbelist_t *le = lsbind_get_entries(eclosure->lec_bind);
        le != NULL; le = lsbelist_get_next(le)) {
     const lsbind_entry_t *bind_ent = lsbelist_get(le, 0);
-    lsexpr_t *rhs = lsbind_entry_get_rhs(bind_ent);
+    const lsexpr_t *rhs = lsbind_entry_get_rhs(bind_ent);
     lspres_t pres = lsexpr_prepare(rhs, eenv);
     if (pres != LSPRES_SUCCESS)
       return pres;

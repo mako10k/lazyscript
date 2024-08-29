@@ -7,11 +7,11 @@ typedef struct lsbind_entry lsbind_entry_t;
 #include "misc/belist.h"
 #include "pat/pat.h"
 
-const lsbind_entry_t *lsbind_entry_new(const lspat_t *lhs, lsexpr_t *rhs);
+const lsbind_entry_t *lsbind_entry_new(const lspat_t *lhs, const lsexpr_t *rhs);
 void lsbind_entry_print(FILE *fp, lsprec_t prec, int indent,
                         const lsbind_entry_t *ent);
 const lspat_t *lsbind_entry_get_lhs(const lsbind_entry_t *ent);
-lsexpr_t *lsbind_entry_get_rhs(const lsbind_entry_t *ent);
+const lsexpr_t *lsbind_entry_get_rhs(const lsbind_entry_t *ent);
 
 lsbind_t *lsbind_new(void);
 void lsbind_push(lsbind_t *bind, const lsbind_entry_t *ent);

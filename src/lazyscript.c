@@ -10,7 +10,7 @@
 #include <getopt.h>
 #include <stdarg.h>
 
-static lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
+static const lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   assert(in_str != NULL);
   yyscan_t yyscanner;
   yylex_init(&yyscanner);
@@ -18,25 +18,25 @@ static lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   yyset_in(in_str, yyscanner);
   yyset_extra(lsscan, yyscanner);
   int ret = yyparse(yyscanner);
-  lsprog_t *prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
+  const lsprog_t *prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
   yylex_destroy(yyscanner);
   return prog;
 }
 
-static lsprog_t *lsparse_file(const char *filename) {
+static const lsprog_t *lsparse_file(const char *filename) {
   FILE *stream = fopen(filename, "r");
   if (!stream) {
     perror(filename);
     exit(1);
   }
-  lsprog_t *prog = lsparse_stream(filename, stream);
+  const lsprog_t *prog = lsparse_stream(filename, stream);
   fclose(stream);
   return prog;
 }
 
-static lsprog_t *lsparse_string(const char *filename, const char *str) {
+static const lsprog_t *lsparse_string(const char *filename, const char *str) {
   FILE *stream = fmemopen((void *)str, strlen(str), "r");
-  lsprog_t *prog = lsparse_stream(filename, stream);
+  const lsprog_t *prog = lsparse_stream(filename, stream);
   fclose(stream);
   return prog;
 }
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
       static int eval_count = 0;
       char name[32];
       snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
-      lsprog_t *prog = lsparse_string(name, optarg);
+      const lsprog_t *prog = lsparse_string(name, optarg);
       lseenv_t *env = lseenv_new(NULL);
       lspres_t res = lsprog_prepare(prog, env);
       if (res != LSPRES_SUCCESS || lseenv_get_nerrors(env) > 0 ||
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
     const char *filename = argv[i];
     if (strcmp(filename, "-") == 0)
       filename = "/dev/stdin";
-    lsprog_t *prog = lsparse_file(argv[i]);
+    const lsprog_t *prog = lsparse_file(argv[i]);
     lseenv_t *env = lseenv_new(NULL);
     lspres_t res = lsprog_prepare(prog, env);
     if (res != LSPRES_SUCCESS || lseenv_get_nerrors(env) > 0 ||

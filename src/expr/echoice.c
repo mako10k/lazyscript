@@ -4,11 +4,11 @@
 #include <assert.h>
 
 struct lsechoice {
-  lsexpr_t *lec_left;
-  lsexpr_t *lec_right;
+  const lsexpr_t *lec_left;
+  const lsexpr_t *lec_right;
 };
 
-lsechoice_t *lsechoice_new(lsexpr_t *left, lsexpr_t *right) {
+const lsechoice_t *lsechoice_new(const lsexpr_t *left, const lsexpr_t *right) {
   assert(left != NULL);
   assert(right != NULL);
   lsechoice_t *echoice = lsmalloc(sizeof(lsechoice_t));
@@ -17,12 +17,12 @@ lsechoice_t *lsechoice_new(lsexpr_t *left, lsexpr_t *right) {
   return echoice;
 }
 
-lsexpr_t *lsechoice_get_left(const lsechoice_t *echoice) {
+const lsexpr_t *lsechoice_get_left(const lsechoice_t *echoice) {
   assert(echoice != NULL);
   return echoice->lec_left;
 }
 
-lsexpr_t *lsechoice_get_right(const lsechoice_t *echoice) {
+const lsexpr_t *lsechoice_get_right(const lsechoice_t *echoice) {
   assert(echoice != NULL);
   return echoice->lec_right;
 }
@@ -47,7 +47,7 @@ void lsechoice_print(FILE *fp, lsprec_t prec, int indent,
     lsprintf(fp, indent, "\n)");
 }
 
-lspres_t lsechoice_prepare(lsechoice_t *echoice, lseenv_t *env) {
+lspres_t lsechoice_prepare(const lsechoice_t *echoice, lseenv_t *env) {
   lspres_t res = lsexpr_prepare(echoice->lec_left, env);
   if (res != LSPRES_SUCCESS)
     return res;

@@ -8,11 +8,11 @@
 
 struct lseref {
   const lsstr_t *ler_name;
-  lserref_t *ler_erref;
+  const lserref_t *ler_erref;
   lsloc_t ler_loc;
 };
 
-lseref_t *lseref_new(const lsstr_t *name, lsloc_t loc) {
+const lseref_t *lseref_new(const lsstr_t *name, lsloc_t loc) {
   assert(name != NULL);
   lseref_t *eref = lsmalloc(sizeof(lseref_t));
   eref->ler_name = name;
@@ -26,12 +26,12 @@ const lsstr_t *lseref_get_name(const lseref_t *eref) {
   return eref->ler_name;
 }
 
-void lseref_set_erref(lseref_t *eref, lserref_t *erref) {
+void lseref_set_erref(lseref_t *eref, const lserref_t *erref) {
   assert(eref != NULL);
   eref->ler_erref = erref;
 }
 
-lserref_t *lseref_get_erref(const lseref_t *eref) {
+const lserref_t *lseref_get_erref(const lseref_t *eref) {
   assert(eref != NULL);
   return eref->ler_erref;
 }
@@ -48,11 +48,12 @@ void lseref_print(FILE *fp, lsprec_t prec, int indent, const lseref_t *eref) {
   lsstr_print_bare(fp, prec, indent, eref->ler_name);
 }
 
-lspres_t lseref_prepare(lseref_t *eref, lseenv_t *env) {
+lspres_t lseref_prepare(const lseref_t *eref, lseenv_t *env) {
   assert(eref != NULL);
   assert(env != NULL);
-  lserref_t *erref = lseenv_get(env, eref->ler_name);
-  if (erref != NULL)
+  assert(eref->ler_erref == NULL);
+  ((lseref_t *)eref)->ler_erref = lseenv_get(env, eref->ler_name); // TODO: fix
+  if (eref->ler_erref != NULL)
     return LSPRES_SUCCESS;
   lsprintf(stderr, 0, "E: ");
   lsloc_print(stderr, lseref_get_loc(eref));

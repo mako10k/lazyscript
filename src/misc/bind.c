@@ -6,10 +6,11 @@
 
 struct lsbind_entry {
   const lspat_t *lbe_lhs;
-  lsexpr_t *lbe_rhs;
+  const lsexpr_t *lbe_rhs;
 };
 
-const lsbind_entry_t *lsbind_entry_new(const lspat_t *lhs, lsexpr_t *rhs) {
+const lsbind_entry_t *lsbind_entry_new(const lspat_t *lhs,
+                                       const lsexpr_t *rhs) {
   lsbind_entry_t *ent = lsmalloc(sizeof(lsbind_entry_t));
   ent->lbe_lhs = lhs;
   ent->lbe_rhs = rhs;
@@ -63,7 +64,7 @@ const lspat_t *lsbind_entry_get_lhs(const lsbind_entry_t *ent) {
   return ent->lbe_lhs;
 }
 
-lsexpr_t *lsbind_entry_get_rhs(const lsbind_entry_t *ent) {
+const lsexpr_t *lsbind_entry_get_rhs(const lsbind_entry_t *ent) {
   assert(ent != NULL);
   return ent->lbe_rhs;
 }

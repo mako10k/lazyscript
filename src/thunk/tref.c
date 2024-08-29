@@ -23,7 +23,7 @@ lstref_t *lstref_new(const lseref_t *eref) {
 lsthunk_t *lstref_eval(lstref_t *tref) {
   if (tref->ltr_bound != NULL)
     return lsthunk_eval(tref->ltr_bound);
-  lserref_t *erref = lseref_get_erref(tref->ltr_eref);
+  const lserref_t *erref = lseref_get_erref(tref->ltr_eref);
   switch (lserref_get_type(erref)) {
   case LSERRTYPE_BIND_ENTRY: {
     if (tref->ltr_env == NULL) {
@@ -41,7 +41,7 @@ lsthunk_t *lstref_eval(lstref_t *tref) {
     return lsthunk_eval(tref->ltr_bound);
   }
   case LSERRTYPE_LAMBDA: {
-    lselambda_t *lambda = lserref_get_lambda(erref);
+    const lselambda_t *lambda = lserref_get_lambda(erref);
     return lsthunk_new_expr(lsexpr_new_lambda(lambda));
   }
   }
