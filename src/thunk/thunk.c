@@ -232,8 +232,8 @@ lsmres_t lsthunk_match_pat_alge(lsthunk_t *thunk, const lspalge_t *palge,
 
 lsmres_t lsthunk_match_pat_as(lsthunk_t *thunk, const lspas_t *pas,
                               lstenv_t *tenv) {
-  lspref_t *pref = lspas_get_pref(pas);
-  lspat_t *pat = lspas_get_pat(pas);
+  const lspref_t *pref = lspas_get_pref(pas);
+  const lspat_t *pat = lspas_get_pat(pas);
   lsmres_t mres = lsthunk_match_pat(thunk, pat, tenv);
   if (mres != LSMATCH_SUCCESS)
     return mres;

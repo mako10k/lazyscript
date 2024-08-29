@@ -36,7 +36,7 @@ void lspref_print(FILE *fp, lsprec_t prec, int indent, const lspref_t *pref) {
   lsstr_print_bare(fp, prec, indent, pref->lpr_name);
 }
 
-lspres_t lspref_prepare(lspref_t *pref, lseenv_t *eenv,
+lspres_t lspref_prepare(const lspref_t *pref, lseenv_t *eenv,
                         const lserref_base_t *erref) {
   assert(pref != NULL);
   assert(eenv != NULL);
