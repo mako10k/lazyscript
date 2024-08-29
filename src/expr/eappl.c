@@ -67,22 +67,3 @@ void lseappl_print(FILE *stream, lsprec_t prec, int indent,
   if (prec > LSPREC_APPL)
     lsprintf(stream, indent, ")");
 }
-
-lspres_t lseappl_prepare(const lseappl_t *eappl, lseenv_t *eenv) {
-  assert(eappl != NULL);
-  assert(eenv != NULL);
-  lspres_t pres = lsexpr_prepare(eappl->lea_func, eenv);
-  if (pres != LSPRES_SUCCESS)
-    return pres;
-  lssize_t argc = lselist_count(eappl->lea_args);
-  if (argc == 0)
-    return LSPRES_SUCCESS;
-  for (const lselist_t *le = eappl->lea_args; le != NULL;
-       le = lselist_get_next(le)) {
-    const lsexpr_t *arg = lselist_get(le, 0);
-    lspres_t pres = lsexpr_prepare(arg, eenv);
-    if (pres != LSPRES_SUCCESS)
-      return pres;
-  }
-  return LSPRES_SUCCESS;
-}

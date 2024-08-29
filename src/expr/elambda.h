@@ -11,4 +11,3 @@ const lspat_t *lselambda_get_arg(const lselambda_t *elambda);
 const lsexpr_t *lselambda_get_body(const lselambda_t *elambda);
 void lselambda_print(FILE *fp, lsprec_t prec, int indent,
                      const lselambda_t *elambda);
-lspres_t lselambda_prepare(const lselambda_t *elambda, lseenv_t *eenv);

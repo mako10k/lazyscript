@@ -10,15 +10,15 @@ struct lstappl {
   const lstlist_t *lta_args;
 };
 
-lstappl_t *lstappl_new(const lseappl_t *eappl) {
+lstappl_t *lstappl_new(const lseappl_t *eappl, lstenv_t *tenv) {
   assert(eappl != NULL);
   lstappl_t *tappl = lsmalloc(sizeof(lstappl_t));
-  tappl->lta_func = lsthunk_new_expr(lseappl_get_func(eappl));
+  tappl->lta_func = lsthunk_new_expr(lseappl_get_func(eappl), tenv);
   tappl->lta_args = lstlist_new();
   for (const lselist_t *le = lseappl_get_args(eappl); le != NULL;
        le = lselist_get_next(le)) {
     const lsexpr_t *arg = lselist_get(le, 0);
-    lstlist_push(tappl->lta_args, lsthunk_new_expr(arg));
+    lstlist_push(tappl->lta_args, lsthunk_new_expr(arg, tenv));
   }
   return tappl;
 }
@@ -44,8 +44,6 @@ lsthunk_t *lstappl_eval(lstappl_t *tappl) {
     return lstappl_apply(lsthunk_get_appl(func), tappl->lta_args);
   case LSTTYPE_ALGE:
     return lstalge_apply(lsthunk_get_alge(func), tappl->lta_args);
-  case LSTTYPE_CLOSURE:
-    return lstclosure_apply(lsthunk_get_closure(func), tappl->lta_args);
   case LSTTYPE_LAMBDA:
     return lstlambda_apply(lsthunk_get_lambda(func), tappl->lta_args);
   case LSTTYPE_INT:

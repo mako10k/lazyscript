@@ -3,12 +3,10 @@
 typedef struct lsprog lsprog_t;
 typedef struct lsscan lsscan_t;
 
-#include "expr/eenv.h"
 #include "expr/expr.h"
 
 lsprog_t *lsprog_new(const lsexpr_t *expr);
 void lsprog_print(FILE *fp, int prec, int indent, const lsprog_t *prog);
-int lsprog_prepare(const lsprog_t *prog, lseenv_t *env);
 
 void yyerror(lsloc_t *loc, lsscan_t *scanner, const char *s);
 

@@ -10,9 +10,7 @@ typedef struct lsexpr lsexpr_t;
 #include "expr/eappl.h"
 #include "expr/echoice.h"
 #include "expr/eclosure.h"
-#include "expr/eenv.h"
 #include "expr/elambda.h"
-#include "expr/eref.h"
 
 typedef enum {
   LSETYPE_ALGE,
@@ -27,7 +25,7 @@ typedef enum {
 
 const lsexpr_t *lsexpr_new_alge(const lsealge_t *ealge);
 const lsexpr_t *lsexpr_new_appl(const lseappl_t *eappl);
-const lsexpr_t *lsexpr_new_ref(const lseref_t *eref);
+const lsexpr_t *lsexpr_new_ref(const lsref_t *ref);
 const lsexpr_t *lsexpr_new_int(const lsint_t *eint);
 const lsexpr_t *lsexpr_new_str(const lsstr_t *str);
 const lsexpr_t *lsexpr_new_lambda(const lselambda_t *elambda);
@@ -36,11 +34,10 @@ const lsexpr_t *lsexpr_new_choice(const lsechoice_t *echoice);
 lsetype_t lsexpr_get_type(const lsexpr_t *expr);
 const lsealge_t *lsexpr_get_alge(const lsexpr_t *expr);
 const lseappl_t *lsexpr_get_appl(const lsexpr_t *expr);
-const lseref_t *lsexpr_get_ref(const lsexpr_t *expr);
+const lsref_t *lsexpr_get_ref(const lsexpr_t *expr);
 const lsint_t *lsexpr_get_int(const lsexpr_t *expr);
 const lsstr_t *lsexpr_get_str(const lsexpr_t *expr);
 const lselambda_t *lsexpr_get_lambda(const lsexpr_t *expr);
 const lseclosure_t *lsexpr_get_closure(const lsexpr_t *expr);
 const lsechoice_t *lsexpr_get_choice(const lsexpr_t *expr);
 void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr);
-lspres_t lsexpr_prepare(const lsexpr_t *expr, lseenv_t *env);

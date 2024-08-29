@@ -1,5 +1,6 @@
 #include "pat/pat.h"
 #include "common/malloc.h"
+#include "common/ref.h"
 #include "lstypes.h"
 #include <assert.h>
 
@@ -10,7 +11,7 @@ struct lspat {
     const lspas_t *lp_as;
     const lsint_t *lp_int;
     const lsstr_t *lp_str;
-    const lspref_t *lp_ref;
+    const lsref_t *lp_ref;
   };
 };
 
@@ -52,7 +53,7 @@ const lsint_t *lspat_get_int(const lspat_t *pat) { return pat->lp_int; }
 
 const lsstr_t *lspat_get_str(const lspat_t *pat) { return pat->lp_str; }
 
-const lspref_t *lspat_get_ref(const lspat_t *pat) { return pat->lp_ref; }
+const lsref_t *lspat_get_ref(const lspat_t *pat) { return pat->lp_ref; }
 
 void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat) {
   switch (pat->lp_type) {
@@ -69,32 +70,14 @@ void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat) {
     lsstr_print(fp, prec, indent, pat->lp_str);
     break;
   case LSPTYPE_REF:
-    lspref_print(fp, prec, indent, pat->lp_ref);
+    lsref_print(fp, prec, indent, pat->lp_ref);
     break;
   }
-  assert(0);
 }
 
-const lspat_t *lspat_new_ref(const lspref_t *pref) {
+const lspat_t *lspat_new_ref(const lsref_t *ref) {
   lspat_t *pat = lsmalloc(sizeof(lspat_t));
   pat->lp_type = LSPTYPE_REF;
-  pat->lp_ref = pref;
+  pat->lp_ref = ref;
   return pat;
-}
-
-lspres_t lspat_prepare(const lspat_t *pat, lseenv_t *env,
-                       const lserref_base_t *erref) {
-  switch (pat->lp_type) {
-  case LSPTYPE_ALGE:
-    return lspalge_prepare(pat->lp_alge, env, erref);
-  case LSPTYPE_AS:
-    return lspas_prepare(pat->lp_as, env, erref);
-  case LSPTYPE_INT:
-    return LSPRES_SUCCESS;
-  case LSPTYPE_STR:
-    return LSPRES_SUCCESS;
-  case LSPTYPE_REF:
-    return lspref_prepare(pat->lp_ref, env, erref);
-  }
-  return LSPRES_SUCCESS;
 }

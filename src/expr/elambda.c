@@ -23,12 +23,3 @@ void lselambda_print(FILE *fp, lsprec_t prec, int indent,
   lsprintf(fp, indent, " -> ");
   lsexpr_print(fp, LSPREC_LAMBDA + 1, indent, elambda->lel_body);
 }
-
-lspres_t lselambda_prepare(const lselambda_t *elambda, lseenv_t *eenv) {
-  eenv = lseenv_new(eenv);
-  const lserref_base_t *erref = lserref_base_new_lambda(elambda);
-  lspres_t res = lspat_prepare(elambda->lel_arg, eenv, erref);
-  if (res != LSPRES_SUCCESS)
-    return res;
-  return lsexpr_prepare(elambda->lel_body, eenv);
-}

@@ -1,12 +1,12 @@
 #include "expr/expr.h"
 #include "common/io.h"
 #include "common/malloc.h"
+#include "common/ref.h"
 #include "expr/ealge.h"
 #include "expr/eappl.h"
 #include "expr/echoice.h"
 #include "expr/eclosure.h"
 #include "expr/elambda.h"
-#include "expr/eref.h"
 #include <assert.h>
 
 struct lsexpr {
@@ -14,7 +14,7 @@ struct lsexpr {
   union {
     const lsealge_t *le_alge;
     const lseappl_t *le_appl;
-    const lseref_t *le_ref;
+    const lsref_t *le_ref;
     const lselambda_t *le_lambda;
     const lseclosure_t *le_closure;
     const lsechoice_t *le_choice;
@@ -31,42 +31,42 @@ const lsexpr_t *lsexpr_new_alge(const lsealge_t *ealge) {
 }
 
 const lsexpr_t *lsexpr_new_appl(const lseappl_t *eappl) {
-   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
+  lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type = LSETYPE_APPL;
   expr->le_appl = eappl;
   return expr;
 }
 
-const lsexpr_t *lsexpr_new_ref(const lseref_t *eref) {
-   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
+const lsexpr_t *lsexpr_new_ref(const lsref_t *ref) {
+  lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type = LSETYPE_REF;
-  expr->le_ref = eref;
+  expr->le_ref = ref;
   return expr;
 }
 
 const lsexpr_t *lsexpr_new_int(const lsint_t *intval) {
-   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
+  lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type = LSETYPE_INT;
   expr->le_intval = intval;
   return expr;
 }
 
 const lsexpr_t *lsexpr_new_str(const lsstr_t *strval) {
-   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
+  lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type = LSETYPE_STR;
   expr->le_strval = strval;
   return expr;
 }
 
 const lsexpr_t *lsexpr_new_lambda(const lselambda_t *lambda) {
-   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
+  lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type = LSETYPE_LAMBDA;
   expr->le_lambda = lambda;
   return expr;
 }
 
 const lsexpr_t *lsexpr_new_choice(const lsechoice_t *echoice) {
-   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
+  lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type = LSETYPE_CHOICE;
   expr->le_choice = echoice;
   return expr;
@@ -89,7 +89,7 @@ void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr) {
     lseappl_print(fp, prec, indent, expr->le_appl);
     return;
   case LSETYPE_REF:
-    lseref_print(fp, prec, indent, expr->le_ref);
+    lsref_print(fp, prec, indent, expr->le_ref);
     return;
   case LSETYPE_INT:
     lsint_print(fp, prec, indent, expr->le_intval);
@@ -111,7 +111,7 @@ void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr) {
 }
 
 const lsexpr_t *lsexpr_new_closure(const lseclosure_t *closure) {
-   lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
+  lsexpr_t *expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type = LSETYPE_CLOSURE;
   expr->le_closure = closure;
   return expr;
@@ -134,7 +134,7 @@ const lseappl_t *lsexpr_get_appl(const lsexpr_t *expr) {
   return expr->le_appl;
 }
 
-const lseref_t *lsexpr_get_ref(const lsexpr_t *expr) {
+const lsref_t *lsexpr_get_ref(const lsexpr_t *expr) {
   assert(expr != NULL);
   assert(expr->le_type == LSETYPE_REF);
   return expr->le_ref;
@@ -168,27 +168,4 @@ const lsechoice_t *lsexpr_get_choice(const lsexpr_t *expr) {
   assert(expr != NULL);
   assert(expr->le_type == LSETYPE_CHOICE);
   return expr->le_choice;
-}
-
-lspres_t lsexpr_prepare(const lsexpr_t *const expr, lseenv_t *const env) {
-  assert(expr != NULL);
-  assert(env != NULL);
-  switch (expr->le_type) {
-  case LSETYPE_ALGE:
-    return lsealge_prepare(expr->le_alge, env);
-  case LSETYPE_APPL:
-    return lseappl_prepare(expr->le_appl, env);
-  case LSETYPE_REF:
-    return lseref_prepare(expr->le_ref, env);
-  case LSETYPE_LAMBDA:
-    return lselambda_prepare(expr->le_lambda, env);
-  case LSETYPE_CLOSURE:
-    return lseclosure_prepare(expr->le_closure, env);
-  case LSETYPE_CHOICE:
-    return lsechoice_prepare(expr->le_choice, env);
-  case LSETYPE_INT:
-  case LSETYPE_STR:
-    return LSPRES_SUCCESS;
-  }
-  assert(0);
 }

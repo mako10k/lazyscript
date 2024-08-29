@@ -101,19 +101,6 @@ void lspalge_print(FILE *fp, int prec, int indent, const lspalge_t *palge) {
     lsprintf(fp, indent, ")");
 }
 
-lspres_t lspalge_prepare(const lspalge_t *alge, lseenv_t *env,
-                         const lserref_base_t *erref) {
-  assert(alge != NULL);
-  lssize_t argc = lsplist_count(alge->lpa_args);
-  for (lssize_t i = 0; i < argc; i++) {
-    const lspat_t *arg = lsplist_get(alge->lpa_args, i);
-    lspres_t res = lspat_prepare(arg, env, erref);
-    if (res != LSPRES_SUCCESS)
-      return res;
-  }
-  return LSPRES_SUCCESS;
-}
-
 const lsplist_t *lspalge_get_args(const lspalge_t *alge) {
   assert(alge != NULL);
   return alge->lpa_args;

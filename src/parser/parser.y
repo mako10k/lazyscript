@@ -52,7 +52,7 @@ while (0)
     const lsint_t *intval;
     const lsstr_t *strval;
     const lspat_t *pat;
-    const lspref_t *pref;
+    const lsref_t *ref;
     lspalge_t *palge;
     lsbind_t *bind;
     const lsbind_entry_t *bind_ent;
@@ -89,7 +89,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %nterm <ealge> ealge elist econs etuple
 %nterm <eappl> eappl
 %nterm <pat> pat pat1 pat2 pat3
-%nterm <pref> pref
+%nterm <ref> pref
 %nterm <palge> palge plist pcons ptuple
 %nterm <bind> bind bind_list
 %nterm <bind_ent> bind_single
@@ -177,7 +177,7 @@ efact:
     | etuple { $$ = lsealge_get_arg_count($1) == 1 ? lsealge_get_arg($1, 0) : lsexpr_new_alge($1); }
     | elist { $$ = lsexpr_new_alge($1); }
     | closure { $$ = lsexpr_new_closure($1); }
-    | '~' LSTSYMBOL { $$ = lsexpr_new_ref(lseref_new($2, @$)); }
+    | '~' LSTSYMBOL { $$ = lsexpr_new_ref(lsref_new($2, @$)); }
     | elambda { $$ = lsexpr_new_lambda($1); }
     | '{' expr '}' { $$ = $2; }
     ;
@@ -239,7 +239,7 @@ pat3:
     ;
 
 pref:
-      '~' LSTSYMBOL { $$ = lspref_new($2, @$); }
+      '~' LSTSYMBOL { $$ = lsref_new($2, @$); }
     ;
 
 ptuple:

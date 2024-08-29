@@ -17,5 +17,7 @@ liblscommon_la_SOURCES = \
     loc.h \
     malloc.c \
     malloc.h \
+    ref.c \
+    ref.h \
     str.c \
     str.h

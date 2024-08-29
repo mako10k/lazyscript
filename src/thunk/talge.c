@@ -9,14 +9,16 @@ struct lstalge {
   const lstlist_t *lta_args;
 };
 
-lstalge_t *lstalge_new(const lsealge_t *ealge) {
+lstalge_t *lstalge_new(const lsealge_t *ealge, lstenv_t *tenv) {
+  assert(ealge != NULL);
+  assert(tenv != NULL);
   lstalge_t *alge = lsmalloc(sizeof(lstalge_t));
   alge->lta_constr = lsealge_get_constr(ealge);
   alge->lta_args = lstlist_new();
   for (const lselist_t *le = lsealge_get_args(ealge); le != NULL;
        le = lselist_get_next(le)) {
     const lsexpr_t *arg = lselist_get(le, 0);
-    lstlist_push(alge->lta_args, lsthunk_new_expr(arg));
+    lstlist_push(alge->lta_args, lsthunk_new_expr(arg, tenv));
   }
   return alge;
 }

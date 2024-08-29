@@ -3,10 +3,10 @@
 typedef struct lstalge lstalge_t;
 
 #include "expr/ealge.h"
-#include "thunk/thunk.h"
 #include "thunk/tlist.h"
+#include "thunk/tenv.h"
 
-lstalge_t *lstalge_new(const lsealge_t *ealge);
+lstalge_t *lstalge_new(const lsealge_t *ealge, lstenv_t *tenv);
 const lsstr_t *lstalge_get_constr(const lstalge_t *talge);
 lssize_t lstalge_get_arg_count(const lstalge_t *talge);
 lsthunk_t *lstalge_get_arg(const lstalge_t *talge, int i);

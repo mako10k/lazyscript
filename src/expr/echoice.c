@@ -46,10 +46,3 @@ void lsechoice_print(FILE *fp, lsprec_t prec, int indent,
   if (prec > LSPREC_CHOICE)
     lsprintf(fp, indent, "\n)");
 }
-
-lspres_t lsechoice_prepare(const lsechoice_t *echoice, lseenv_t *env) {
-  lspres_t res = lsexpr_prepare(echoice->lec_left, env);
-  if (res != LSPRES_SUCCESS)
-    return res;
-  return lsexpr_prepare(echoice->lec_right, env);
-}

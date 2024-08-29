@@ -4,7 +4,6 @@
 typedef struct lseappl lseappl_t;
 
 #include "common/array.h"
-#include "expr/eenv.h"
 #include "expr/elist.h"
 #include "expr/expr.h"
 #include "lazyscript.h"
@@ -18,4 +17,3 @@ lssize_t lseappl_get_arg_count(const lseappl_t *eappl);
 const lsexpr_t *lseappl_get_arg(const lseappl_t *eappl, lssize_t i);
 void lseappl_print(FILE *stream, lsprec_t prec, int indent,
                    const lseappl_t *eappl);
-lspres_t lseappl_prepare(const lseappl_t *eappl, lseenv_t *eenv);

@@ -23,10 +23,6 @@ void lsprog_print(FILE *fp, int prec, int indent, const lsprog_t *prog) {
   lsprintf(fp, 0, ";\n");
 }
 
-int lsprog_prepare(const lsprog_t *prog, lseenv_t *env) {
-  return lsexpr_prepare(prog->lp_expr, env);
-}
-
 void yyerror(lsloc_t *loc, lsscan_t *scanner, const char *s) {
   (void)scanner;
   lsloc_print(stderr, *loc);

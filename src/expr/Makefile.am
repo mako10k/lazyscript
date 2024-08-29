@@ -11,15 +11,9 @@ liblsexpr_la_SOURCES = \
     echoice.h \
     eclosure.c \
     eclosure.h \
-    eenv.c \
-    eenv.h \
     elambda.c \
     elambda.h \
     elist.c \
     elist.h \
-    eref.c \
-    eref.h \
-    erref.c \
-    erref.h \
     expr.c \
     expr.h

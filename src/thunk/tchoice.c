@@ -9,11 +9,11 @@ struct lstchoice {
   lsthunk_t *ltc_right;
 };
 
-lstchoice_t *lstchoice_new(const lsechoice_t *echoice) {
+lstchoice_t *lstchoice_new(const lsechoice_t *echoice, lstenv_t *tenv) {
   assert(echoice != NULL);
   lstchoice_t *lchoice = lsmalloc(sizeof(lstchoice_t));
-  lchoice->ltc_left = lsthunk_new_expr( lsechoice_get_left(echoice));
-  lchoice->ltc_right = lsthunk_new_expr(lsechoice_get_right(echoice));
+  lchoice->ltc_left = lsthunk_new_expr(lsechoice_get_left(echoice), tenv);
+  lchoice->ltc_right = lsthunk_new_expr(lsechoice_get_right(echoice), tenv);
   return lchoice;
 }
 

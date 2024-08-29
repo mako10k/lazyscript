@@ -9,13 +9,11 @@ liblsthunk_la_SOURCES = \
     tappl.h \
     tchoice.c \
     tchoice.h \
-    tclosure.c \
-    tclosure.h \
+    tenv.c \
+    tenv.h \
     thunk.c \
     thunk.h \
     tlambda.c \
     tlambda.h \
     tlist.c \
-    tlist.h \
-    tref.c \
-    tref.h
+    tlist.h

@@ -2,8 +2,17 @@
 
 typedef struct lstenv lstenv_t;
 
-#include "thunk/thunk.h"
+#include "common/str.h"
+#include "thunk/tref.h"
 
-lstenv_t *lstenv_new(lstenv_t *parent);
-lsthunk_t *lstenv_get(const lstenv_t *env, const lsstr_t *name);
-void lstenv_put(lstenv_t *env, const lsstr_t *name, lsthunk_t *thunk);
+lstenv_t *lstenv_new(const lstenv_t *parent);
+lstref_t *lstenv_get(const lstenv_t *tenv, const lsstr_t *name);
+lstref_t *lstenv_get_self(const lstenv_t *tenv, const lsstr_t *name);
+void lstenv_put(lstenv_t *tenv, const lsstr_t *name, const lstref_t *tref);
+void lstenv_incr_nwarnings(lstenv_t *tenv);
+void lstenv_incr_nerrors(lstenv_t *tenv);
+void lstenv_incr_nfatals(lstenv_t *tenv);
+lssize_t lstenv_get_nwarnings(const lstenv_t *tenv);
+lssize_t lstenv_get_nerrors(const lstenv_t *tenv);
+lssize_t lstenv_get_nfatals(const lstenv_t *tenv);
+void lstenv_print(FILE *fp, const lstenv_t *tenv);

@@ -1,5 +1,4 @@
 #include "lazyscript.h"
-#include "expr/eenv.h"
 #include "misc/prog.h"
 #include "parser/parser.h"
 #include <string.h>
@@ -57,12 +56,6 @@ int main(int argc, char **argv) {
       char name[32];
       snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
       const lsprog_t *prog = lsparse_string(name, optarg);
-      lseenv_t *env = lseenv_new(NULL);
-      lspres_t res = lsprog_prepare(prog, env);
-      if (res != LSPRES_SUCCESS || lseenv_get_nerrors(env) > 0 ||
-          lseenv_get_nfatals(env) > 0) {
-        exit(1);
-      }
       if (prog != NULL)
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
       break;
@@ -94,12 +87,6 @@ int main(int argc, char **argv) {
     if (strcmp(filename, "-") == 0)
       filename = "/dev/stdin";
     const lsprog_t *prog = lsparse_file(argv[i]);
-    lseenv_t *env = lseenv_new(NULL);
-    lspres_t res = lsprog_prepare(prog, env);
-    if (res != LSPRES_SUCCESS || lseenv_get_nerrors(env) > 0 ||
-        lseenv_get_nfatals(env) > 0) {
-      exit(1);
-    }
     if (prog != NULL)
       lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
   }

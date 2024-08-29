@@ -2,9 +2,8 @@
 #include "common/io.h"
 #include "common/malloc.h"
 #include "thunk/talge.h"
-#include "thunk/tclosure.h"
-#include "thunk/tenv.h"
 #include "thunk/tlambda.h"
+#include "thunk/tenv.h"
 #include <assert.h>
 
 struct lsthunk {
@@ -16,7 +15,6 @@ struct lsthunk {
     const lsstr_t *lt_str;
     lstref_t *lt_ref;
     lstlambda_t *lt_lambda;
-    lstclosure_t *lt_closure;
     lstchoice_t *lt_choice;
   };
   lsthunk_t *lt_whnf;
@@ -70,14 +68,6 @@ lsthunk_t *lsthunk_new_lambda(lstlambda_t *tlambda) {
   return thunk;
 }
 
-lsthunk_t *lsthunk_new_closure(lstclosure_t *tclosure) {
-  lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
-  thunk->lt_type = LSTTYPE_CLOSURE;
-  thunk->lt_closure = tclosure;
-  thunk->lt_whnf = NULL;
-  return thunk;
-}
-
 lsthunk_t *lsthunk_new_choice(lstchoice_t *tchoice) {
   lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type = LSTTYPE_CHOICE;
@@ -94,9 +84,6 @@ lsthunk_t *lsthunk_get_whnf(lsthunk_t *thunk) {
   switch (thunk->lt_type) {
   case LSTTYPE_APPL:
     thunk->lt_whnf = lstappl_eval(thunk->lt_appl);
-    break;
-  case LSTTYPE_CLOSURE:
-    thunk->lt_whnf = lstclosure_eval(thunk->lt_closure);
     break;
   case LSTTYPE_REF:
     thunk->lt_whnf = lstref_eval(thunk->lt_ref);
@@ -127,10 +114,6 @@ const lsstr_t *lsthunk_get_str(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_STR);
   return thunk->lt_str;
 }
-lstclosure_t *lsthunk_get_closure(const lsthunk_t *thunk) {
-  assert(thunk->lt_type == LSTTYPE_CLOSURE);
-  return thunk->lt_closure;
-}
 lstlambda_t *lsthunk_get_lambda(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_LAMBDA);
   return thunk->lt_lambda;
@@ -144,25 +127,26 @@ lstchoice_t *lsthunk_get_choice(const lsthunk_t *thunk) {
   return thunk->lt_choice;
 }
 
-lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr) {
+lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr, lstenv_t *tenv) {
   assert(expr != NULL);
+  assert(tenv != NULL);
   switch (lsexpr_get_type(expr)) {
   case LSETYPE_ALGE:
-    return lsthunk_new_alge(lstalge_new(lsexpr_get_alge(expr)));
+    return lsthunk_new_alge(lstalge_new(lsexpr_get_alge(expr), tenv));
   case LSETYPE_APPL:
-    return lsthunk_new_appl(lstappl_new(lsexpr_get_appl(expr)));
+    return lsthunk_new_appl(lstappl_new(lsexpr_get_appl(expr), tenv));
   case LSETYPE_REF:
-    return lsthunk_new_ref(lstref_new(lsexpr_get_ref(expr)));
+    return lsthunk_new_ref(lstenv_get(tenv, lsref_get_name(lsexpr_get_ref(expr))));
   case LSETYPE_LAMBDA:
-    return lsthunk_new_lambda(lstlambda_new(lsexpr_get_lambda(expr)));
+    return lsthunk_new_lambda(lstlambda_new(lsexpr_get_lambda(expr), tenv));
   case LSETYPE_CLOSURE:
-    return lsthunk_new_closure(lstclosure_new(lsexpr_get_closure(expr)));
+    return NULL; // TODO: implement
   case LSETYPE_INT:
     return lsthunk_new_int(lsexpr_get_int(expr));
   case LSETYPE_STR:
     return lsthunk_new_str(lsexpr_get_str(expr));
   case LSETYPE_CHOICE:
-    return lsthunk_new_choice(lstchoice_new(lsexpr_get_choice(expr)));
+    return lsthunk_new_choice(lstchoice_new(lsexpr_get_choice(expr), tenv));
   }
   assert(0);
 }
@@ -232,18 +216,18 @@ lsmres_t lsthunk_match_pat_alge(lsthunk_t *thunk, const lspalge_t *palge,
 
 lsmres_t lsthunk_match_pat_as(lsthunk_t *thunk, const lspas_t *pas,
                               lstenv_t *tenv) {
-  const lspref_t *pref = lspas_get_pref(pas);
+  const lsref_t *ref = lspas_get_ref(pas);
   const lspat_t *pat = lspas_get_pat(pas);
   lsmres_t mres = lsthunk_match_pat(thunk, pat, tenv);
   if (mres != LSMATCH_SUCCESS)
     return mres;
-  mres = lsthunk_match_pat_ref(thunk, pref, tenv);
+  mres = lsthunk_match_pat_ref(thunk, ref, tenv);
   if (mres != LSMATCH_SUCCESS)
     return mres;
   return LSMATCH_SUCCESS;
 }
 
-lsmres_t lsthunk_match_pat_ref(lsthunk_t *thunk, const lspref_t *pref,
+lsmres_t lsthunk_match_pat_ref(lsthunk_t *thunk, const lsref_t *ref,
                                lstenv_t *tenv) {
   return LSMATCH_FAILURE; // TODO: implement
 }
@@ -254,8 +238,6 @@ lsthunk_t *lsthunk_apply(lsthunk_t *func, const lstlist_t *args) {
   switch (lsthunk_get_type(func)) {
   case LSTTYPE_ALGE:
     return lstalge_apply(lsthunk_get_alge(func), args);
-  case LSTTYPE_CLOSURE:
-    return lstclosure_apply(lsthunk_get_closure(func), args);
   case LSTTYPE_LAMBDA:
     return lstlambda_apply(lsthunk_get_lambda(func), args);
   case LSTTYPE_REF:

@@ -9,7 +9,5 @@ liblspat_la_SOURCES = \
     pas.h \
     plist.c \
     plist.h \
-    pref.c \
-    pref.h \
     pat.c \
     pat.h

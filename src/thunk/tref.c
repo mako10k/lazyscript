@@ -1,52 +1,131 @@
-#include "thunk/tref.h"
 #include "common/malloc.h"
-#include "expr/eref.h"
+#include "common/ref.h"
 #include "misc/bind.h"
-#include "thunk/tenv.h"
+#include "thunk/thunk.h"
+#include <assert.h>
 
-struct lstref {
-  /** origin information */
-  const lseref_t *ltr_eref;
-  lstenv_t *ltr_env;
-  /** thunk reference */
-  lsthunk_t *ltr_bound;
+struct lstref_bind_entry {
+  const lspat_t *ltrb_lhs;
+  const lsthunk_t *ltrb_rhs;
 };
 
-lstref_t *lstref_new(const lseref_t *eref) {
+struct lstref_lambda {
+  const lspat_t *ltrl_arg;
+  const lsthunk_t *ltrl_body;
+};
+
+struct lstref_target {
+  lstrtype_t ltrt_type;
+  union {
+    const lstref_bind_entry_t *ltrt_bind_entry;
+    const lstref_lambda_t *ltrt_lambda;
+  };
+  const lstref_entry_t *ltrt_entry;
+};
+
+struct lstref_entry {
+  const lsref_t *ltre_ref;
+  lsthunk_t *ltre_bound;
+  const lstref_entry_t *ltre_next;
+};
+
+struct lstref {
+  const lstref_target_t *ltr_target;
+  const lstref_entry_t *ltr_entry;
+};
+
+lstref_t *lstref_new_bind_entry(const lsbind_entry_t *bentry, lstenv_t *tenv) {
   lstref_t *tref = lsmalloc(sizeof(lstref_t));
-  tref->ltr_eref = eref;
-  tref->ltr_env = NULL;
-  tref->ltr_bound = NULL;
+  lstref_target_t *target = lsmalloc(sizeof(lstref_target_t));
+  target->ltrt_type = LSTRTYPE_BIND_ENTRY;
+  target->ltrt_bind_entry = bentry;
   return tref;
 }
 
-lsthunk_t *lstref_eval(lstref_t *tref) {
-  if (tref->ltr_bound != NULL)
-    return lsthunk_eval(tref->ltr_bound);
-  const lserref_t *erref = lseref_get_erref(tref->ltr_eref);
-  switch (lserref_get_type(erref)) {
-  case LSERRTYPE_BIND_ENTRY: {
-    if (tref->ltr_env == NULL) {
-      tref->ltr_env = lstenv_new(NULL);
-      const lsbind_entry_t *bentry = lserref_get_bind_entry(erref);
-      const lspat_t *lhs = lsbind_entry_get_lhs(bentry);
-      const lsexpr_t *erhs = lsbind_entry_get_rhs(bentry);
-      lsthunk_t *trhs = lsthunk_new_expr(erhs);
-      lsmres_t mres = lsthunk_match_pat(trhs, lhs, tref->ltr_env);
-      if (mres != LSMATCH_SUCCESS)
-        return NULL;
-    }
-    tref->ltr_bound =
-        lstenv_get(tref->ltr_env, lseref_get_name(tref->ltr_eref));
-    return lsthunk_eval(tref->ltr_bound);
-  }
-  case LSERRTYPE_LAMBDA: {
-    const lselambda_t *lambda = lserref_get_lambda(erref);
-    return lsthunk_new_expr(lsexpr_new_lambda(lambda));
-  }
-  }
+lstref_t *lstref_new(const lsref_t *ref, lstenv_t *tenv) {
+  assert(ref != NULL);
+  assert(tenv != NULL);
+  const lsstr_t *ename = lsref_get_name(ref);
+  return lstenv_get(tenv, ename);
 }
+
+lsthunk_t *lstref_eval(lstref_t *tref) {}
 
 lsthunk_t *lstref_apply(lstref_t *tref, const lstlist_t *args) {
   return NULL; // TODO: implement
+}
+
+const lstref_entry_t *lstref_entry_add_pat(const lstref_entry_t *entry,
+                                           const lspat_t *pat, lstenv_t *tenv);
+
+const lstref_entry_t *lstref_entry_add_palge(const lstref_entry_t *entry,
+                                             const lspalge_t *alge,
+                                             lstenv_t *tenv) {
+  assert(alge != NULL);
+  assert(tenv != NULL);
+  const lstref_entry_t **pentry = &entry;
+  for (const lsplist_t *arg = lspalge_get_args(alge); arg != NULL;
+       arg = lsplist_get_next(arg)) {
+    const lspat_t *pat = lsplist_get(arg, 0);
+    entry = lstref_entry_add_pat(entry, pat, tenv);
+  }
+  return entry;
+}
+
+const lstref_entry_t *lstref_entry_add_ref(const lstref_entry_t *entry,
+                                            const lsref_t *ref,
+                                            lstenv_t *tenv) {
+  assert(ref != NULL);
+  assert(tenv != NULL);
+  lstref_entry_t *new_entry = lsmalloc(sizeof(lstref_entry_t));
+  new_entry->ltre_ref = ref;
+  new_entry->ltre_bound = NULL;
+  new_entry->ltre_next = entry;
+  return new_entry;
+}
+
+const lstref_entry_t *lstref_entry_add_pas(const lstref_entry_t *entry,
+                                           const lspas_t *pas, lstenv_t *tenv) {
+  assert(pas != NULL);
+  assert(tenv != NULL);
+  const lspat_t *pat = lspas_get_pat(pas);
+  const lsref_t *ref = lspas_get_ref(pas);
+  return lstref_entry_add_ref(lstref_entry_add_pat(entry, pat, tenv), ref,
+                               tenv);
+  if (entry == NULL)
+    return NULL;
+  return entry;
+}
+
+const lstref_entry_t *lstref_entry_add_pat(const lstref_entry_t *entry,
+                                           const lspat_t *pat, lstenv_t *tenv) {
+  assert(pat != NULL);
+  assert(tenv != NULL);
+  switch (lspat_get_type(pat)) {
+  case LSPTYPE_ALGE:
+    return lstref_entry_add_palge(entry, lspat_get_alge(pat), tenv);
+  case LSPTYPE_AS:
+    return lstref_target_create_entries_as(lspat_get_as(pat), tenv);
+  case LSPTYPE_INT:
+    return lstref_target_create_entries_int(lspat_get_int(pat), tenv);
+  case LSPTYPE_STR:
+    return lstref_target_create_entries_str(lspat_get_str(pat), tenv);
+  case LSPTYPE_REF:
+    return lstref_target_create_entries_ref(lspat_get_ref(pat), tenv);
+  }
+}
+
+const lstref_target_t *lstref_target_new_lambda(const lselambda_t *elambda,
+                                                lstenv_t *tenv) {
+  assert(elambda != NULL);
+  assert(tenv != NULL);
+  const lspat_t *arg = lselambda_get_arg(elambda);
+  const lstref_entry_t *entry = lstref_target_create_entries(arg, tenv);
+  lstref_target_t *target = lsmalloc(sizeof(lstref_target_t));
+  target->ltrt_type = LSTRTYPE_LAMBDA;
+  lstref_lambda_t *lambda = lsmalloc(sizeof(lstref_lambda_t));
+  lambda->ltrl_arg = arg;
+  lambda->ltrl_body = lsthunk_new_expr(lselambda_get_body(elambda), tenv);
+  target->ltrt_lambda = lambda;
+  return target;
 }

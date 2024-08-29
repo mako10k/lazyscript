@@ -100,18 +100,6 @@ void lsealge_print(FILE *fp, lsprec_t prec, int indent,
     lsprintf(fp, indent, ")");
 }
 
-lspres_t lsealge_prepare(const lsealge_t *ealge, lseenv_t *env) {
-  assert(ealge != NULL);
-  lssize_t argc = lselist_count(ealge->lea_args);
-  for (lssize_t i = 0; i < argc; i++) {
-    const lsexpr_t *arg = lselist_get(ealge->lea_args, i);
-    lspres_t pres = lsexpr_prepare(arg, env);
-    if (pres != LSPRES_SUCCESS)
-      return pres;
-  }
-  return LSPRES_SUCCESS;
-}
-
 const lselist_t *lsealge_get_args(const lsealge_t *ealge) {
   assert(ealge != NULL);
   return ealge->lea_args;
