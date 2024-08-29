@@ -18,7 +18,7 @@ lspalge_t *lspalge_new(const lsstr_t *constr) {
   return palge;
 }
 
-void lsexpr_add_args(lspalge_t *palge, lspat_t *arg) {
+void lsexpr_add_args(lspalge_t *palge, const lspat_t *arg) {
   assert(palge != NULL);
   assert(arg != NULL);
   palge->lpa_args = lsplist_push(palge->lpa_args, arg);
@@ -39,7 +39,7 @@ lssize_t lspalge_get_arg_count(const lspalge_t *palge) {
   return lsplist_count(palge->lpa_args);
 }
 
-lspat_t *lspalge_get_arg(const lspalge_t *alge, int i) {
+const lspat_t *lspalge_get_arg(const lspalge_t *alge, int i) {
   assert(alge != NULL);
   return lsplist_get(alge->lpa_args, i);
 }
@@ -106,7 +106,7 @@ lspres_t lspalge_prepare(lspalge_t *alge, lseenv_t *env,
   assert(alge != NULL);
   lssize_t argc = lsplist_count(alge->lpa_args);
   for (lssize_t i = 0; i < argc; i++) {
-    lspat_t *arg = lsplist_get(alge->lpa_args, i);
+    const lspat_t *arg = lsplist_get(alge->lpa_args, i);
     lspres_t res = lspat_prepare(arg, env, erref);
     if (res != LSPRES_SUCCESS)
       return res;

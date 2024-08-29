@@ -222,7 +222,7 @@ lsmres_t lsthunk_match_pat_alge(lsthunk_t *thunk, const lspalge_t *palge,
   if (pargc != targc)
     return LSMATCH_FAILURE;
   for (lssize_t i = 0; i < pargc; i++) {
-    lspat_t *parg = lsplist_get(pargs, i);
+    const lspat_t *parg = lsplist_get(pargs, i);
     lsthunk_t *targ = lstalge_get_arg(talge, i);
     if (lsthunk_match_pat(targ, parg, tenv) < 0)
       return LSMATCH_FAILURE;

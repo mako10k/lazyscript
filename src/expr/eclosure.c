@@ -28,7 +28,7 @@ lspres_t lseclosure_prepare(lseclosure_t *eclosure, lseenv_t *eenv) {
   for (const lsbelist_t *le = lsbind_get_entries(eclosure->lec_bind);
        le != NULL; le = lsbelist_get_next(le)) {
     lsbind_entry_t *bind_ent = lsbelist_get(le, 0);
-    lspat_t *lhs = lsbind_entry_get_lhs(bind_ent);
+    const lspat_t *lhs = lsbind_entry_get_lhs(bind_ent);
     const lserref_base_t *erref = lserref_base_new_bind_entry(bind_ent);
     lspres_t pres = lspat_prepare(lhs, eenv, erref);
     if (pres != LSPRES_SUCCESS)
