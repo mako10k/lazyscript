@@ -5,7 +5,7 @@ typedef struct lseenv lseenv_t;
 #include "common/str.h"
 #include "expr/erref.h"
 
-lseenv_t *lseenv_new(lseenv_t *parent);
+lseenv_t *lseenv_new(const lseenv_t *parent);
 lserref_t *lseenv_get(const lseenv_t *eenv, const lsstr_t *name);
 lserref_t *lseenv_get_self(const lseenv_t *eenv, const lsstr_t *name);
 void lseenv_put(lseenv_t *eenv, const lsstr_t *name, const lserref_t *erref);
