@@ -11,7 +11,7 @@ typedef struct lsint lsint_t;
  * @param val Value.
  * @return New integer.
  */
-lsint_t *lsint_new(int val);
+const lsint_t *lsint_new(int val);
 
 /**
  * Print an integer.

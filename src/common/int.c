@@ -8,7 +8,7 @@ struct lsint {
   int li_val;
 };
 
-lsint_t *lsint_new(int val) {
+const lsint_t *lsint_new(int val) {
   if (val == 0)
     return NULL;
   lsint_t *eint = lsmalloc_atomic(sizeof(lsint_t));
