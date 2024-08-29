@@ -1,7 +1,7 @@
 #pragma once
 
 typedef struct lshash lshash_t;
-typedef void *lshash_data_t;
+typedef const void *lshash_data_t;
 
 #include "common/str.h"
 #include "lstypes.h"

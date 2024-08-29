@@ -37,13 +37,13 @@ void lspref_print(FILE *fp, lsprec_t prec, int indent, const lspref_t *pref) {
 }
 
 lspres_t lspref_prepare(lspref_t *pref, lseenv_t *eenv,
-                        lserref_wrapper_t *erref) {
+                        const lserref_base_t *erref) {
   assert(pref != NULL);
   assert(eenv != NULL);
   assert(erref != NULL);
   lserref_t *erref_found = lseenv_get_self(eenv, pref->lpr_name);
   if (erref_found != NULL) {
-    lspref_t *pref_found = lserref_get_pref(erref_found);
+    const lspref_t *pref_found = lserref_get_pref(erref_found);
     lsprintf(stderr, 0, "E: ");
     lsloc_print(stderr, pref->lpr_loc);
     lsprintf(stderr, 0, "duplicated reference: ");
@@ -58,7 +58,7 @@ lspres_t lspref_prepare(lspref_t *pref, lseenv_t *eenv,
   }
   erref_found = lseenv_get(eenv, pref->lpr_name);
   if (erref_found != NULL) {
-    lspref_t *pref_found = lserref_get_pref(erref_found);
+    const lspref_t *pref_found = lserref_get_pref(erref_found);
     lsprintf(stderr, 0, "W: ");
     lsloc_print(stderr, pref->lpr_loc);
     lsprintf(stderr, 0, "overridden reference: ");

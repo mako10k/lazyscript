@@ -17,7 +17,7 @@ lseclosure_t *lseclosure_new(lsexpr_t *expr, lsbind_t *bind) {
 
 void lseclosure_print(FILE *stream, lsprec_t prec, int indent,
                       lseclosure_t *eclosure) {
-  lsprintf(stream, indent+1, "{\n");
+  lsprintf(stream, indent + 1, "{\n");
   lsexpr_print(stream, prec, indent + 1, eclosure->lec_expr);
   lsbind_print(stream, prec, indent + 1, eclosure->lec_bind);
   lsprintf(stream, indent, "\n}");
@@ -29,7 +29,7 @@ lspres_t lseclosure_prepare(lseclosure_t *eclosure, lseenv_t *eenv) {
        le != NULL; le = lsbelist_get_next(le)) {
     lsbind_entry_t *bind_ent = lsbelist_get(le, 0);
     lspat_t *lhs = lsbind_entry_get_lhs(bind_ent);
-    lserref_wrapper_t *erref = lserref_wrapper_bind_ent(bind_ent);
+    const lserref_base_t *erref = lserref_base_new_bind_entry(bind_ent);
     lspres_t pres = lspat_prepare(lhs, eenv, erref);
     if (pres != LSPRES_SUCCESS)
       return pres;
@@ -43,8 +43,4 @@ lspres_t lseclosure_prepare(lseclosure_t *eclosure, lseenv_t *eenv) {
       return pres;
   }
   return lsexpr_prepare(eclosure->lec_expr, eenv);
-}
-
-lsthunk_t *lseclosure_thunk(lstenv_t *tenv, const lseclosure_t *eclosure) {
-  return lsthunk_new_expr(lstenv(tenv), eclosure->lec_expr);
 }

@@ -25,7 +25,7 @@ lserref_t *lseenv_get(const lseenv_t *eenv, const lsstr_t *name) {
   assert(eenv != NULL);
   assert(name != NULL);
   lserref_t *erref;
-  int found = lshash_get(eenv->lee_refs, name, (void **)&erref);
+  int found = lshash_get(eenv->lee_refs, name, (lshash_data_t *)&erref);
   if (found)
     return erref;
   if (eenv->lee_parent != NULL)
@@ -37,13 +37,13 @@ lserref_t *lseenv_get_self(const lseenv_t *eenv, const lsstr_t *name) {
   assert(eenv != NULL);
   assert(name != NULL);
   lserref_t *erref;
-  int found = lshash_get(eenv->lee_refs, name, (void **)&erref);
+  int found = lshash_get(eenv->lee_refs, name, (lshash_data_t *)&erref);
   if (found)
     return erref;
   return NULL;
 }
 
-void lseenv_put(lseenv_t *eenv, const lsstr_t *name, lserref_t *erref) {
+void lseenv_put(lseenv_t *eenv, const lsstr_t *name, const lserref_t *erref) {
   assert(eenv != NULL);
   assert(name != NULL);
   assert(erref != NULL);

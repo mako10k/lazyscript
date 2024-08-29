@@ -10,7 +10,6 @@ typedef struct lsealge lsealge_t;
 #include "expr/elist.h"
 #include "expr/expr.h"
 #include "lazyscript.h"
-#include "thunk/tenv.h"
 
 lsealge_t *lsealge_new(const lsstr_t *constr);
 void lsealge_add_arg(lsealge_t *ealge, lsexpr_t *arg);

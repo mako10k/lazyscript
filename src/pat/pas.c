@@ -25,7 +25,8 @@ void lspas_print(FILE *fp, int prec, int indent, lspas_t *pas) {
     lsprintf(fp, indent, ")");
 }
 
-lspres_t lspas_prepare(lspas_t *pas, lseenv_t *env, lserref_wrapper_t *erref) {
+lspres_t lspas_prepare(lspas_t *pas, lseenv_t *env,
+                       const lserref_base_t *erref) {
   lspres_t res = lspat_prepare(pas->lpa_pat, env, erref);
   if (res != LSPRES_SUCCESS)
     return res;

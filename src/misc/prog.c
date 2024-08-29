@@ -27,10 +27,6 @@ int lsprog_prepare(lsprog_t *prog, lseenv_t *env) {
   return lsexpr_prepare(prog->lp_expr, env);
 }
 
-lsthunk_t *lsprog_thunk(lstenv_t *tenv, const lsprog_t *prog) {
-  return lsthunk_new_expr(tenv, prog->lp_expr);
-}
-
 void yyerror(lsloc_t *loc, lsscan_t *scanner, const char *s) {
   (void)scanner;
   lsloc_print(stderr, *loc);

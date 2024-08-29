@@ -35,7 +35,7 @@ lsthunk_t *lsthunk_new_lambda(lstlambda_t *tlambda);
 lsthunk_t *lsthunk_new_closure(lstclosure_t *tclosure);
 lsthunk_t *lsthunk_new_ref(lstref_t *tref);
 lsthunk_t *lsthunk_new_choice(lstchoice_t *tchoice);
-lsthunk_t *lsthunk_new_expr(lstenv_t *tenv, const lsexpr_t *expr);
+lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr);
 
 lsthunk_t *lsthunk_get_whnf(lsthunk_t *thunk);
 lsttype_t lsthunk_get_type(const lsthunk_t *thunk);
@@ -49,13 +49,14 @@ lstlambda_t *lsthunk_get_lambda(const lsthunk_t *thunk);
 lstref_t *lsthunk_get_ref(const lsthunk_t *thunk);
 lstchoice_t *lsthunk_get_choice(const lsthunk_t *thunk);
 
-lsmres_t lsthunk_match_pat(lstenv_t *tenv, const lspat_t *pat,
-                           lsthunk_t *thunk);
-lsmres_t lsthunk_match_pat_alge(lstenv_t *tenv, const lspalge_t *alge,
-                                lsthunk_t *thunk);
-lsmres_t lsthunk_match_pat_as(lstenv_t *tenv, const lspas_t *pas,
-                              lsthunk_t *thunk);
-lsmres_t lsthunk_match_pat_ref(lstenv_t *tenv, const lspref_t *pref,
-                               lsthunk_t *thunk);
+lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lspat_t *pat,
+                           lstenv_t *tenv);
+lsmres_t lsthunk_match_pat_alge(lsthunk_t *thunk, const lspalge_t *alge,
+                                lstenv_t *tenv);
+lsmres_t lsthunk_match_pat_as(lsthunk_t *thunk, const lspas_t *pas,
+                              lstenv_t *tenv);
+lsmres_t lsthunk_match_pat_ref(lsthunk_t *thunk, const lspref_t *pref,
+                               lstenv_t *tenv);
 
+lsthunk_t *lsthunk_eval(lsthunk_t *thunk);
 lsthunk_t *lsthunk_apply(lsthunk_t *func, const lstlist_t *args);

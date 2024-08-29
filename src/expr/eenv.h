@@ -8,7 +8,7 @@ typedef struct lseenv lseenv_t;
 lseenv_t *lseenv_new(lseenv_t *parent);
 lserref_t *lseenv_get(const lseenv_t *eenv, const lsstr_t *name);
 lserref_t *lseenv_get_self(const lseenv_t *eenv, const lsstr_t *name);
-void lseenv_put(lseenv_t *eenv, const lsstr_t *name, lserref_t *erref);
+void lseenv_put(lseenv_t *eenv, const lsstr_t *name, const lserref_t *erref);
 void lseenv_incr_nwarnings(lseenv_t *eenv);
 void lseenv_incr_nerrors(lseenv_t *eenv);
 void lseenv_incr_nfatals(lseenv_t *eenv);

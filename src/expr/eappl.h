@@ -8,7 +8,6 @@ typedef struct lseappl lseappl_t;
 #include "expr/elist.h"
 #include "expr/expr.h"
 #include "lazyscript.h"
-#include "thunk/tenv.h"
 
 lseappl_t *lseappl_new(lsexpr_t *func);
 void lseappl_add_arg(lseappl_t *eappl, lsexpr_t *arg);

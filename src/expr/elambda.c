@@ -26,7 +26,7 @@ void lselambda_print(FILE *fp, lsprec_t prec, int indent,
 
 lspres_t lselambda_prepare(lselambda_t *ent, lseenv_t *env) {
   env = lseenv_new(env);
-  lserref_wrapper_t *erref = lserref_wrapper_lambda_ent(ent);
+  const lserref_base_t *erref = lserref_base_new_lambda(ent);
   lspres_t res = lspat_prepare(ent->lele_arg, env, erref);
   if (res != LSPRES_SUCCESS)
     return res;

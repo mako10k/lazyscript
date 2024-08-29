@@ -5,18 +5,15 @@
 #include <assert.h>
 
 struct lstchoice {
-  lstenv_t *ltc_tenv;
   lsthunk_t *ltc_left;
   lsthunk_t *ltc_right;
 };
 
-lstchoice_t *lstchoice_new(lstenv_t *tenv, const lsechoice_t *echoice) {
-  assert(tenv != NULL);
+lstchoice_t *lstchoice_new(const lsechoice_t *echoice) {
   assert(echoice != NULL);
   lstchoice_t *lchoice = lsmalloc(sizeof(lstchoice_t));
-  lchoice->ltc_tenv = tenv;
-  lchoice->ltc_left = lsthunk_new_expr(tenv, lsechoice_get_left(echoice));
-  lchoice->ltc_right = lsthunk_new_expr(tenv, lsechoice_get_right(echoice));
+  lchoice->ltc_left = lsthunk_new_expr( lsechoice_get_left(echoice));
+  lchoice->ltc_right = lsthunk_new_expr(lsechoice_get_right(echoice));
   return lchoice;
 }
 

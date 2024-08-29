@@ -11,8 +11,6 @@ liblsthunk_la_SOURCES = \
     tchoice.h \
     tclosure.c \
     tclosure.h \
-    tenv.c \
-    tenv.h \
     thunk.c \
     thunk.h \
     tlambda.c \
@@ -20,6 +18,4 @@ liblsthunk_la_SOURCES = \
     tlist.c \
     tlist.h \
     tref.c \
-    tref.h \
-    trref.c \
-    trref.h
+    tref.h

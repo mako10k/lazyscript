@@ -10,16 +10,15 @@ struct lstappl {
   const lstlist_t *lta_args;
 };
 
-lstappl_t *lstappl_new(lstenv_t *tenv, const lseappl_t *eappl) {
-  assert(tenv != NULL);
+lstappl_t *lstappl_new(const lseappl_t *eappl) {
   assert(eappl != NULL);
   lstappl_t *tappl = lsmalloc(sizeof(lstappl_t));
-  tappl->lta_func = lsthunk_new_expr(tenv, lseappl_get_func(eappl));
+  tappl->lta_func = lsthunk_new_expr(lseappl_get_func(eappl));
   tappl->lta_args = lstlist_new();
   for (const lselist_t *le = lseappl_get_args(eappl); le != NULL;
        le = lselist_get_next(le)) {
     lsexpr_t *arg = lselist_get(le, 0);
-    lstlist_push(tappl->lta_args, lsthunk_new_expr(tenv, arg));
+    lstlist_push(tappl->lta_args, lsthunk_new_expr(arg));
   }
   return tappl;
 }
