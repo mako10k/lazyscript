@@ -4,7 +4,7 @@
 typedef struct lslist lslist_t;
 
 /** list data type */
-typedef void *lslist_data_t;
+typedef const void *lslist_data_t;
 
 #include "lstypes.h"
 
