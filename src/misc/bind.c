@@ -5,11 +5,11 @@
 #include <assert.h>
 
 struct lsbind_entry {
-  lspat_t *lbe_lhs;
+  const lspat_t *lbe_lhs;
   lsexpr_t *lbe_rhs;
 };
 
-lsbind_entry_t *lsbind_entry_new(lspat_t *lhs, lsexpr_t *rhs) {
+lsbind_entry_t *lsbind_entry_new(const lspat_t *lhs, lsexpr_t *rhs) {
   lsbind_entry_t *ent = lsmalloc(sizeof(lsbind_entry_t));
   ent->lbe_lhs = lhs;
   ent->lbe_rhs = rhs;
@@ -39,7 +39,7 @@ void lsbind_push(lsbind_t *bind, lsbind_entry_t *ent) {
   bind->lb_entries = lsbelist_push(bind->lb_entries, ent);
 }
 
-void lsbind_print(FILE *fp, lsprec_t prec, int indent, lsbind_t *bind) {
+void lsbind_print(FILE *fp, lsprec_t prec, int indent, const lsbind_t *bind) {
   (void)prec;
   for (const lsbelist_t *le = bind->lb_entries; le != NULL;
        le = lsbelist_get_next(le)) {
@@ -58,7 +58,7 @@ lsbind_entry_t *lsbind_get_entry(const lsbind_t *bind, lssize_t i) {
   return lsbelist_get(bind->lb_entries, i);
 }
 
-lspat_t *lsbind_entry_get_lhs(const lsbind_entry_t *ent) {
+const lspat_t *lsbind_entry_get_lhs(const lsbind_entry_t *ent) {
   assert(ent != NULL);
   return ent->lbe_lhs;
 }
