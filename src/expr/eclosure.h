@@ -5,16 +5,17 @@ typedef struct lseclosure lseclosure_t;
 #include "expr/expr.h"
 #include "misc/bind.h"
 
-#define lsapi_eclosure_new lsapi_nn12 lsapi_wur
+#define lsapi_eclosure_new lsapi_nn13 lsapi_wur
 
 /**
  * Create a new expression closure.
  * @param expr The expression.
- * @param bind The bind.
+ * @param bindc The number of binds.
+ * @param binds The binds.
  * @return The new expression closure.
  */
-lsapi_eclosure_new const lseclosure_t *lseclosure_new(const lsexpr_t *expr,
-                                                      const lsbind_t *bind);
+lsapi_eclosure_new const lseclosure_t *
+lseclosure_new(const lsexpr_t *expr, size_t bindc, const lsbind_t *binds[]);
 
 /**
  * Print an expression closure.

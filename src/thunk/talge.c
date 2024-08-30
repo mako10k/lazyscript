@@ -6,29 +6,30 @@
 
 struct lstalge {
   const lsstr_t *lta_constr;
-  const lstlist_t *lta_args;
+  lssize_t lta_argc;
+  const lsthunk_t *lta_args[0];
 };
 
 lstalge_t *lstalge_new(const lsealge_t *ealge, lstenv_t *tenv) {
-  assert(ealge != NULL);
-  assert(tenv != NULL);
-  lstalge_t *talge = lsmalloc(sizeof(lstalge_t));
+  size_t eargc = lsealge_get_argc(ealge);
+  const lsexpr_t *const *eargs = lsealge_get_args(ealge);
+  lstalge_t *talge = lsmalloc(sizeof(lstalge_t) + eargc * sizeof(lsthunk_t *));
   talge->lta_constr = lsealge_get_constr(ealge);
-  talge->lta_args = lstlist_new();
-  for (const lselist_t *le = lsealge_get_args(ealge); le != NULL;
-       le = lselist_get_next(le)) {
-    const lsexpr_t *earg = lselist_get(le, 0);
-    lsthunk_t *targ = lsthunk_new_expr(earg, tenv);
-    lstlist_push(talge->lta_args, targ);
-  }
+  talge->lta_argc = lsealge_get_argc(ealge);
+  for (size_t i = 0; i < eargc; i++)
+    talge->lta_args[i] = lsthunk_new_expr(eargs[i], tenv);
   return talge;
 }
 
-lsthunk_t *lstalge_apply(lstalge_t *talge, const lstlist_t *args) {
-  assert(talge != NULL);
+lsthunk_t *lstalge_apply(lstalge_t *talge, size_t argc, const lsthunk_t *args[]) {
+  size_t argc0 = talge->lta_argc;
+  lstalge_t *talge0 = lsmalloc(sizeof(lstalge_t) + (argc0 + argc) * sizeof(lsthunk_t *));
   talge->lta_constr = talge->lta_constr;
-  talge->lta_args = lstlist_concat(talge->lta_args, args);
-  return lsthunk_new_alge(talge);
+  for (size_t i = 0; i < argc0; i++)
+    talge0->lta_args[i] = talge->lta_args[i];
+  for (size_t i = 0; i < argc; i++)
+    talge0->lta_args[argc0 + i] = args[i];
+  return lsthunk_new_alge(talge0);
 }
 
 const lsstr_t *lstalge_get_constr(const lstalge_t *talge) {

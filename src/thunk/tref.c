@@ -5,7 +5,7 @@
 #include "thunk/thunk.h"
 #include <assert.h>
 
-struct lstref_bind_entry {
+struct lstref_bind {
   lstenv_t *ltrb_env;
   const lspat_t *ltrb_lhs;
   lsthunk_t *ltrb_rhs;
@@ -19,7 +19,7 @@ struct lstref_lambda {
 struct lstref_target {
   lstrtype_t ltrt_type;
   union {
-    const lstref_bind_entry_t *ltrt_bind_entry;
+    const lstref_bind_t *ltrt_bind;
     const lstref_lambda_t *ltrt_lambda;
     lsthunk_t *ltrt_thunk;
   };
@@ -48,17 +48,17 @@ lstref_t *lstref_new_thunk(const lsref_t *ref, lsthunk_t *thunk) {
   return tref;
 }
 
-lstref_t *lstref_new_bind_entry(const lsbind_entry_t *bentry, lstenv_t *tenv) {
+lstref_t *lstref_new_bind(const lsbind_t *bentry, lstenv_t *tenv) {
   assert(bentry != NULL);
   assert(tenv != NULL);
   lstref_t *tref = lsmalloc(sizeof(lstref_t));
   lstref_target_t *target = lsmalloc(sizeof(lstref_target_t));
-  target->ltrt_type = LSTRTYPE_BIND_ENTRY;
-  lstref_bind_entry_t *trbentry = lsmalloc(sizeof(lstref_bind_entry_t));
+  target->ltrt_type = LSTRTYPE_bind;
+  lstref_bind_t *trbentry = lsmalloc(sizeof(lstref_bind_t));
   trbentry->ltrb_env = tenv;
-  trbentry->ltrb_lhs = lsbind_entry_get_lhs(bentry);
-  trbentry->ltrb_rhs = lsthunk_new_expr(lsbind_entry_get_rhs(bentry), tenv);
-  target->ltrt_bind_entry = trbentry;
+  trbentry->ltrb_lhs = lsbind_get_lhs(bentry);
+  trbentry->ltrb_rhs = lsthunk_new_expr(lsbind_get_rhs(bentry), tenv);
+  target->ltrt_bind = trbentry;
   return tref;
 }
 
@@ -69,7 +69,7 @@ lstref_t *lstref_new(const lsref_t *ref, lstenv_t *tenv) {
   return lstenv_get(tenv, ename);
 }
 
-const lsthunk_t *lstref_bind_entry_eval(const lstref_bind_entry_t *bentry) {
+const lsthunk_t *lstref_bind_eval(const lstref_bind_t *bentry) {
   assert(bentry != NULL);
   lsmres_t mres  = lsthunk_match_pat(bentry->ltrb_rhs, bentry->ltrb_lhs, tenv);
   return bentry->ltrb_rhs;
@@ -80,8 +80,8 @@ lsthunk_t *lstref_eval(lstref_t *tref) {
   switch (tref->ltr_target->ltrt_type) {
   case LSTRTYPE_THUNK:
     return tref->ltr_target->ltrt_thunk;
-  case LSTRTYPE_BIND_ENTRY:
-    return lstref_bind_entry_eval(tref->ltr_target->ltrt_bind_entry);
+  case LSTRTYPE_bind:
+    return lstref_bind_eval(tref->ltr_target->ltrt_bind);
   case LSTRTYPE_LAMBDA:
     return lstref_lambda_eval(tref->ltr_target->ltrt_lambda);
   }

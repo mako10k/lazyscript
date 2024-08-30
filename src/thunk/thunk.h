@@ -25,24 +25,35 @@ typedef enum lsttype {
 
 /**
  * Create a new thunk for an algebraic data type
- * @param talge The algebraic value
+ * @param ealge The algebraic expression
+ * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_alge(lstalge_t *talge);
+lsthunk_t *lsthunk_new_alge(const lsealge_t *ealge, lstenv_t *tenv);
 
 /**
  * Create a new thunk for an application data type
- * @param tappl The application value
+ * @param tappl The application expression
+ * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_appl(lstappl_t *tappl);
+lsthunk_t *lsthunk_new_appl(const lseappl_t *eappl, lstenv_t *tenv);
 
 /**
  * Create a new thunk for a choice data type
- * @param tchoice The choice value
+ * @param echoice The choice expression
+ * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_choice(lstchoice_t *tchoice);
+lsthunk_t *lsthunk_new_choice(const lsechoice_t *echoice, lstenv_t *tenv);
+
+/**
+ * Create a new thunk for a closure data type
+ * @param eclosure The closure expression
+ * @param tenv The environment
+ * @return The new thunk
+ */
+lsthunk_t *lsthunk_new_closure(const lseclosure *eclosure, lstenv_t *tenv);
 
 /**
  * Create a new thunk for an integer data type
@@ -53,17 +64,19 @@ lsthunk_t *lsthunk_new_int(const lsint_t *intval);
 
 /**
  * Create a new thunk for a lambda data type
- * @param tlambda The lambda value
+ * @param elambda The lambda expression
+ * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_lambda(lstlambda_t *tlambda);
+lsthunk_t *lsthunk_new_lambda(const lselambda_t *elambda, lstenv_t *tenv);
 
 /**
  * Create a new thunk for a reference data type
- * @param tref The reference value
+ * @param ref The reference value
+ * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_ref(lstref_t *tref);
+lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstenv_t *tenv);
 
 /**
  * Create a new thunk for a string data type
@@ -178,7 +191,7 @@ lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lspat_t *pat,
 
 /**
  * Evaluate a thunk to WHNF (Weak Head Normal Form)
-  * @param thunk The thunk
+ * @param thunk The thunk
  * @return The new thunk evaluate to WHNF
  */
 lsthunk_t *lsthunk_eval(lsthunk_t *thunk);

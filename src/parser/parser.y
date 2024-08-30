@@ -55,7 +55,7 @@ while (0)
     const lsref_t *ref;
     lspalge_t *palge;
     lsbind_t *bind;
-    const lsbind_entry_t *bind_ent;
+    const lsbind_t *bind_ent;
     const lseclosure_t *eclosure;
     const lselist_t *elist;
     const lsplist_t *plist;
@@ -116,7 +116,7 @@ bind:
     ;
 
 bind_single:
-      pat '=' expr { $$ = lsbind_entry_new($1, $3); }
+      pat '=' expr { $$ = lsbind_new($1, $3); }
     ;
 
 bind_list:
