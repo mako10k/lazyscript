@@ -34,7 +34,7 @@ lsthunk_t *lstappl_apply(lstappl_t *tappl, const lstlist_t *args) {
 
 lsthunk_t *lstappl_eval(lstappl_t *tappl) {
   assert(tappl != NULL);
-  lsthunk_t *func = lsthunk_get_whnf(tappl->lta_func);
+  lsthunk_t *func = lsthunk_eval(tappl->lta_func);
   if (lstlist_count(tappl->lta_args) == 0)
     return func;
   lsttype_t ttype = lsthunk_get_type(func);

@@ -30,6 +30,6 @@ lsthunk_t *lstchoice_get_right(const lstchoice_t *choice) {
 lsthunk_t *lstchoice_apply(lstchoice_t *choice, const lstlist_t *args) {
   assert(choice != NULL);
   assert(args != NULL);
-  lsthunk_t *left = lsthunk_get_whnf(choice->ltc_left);
+  lsthunk_t *left = lsthunk_eval(choice->ltc_left);
   return NULL; // TODO implement
 }

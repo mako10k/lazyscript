@@ -46,7 +46,7 @@ int lshash_put(lshash_t *hash, const lsstr_t *key, lshash_data_t value,
  * Remove a key-value pair from a hash table.
  * @param hash Hash table.
  * @param key Key.
- * @param value Pointer to the variable to store the value.
+ * @param pvalue Pointer to the variable to store the value.
  * @return 1 if the key exists, 0 otherwise.
  */
 int lshash_remove(lshash_t *hash, const lsstr_t *key, lshash_data_t *pvalue);

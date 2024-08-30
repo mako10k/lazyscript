@@ -22,11 +22,11 @@ static lsstr_ht_t g_str_ht = {NULL, 0, 0};
 /**
  * Calculates the hash value of a key.
  *
- * @param key The key to calculate the hash value.
+ * @param buf The key to calculate the hash value.
+ * @param len The length of the key.
  * @return The hash value of the key.
  */
-static unsigned int lsstr_calc_hash_bare(const char *const buf,
-                                         const lssize_t len) {
+static unsigned int lsstr_calc_hash_bare(const char *buf, lssize_t len) {
   assert(buf != NULL);
   unsigned int hash = 0;
   for (lssize_t i = 0; i < len; i++)
@@ -34,20 +34,14 @@ static unsigned int lsstr_calc_hash_bare(const char *const buf,
   return hash;
 }
 
-/**
- * Calculates the hash value of a key.
- *
- * @param key The key to calculate the hash value.
- * @return The hash value of the key.
- */
-unsigned int lsstr_calc_hash(const lsstr_t *const str) {
+unsigned int lsstr_calc_hash(const lsstr_t *str) {
   assert(str != NULL);
   return lsstr_calc_hash_bare(str->ls_buf, str->ls_len);
 }
 
-static const lsstr_t *lsstr_new_raw(const char *const buf, const lssize_t len) {
+static const lsstr_t *lsstr_new_raw(const char *buf, lssize_t len) {
   assert(buf != NULL);
-  lsstr_t *const str = lsmalloc(sizeof(lsstr_t) + len + 1);
+  lsstr_t *str = lsmalloc(sizeof(lsstr_t) + len + 1);
   str->ls_buf = lsmalloc_atomic(len + 1);
   str->ls_len = len;
   memcpy((void *)str->ls_buf, buf, len);
@@ -55,17 +49,16 @@ static const lsstr_t *lsstr_new_raw(const char *const buf, const lssize_t len) {
   return str;
 }
 
-static const lsstr_t **lsstr_ht_get_raw(lsstr_ht_t *const str_ht,
-                                        const char *const buf,
-                                        const lssize_t len) {
+static const lsstr_t **lsstr_ht_get_raw(lsstr_ht_t *str_ht, const char *buf,
+                                        lssize_t len) {
   assert(str_ht != NULL);
   assert(buf != NULL);
-  const unsigned int hash = lsstr_calc_hash_bare(buf, len);
-  const lssize_t cap = str_ht->lsth_cap;
-  const lsstr_t **const ents = str_ht->lsth_ents;
+  unsigned int hash = lsstr_calc_hash_bare(buf, len);
+  lssize_t cap = str_ht->lsth_cap;
+  const lsstr_t **ents = str_ht->lsth_ents;
   lssize_t i = hash % cap;
   while (1) {
-    const lsstr_t *const ent = ents[i];
+    const lsstr_t *ent = ents[i];
     if (ent == NULL)
       return &ents[i];
     if (lsstrcmp(ent, &(lsstr_t){.ls_buf = buf, .ls_len = len}) == 0)
@@ -76,8 +69,7 @@ static const lsstr_t **lsstr_ht_get_raw(lsstr_ht_t *const str_ht,
   }
 }
 
-static void lsstr_ht_resize(lsstr_ht_t *const str_ht,
-                            const lssize_t new_capacity) {
+static void lsstr_ht_resize(lsstr_ht_t *str_ht, lssize_t new_capacity) {
   assert(str_ht != NULL);
   assert(new_capacity >= str_ht->lsth_size);
   if (str_ht->lsth_cap == new_capacity)
@@ -88,11 +80,11 @@ static void lsstr_ht_resize(lsstr_ht_t *const str_ht,
   for (lssize_t i = 0; i < new_capacity; i++)
     new_str_hash.lsth_ents[i] = NULL;
   for (lssize_t i = 0; i < str_ht->lsth_cap; i++) {
-    const lsstr_t *const ent = str_ht->lsth_ents[i];
+    const lsstr_t *ent = str_ht->lsth_ents[i];
     if (ent != NULL) {
-      const char *const ebuf = ent->ls_buf;
-      const lssize_t elen = ent->ls_len;
-      const lsstr_t **const pstr = lsstr_ht_get_raw(&new_str_hash, ebuf, elen);
+      const char *ebuf = ent->ls_buf;
+      lssize_t elen = ent->ls_len;
+      const lsstr_t **pstr = lsstr_ht_get_raw(&new_str_hash, ebuf, elen);
       assert(*pstr == NULL);
       *pstr = ent;
     }
@@ -104,38 +96,36 @@ static void lsstr_ht_resize(lsstr_ht_t *const str_ht,
   str_ht->lsth_cap = new_str_hash.lsth_cap;
 }
 
-static const lsstr_t **lsstr_ht_put_raw(lsstr_ht_t *const str_ht,
-                                        const char *const buf,
-                                        const lssize_t len) {
+static const lsstr_t **lsstr_ht_put_raw(lsstr_ht_t *str_ht, const char *buf,
+                                        lssize_t len) {
   assert(str_ht != NULL);
   assert(buf != NULL);
-  const lsstr_t **const pstr = lsstr_ht_get_raw(str_ht, buf, len);
+  const lsstr_t **pstr = lsstr_ht_get_raw(str_ht, buf, len);
   *pstr = lsstr_new_raw(buf, len);
   str_ht->lsth_size++;
   return pstr;
 }
 
-static const lsstr_t *lsstr_ht_del_raw(lsstr_ht_t *const str_ht,
-                                       const char *const buf,
-                                       const lssize_t len) {
+static const lsstr_t *lsstr_ht_del_raw(lsstr_ht_t *str_ht, const char *buf,
+                                       lssize_t len) {
   assert(str_ht != NULL);
   assert(buf != NULL);
-  const lsstr_t **const pstr = lsstr_ht_get_raw(str_ht, buf, len);
+  const lsstr_t **pstr = lsstr_ht_get_raw(str_ht, buf, len);
   if (*pstr == NULL)
     return NULL;
-  const lsstr_t *const str = *pstr;
-  const lsstr_t **const ents = str_ht->lsth_ents;
+  const lsstr_t *str = *pstr;
+  const lsstr_t **ents = str_ht->lsth_ents;
   lssize_t i = pstr - ents;
   *pstr = NULL;
   while (1) {
     if (++i >= str_ht->lsth_cap)
       i = str_ht->lsth_cap;
-    const lsstr_t *const ent = ents[i];
+    const lsstr_t *ent = ents[i];
     if (ent == NULL)
       break;
     ents[i] = NULL;
     {
-      const lsstr_t **const pstr2 =
+      const lsstr_t **pstr2 =
           lsstr_ht_get_raw(str_ht, ent->ls_buf, ent->ls_len);
       assert(*pstr2 == NULL);
       *pstr2 = ent;
@@ -145,9 +135,8 @@ static const lsstr_t *lsstr_ht_del_raw(lsstr_ht_t *const str_ht,
   return str;
 }
 
-static const lsstr_t *lsstr_ht_put_raw_resizable(lsstr_ht_t *const str_ht,
-                                                 const char *const buf,
-                                                 const lssize_t len) {
+static const lsstr_t *
+lsstr_ht_put_raw_resizable(lsstr_ht_t *str_ht, const char *buf, lssize_t len) {
   assert(str_ht != NULL);
   assert(buf != NULL);
   lssize_t cap = str_ht->lsth_cap;
@@ -158,12 +147,11 @@ static const lsstr_t *lsstr_ht_put_raw_resizable(lsstr_ht_t *const str_ht,
   return *lsstr_ht_put_raw(str_ht, buf, len);
 }
 
-static const lsstr_t *lsstr_ht_del_raw_resizable(lsstr_ht_t *const str_hash,
-                                                 const lsstr_t *const str) {
+static const lsstr_t *lsstr_ht_del_raw_resizable(lsstr_ht_t *str_hash,
+                                                 const lsstr_t *str) {
   assert(str_hash != NULL);
   assert(str != NULL);
-  const lsstr_t *const str2 =
-      lsstr_ht_del_raw(str_hash, str->ls_buf, str->ls_len);
+  const lsstr_t *str2 = lsstr_ht_del_raw(str_hash, str->ls_buf, str->ls_len);
   if (str2 == NULL)
     return NULL;
   lssize_t cap = str_hash->lsth_cap;
@@ -174,11 +162,11 @@ static const lsstr_t *lsstr_ht_del_raw_resizable(lsstr_ht_t *const str_hash,
   return str;
 }
 
-static void lsstr_finalizer(void *const ptr, void *const data) {
+static void lsstr_finalizer(void *ptr, void *data) {
   assert(ptr != NULL);
   (void)data;
   const lsstr_t *str = ptr;
-  const lsstr_t *const str2 = lsstr_ht_del_raw_resizable(&g_str_ht, str);
+  const lsstr_t *str2 = lsstr_ht_del_raw_resizable(&g_str_ht, str);
   assert(str == str2);
 }
 
@@ -190,64 +178,62 @@ __attribute__((constructor)) static void lsstr_init(void) {
     g_str_ht.lsth_ents[i] = NULL;
 }
 
-const lsstr_t *lsstr_new(const char *const buf, const lssize_t len) {
+const lsstr_t *lsstr_new(const char *buf, lssize_t len) {
   assert(buf != NULL);
-  const lsstr_t *const str = lsstr_ht_put_raw_resizable(&g_str_ht, buf, len);
+  const lsstr_t *str = lsstr_ht_put_raw_resizable(&g_str_ht, buf, len);
   GC_REGISTER_FINALIZER((void *)str, lsstr_finalizer, NULL, NULL, NULL);
   return str;
 }
 
-const lsstr_t *lsstr_sub(const lsstr_t *const str, const lssize_t pos,
-                         const lssize_t len) {
+const lsstr_t *lsstr_sub(const lsstr_t *str, lssize_t pos, lssize_t len) {
   assert(str != NULL);
   assert(pos <= str->ls_len);
   assert(len <= str->ls_len - pos);
   if (pos == 0 && len == str->ls_len)
     return str;
-  lsstr_t *const sub = lsmalloc(sizeof(lsstr_t));
+  lsstr_t *sub = lsmalloc(sizeof(lsstr_t));
   sub->ls_buf = str->ls_buf + pos;
   sub->ls_len = len;
   return sub;
 }
 
-const lsstr_t *lsstr_cstr(const char *const str) {
+const lsstr_t *lsstr_cstr(const char *str) {
   assert(str != NULL);
   return lsstr_new(str, strlen(str));
 }
 
-const char *lsstr_get_buf(const lsstr_t *const str) {
+const char *lsstr_get_buf(const lsstr_t *str) {
   assert(str != NULL);
   return str->ls_buf;
 }
 
-lssize_t lsstr_get_len(const lsstr_t *const str) {
+lssize_t lsstr_get_len(const lsstr_t *str) {
   assert(str != NULL);
   return str->ls_len;
 }
 
-int lsstrcmp(const lsstr_t *const str1, const lsstr_t *const str2) {
+int lsstrcmp(const lsstr_t *str1, const lsstr_t *str2) {
   assert(str1 != NULL);
   assert(str2 != NULL);
   if (str1 == str2)
     return 0;
-  const char *const buf1 = str1->ls_buf;
-  const char *const buf2 = str2->ls_buf;
+  const char *buf1 = str1->ls_buf;
+  const char *buf2 = str2->ls_buf;
   if (buf1 == buf2)
     return 0;
-  const lssize_t len1 = str1->ls_len;
-  const lssize_t len2 = str2->ls_len;
-  const lssize_t len = len1 < len2 ? len1 : len2;
-  const int cmp = memcmp(str1->ls_buf, str2->ls_buf, len);
+  lssize_t len1 = str1->ls_len;
+  lssize_t len2 = str2->ls_len;
+  lssize_t len = len1 < len2 ? len1 : len2;
+  int cmp = memcmp(str1->ls_buf, str2->ls_buf, len);
   if (cmp != 0)
     return cmp;
   return len1 - len2;
 }
 
 __attribute__((nonnull(1, 2), warn_unused_result)) static int
-lsstr_parse_hex(const char *const str, lssize_t *const pi,
-                const lssize_t slen) {
+lsstr_parse_hex(const char *str, lssize_t *pi, lssize_t slen) {
   int hex = 0;
-  const int c1 = *pi < slen ? str[(*pi)++] : -1;
+  int c1 = *pi < slen ? str[(*pi)++] : -1;
   if (c1 == -1)
     return -1;
 
@@ -260,7 +246,7 @@ lsstr_parse_hex(const char *const str, lssize_t *const pi,
   else
     return 'x';
 
-  const int c2 = *pi < slen ? str[(*pi)++] : -1;
+  int c2 = *pi < slen ? str[(*pi)++] : -1;
   if (c2 == -1)
     return -1;
   if ('0' <= c2 && c2 <= '9')
@@ -273,10 +259,9 @@ lsstr_parse_hex(const char *const str, lssize_t *const pi,
 }
 
 __attribute__((nonnull(1, 2), warn_unused_result)) static int
-lsstr_parse_oct(const char *const str, lssize_t *const pi, const lssize_t slen,
-                int oct) {
+lsstr_parse_oct(const char *str, lssize_t *pi, lssize_t slen, int oct) {
   oct = oct - '0';
-  const int c = *pi < slen ? str[(*pi)++] : -1;
+  int c = *pi < slen ? str[(*pi)++] : -1;
   if (c == -1)
     return -1;
   if ('0' <= c && c <= '7')
@@ -287,8 +272,7 @@ lsstr_parse_oct(const char *const str, lssize_t *const pi, const lssize_t slen,
 }
 
 __attribute__((nonnull(1, 2), warn_unused_result)) static int
-lsstr_parse_esc(const char *const str, lssize_t *const pi,
-                const lssize_t slen) {
+lsstr_parse_esc(const char *str, lssize_t *pi, lssize_t slen) {
   int c = *pi < slen ? str[(*pi)++] : -1;
   switch (c) {
   case -1:
@@ -339,7 +323,7 @@ lsstr_parse_esc(const char *const str, lssize_t *const pi,
   return c;
 }
 
-const lsstr_t *lsstr_parse(const char *const cstr, const lssize_t slen) {
+const lsstr_t *lsstr_parse(const char *cstr, lssize_t slen) {
   assert(cstr != NULL);
   lssize_t i = 0;
   int c;
@@ -368,14 +352,13 @@ const lsstr_t *lsstr_parse(const char *const cstr, const lssize_t slen) {
   return lsstr_new(strval, len);
 }
 
-void lsstr_print(FILE *const fp, const lsprec_t prec, const int indent,
-                 const lsstr_t *const str) {
+void lsstr_print(FILE *fp, lsprec_t prec, int indent, const lsstr_t *str) {
   assert(fp != NULL);
   assert(str != NULL);
   (void)prec;
   lsprintf(fp, indent, "\"");
-  const char *const cstr = str->ls_buf;
-  const lssize_t len = str->ls_len;
+  const char *cstr = str->ls_buf;
+  lssize_t len = str->ls_len;
   for (lssize_t i = 0; i < len; i++) {
     switch (cstr[i]) {
     case '\n':
@@ -421,8 +404,7 @@ void lsstr_print(FILE *const fp, const lsprec_t prec, const int indent,
   lsprintf(fp, 0, "\"");
 }
 
-void lsstr_print_bare(FILE *const fp, const lsprec_t prec, const int indent,
-                      const lsstr_t *const str) {
+void lsstr_print_bare(FILE *fp, lsprec_t prec, int indent, const lsstr_t *str) {
   assert(fp != NULL);
   assert(str != NULL);
   (void)prec;
