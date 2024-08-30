@@ -216,7 +216,15 @@ static lsmres_t lsthunk_match_str(lsthunk_t *thunk, const lsstr_t *strval,
 
 lsmres_t lsthunk_match_pref(lsthunk_t *thunk, const lsref_t *ref,
                             lstenv_t *tenv) {
-  return LSMATCH_FAILURE; // TODO: implement
+  const lsstr_t *refname = lsref_get_name(ref);
+#ifdef DEBUG
+  const lstref_t *tref = lstenv_get_self(tenv, refname);
+  // tref must be NULL, otherwise it is a bug
+  if (tref != NULL)
+    assert(0);
+#endif
+  lstenv_put(tenv, refname, lstref_new_thunk(ref, thunk)); // TODO: should change to lstenv_put_thunk?
+  return LSMATCH_SUCCESS;
 }
 
 lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lspat_t *pat,
@@ -275,6 +283,6 @@ lsthunk_t *lsthunk_apply(lsthunk_t *func, const lstlist_t *args) {
     lsprintf(stderr, 0, "F: cannot apply for string\n");
     exit(1);
   case LSTTYPE_APPL:
-    assert(0); // TODO: IMPLEMENT
+    return lstappl_apply(lsthunk_get_appl(func), args);
   }
 }

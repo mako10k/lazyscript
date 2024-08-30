@@ -19,6 +19,7 @@ struct lstref_target {
   union {
     const lstref_bind_entry_t *ltrt_bind_entry;
     const lstref_lambda_t *ltrt_lambda;
+    const lsthunk_t *ltrt_thunk;
   };
   const lstref_entry_t *ltrt_entry;
 };
@@ -33,6 +34,17 @@ struct lstref {
   const lstref_target_t *ltr_target;
   const lstref_entry_t *ltr_entry;
 };
+
+lstref_t *lstref_new_thunk(const lsref_t *ref, const lsthunk_t *thunk) {
+  assert(ref != NULL);
+  assert(thunk != NULL);
+  lstref_t *tref = lsmalloc(sizeof(lstref_t));
+  lstref_target_t *target = lsmalloc(sizeof(lstref_target_t));
+  target->ltrt_type = LSTRTYPE_THUNK;
+  target->ltrt_thunk = thunk;
+  tref->ltr_target = target;
+  return tref;
+}
 
 lstref_t *lstref_new_bind_entry(const lsbind_entry_t *bentry, lstenv_t *tenv) {
   lstref_t *tref = lsmalloc(sizeof(lstref_t));
