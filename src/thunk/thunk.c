@@ -223,7 +223,9 @@ lsmres_t lsthunk_match_pref(lsthunk_t *thunk, const lsref_t *ref,
   if (tref != NULL)
     assert(0);
 #endif
-  lstenv_put(tenv, refname, lstref_new_thunk(ref, thunk)); // TODO: should change to lstenv_put_thunk?
+  lstenv_put(
+      tenv, refname,
+      lstref_new_thunk(ref, thunk)); // TODO: should change to lstenv_put_thunk?
   return LSMATCH_SUCCESS;
 }
 
@@ -256,6 +258,9 @@ lsthunk_t *lsthunk_eval(lsthunk_t *thunk) {
   case LSTTYPE_REF:
     thunk->lt_whnf = lstref_eval(thunk->lt_ref);
     break;
+  case LSTTYPE_CHOICE:
+    thunk->lt_whnf = lstchoice_eval(thunk->lt_choice);
+    break;
   default:
     // it already is in WHNF
     thunk->lt_whnf = thunk;
@@ -264,25 +269,61 @@ lsthunk_t *lsthunk_eval(lsthunk_t *thunk) {
   return thunk->lt_whnf;
 }
 
+static lsthunk_t *lsthunk_apply_alge(lsthunk_t *thunk, const lstlist_t *args) {
+  assert(thunk != NULL);
+  assert(thunk->lt_type == LSTTYPE_ALGE);
+  assert(args != NULL);
+  return lstalge_apply(lsthunk_get_alge(thunk), args);
+}
+
+static lsthunk_t *lsthunk_apply_appl(lsthunk_t *thunk, const lstlist_t *args) {
+  assert(thunk != NULL);
+  assert(thunk->lt_type == LSTTYPE_APPL);
+  assert(args != NULL);
+  return lstappl_apply(lsthunk_get_appl(thunk), args);
+}
+
+static lsthunk_t *lsthunk_apply_lambda(lsthunk_t *thunk, const lstlist_t *args) {
+  assert(thunk != NULL);
+  assert(thunk->lt_type == LSTTYPE_LAMBDA);
+  assert(args != NULL);
+  return lstlambda_apply(lsthunk_get_lambda(thunk), args);
+}
+
+static lsthunk_t *lsthunk_apply_ref(lsthunk_t *thunk, const lstlist_t *args) {
+  assert(thunk != NULL);
+  assert(thunk->lt_type == LSTTYPE_REF);
+  assert(args != NULL);
+  return lstref_apply(lsthunk_get_ref(thunk), args);
+}
+
+static lsthunk_t *lsthunk_apply_choice(lsthunk_t *thunk, const lstlist_t *args) {
+  assert(thunk != NULL);
+  assert(thunk->lt_type == LSTTYPE_CHOICE);
+  assert(args != NULL);
+  return lstchoice_apply(lsthunk_get_choice(thunk), args);
+}
+
 lsthunk_t *lsthunk_apply(lsthunk_t *func, const lstlist_t *args) {
   assert(func != NULL);
-  assert(args != NULL);
+  if (lstlist_count(args) == 0)
+    return func;
   switch (lsthunk_get_type(func)) {
   case LSTTYPE_ALGE:
-    return lstalge_apply(lsthunk_get_alge(func), args);
+    return lsthunk_apply_alge(func, args);
+  case LSTTYPE_APPL:
+    return lsthunk_apply_appl(func, args);
   case LSTTYPE_LAMBDA:
-    return lstlambda_apply(lsthunk_get_lambda(func), args);
+    return lsthunk_apply_lambda(func, args);
   case LSTTYPE_REF:
-    return lstref_apply(lsthunk_get_ref(func), args);
+    return lsthunk_apply_ref(func, args);
   case LSTTYPE_CHOICE:
-    return lstchoice_apply(lsthunk_get_choice(func), args);
+    return lsthunk_apply_choice(func, args);
   case LSTTYPE_INT:
     lsprintf(stderr, 0, "F: cannot apply for integer\n");
-    exit(1);
+    return NULL;
   case LSTTYPE_STR:
     lsprintf(stderr, 0, "F: cannot apply for string\n");
-    exit(1);
-  case LSTTYPE_APPL:
-    return lstappl_apply(lsthunk_get_appl(func), args);
+    return NULL;
   }
 }

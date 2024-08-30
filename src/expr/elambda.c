@@ -1,7 +1,6 @@
 #include "expr/elambda.h"
 #include "common/io.h"
 #include "common/malloc.h"
-#include <assert.h>
 
 struct lselambda {
   const lspat_t *lel_arg;
@@ -13,6 +12,10 @@ const lselambda_t *lselambda_new(const lspat_t *arg, const lsexpr_t *body) {
   elambda->lel_arg = arg;
   elambda->lel_body = body;
   return elambda;
+}
+
+const lspat_t *lselambda_get_arg(const lselambda_t *elambda) {
+  return elambda->lel_arg;
 }
 
 void lselambda_print(FILE *fp, lsprec_t prec, int indent,

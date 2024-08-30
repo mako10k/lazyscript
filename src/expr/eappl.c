@@ -2,56 +2,66 @@
 #include "common/io.h"
 #include "common/malloc.h"
 #include "expr/expr.h"
-#include <assert.h>
 
 struct lseappl {
   const lsexpr_t *lea_func;
-  const lselist_t *lea_args;
+  lssize_t lea_argc;
+  const lsexpr_t *lea_args[0];
 };
 
-lseappl_t *lseappl_new(const lsexpr_t *func) {
-  assert(func != NULL);
+const lseappl_t *lseappl_new(const lsexpr_t *func, size_t argc,
+                             const lsexpr_t *args[]) {
   lseappl_t *eappl = lsmalloc(sizeof(lseappl_t));
   eappl->lea_func = func;
-  eappl->lea_args = lselist_new();
+  eappl->lea_argc = argc;
+  for (lssize_t i = 0; i < argc; i++)
+    eappl->lea_args[i] = args[i];
   return eappl;
 }
 
-void lseappl_add_arg(lseappl_t *eappl, const lsexpr_t *arg) {
-  assert(eappl != NULL);
-  eappl->lea_args = lselist_push(eappl->lea_args, arg);
+const lseappl_t *lseappl_add_arg(lseappl_t *eappl, const lsexpr_t *arg) {
+  lssize_t argc = eappl->lea_argc;
+  lseappl_t *eappl_new =
+      lsmalloc(sizeof(lseappl_t) + (argc + 1) * sizeof(lsexpr_t *));
+  eappl_new->lea_func = eappl->lea_func;
+  eappl_new->lea_argc = argc + 1;
+  for (lssize_t i = 0; i < argc; i++)
+    eappl_new->lea_args[i] = eappl->lea_args[i];
+  eappl_new->lea_args[argc] = arg;
+  return eappl_new;
 }
 
-void lseappl_concat_args(lseappl_t *eappl, const lselist_t *args) {
-  assert(eappl != NULL);
-  eappl->lea_args = lselist_concat(eappl->lea_args, args);
-}
-
-const lselist_t *lseappl_get_args(const lseappl_t *eappl) {
-  assert(eappl != NULL);
-  return eappl->lea_args;
+const lseappl_t *lseappl_concat_args(lseappl_t *eappl, size_t argc,
+                                     const lsexpr_t *args[]) {
+  lssize_t argc0 = eappl->lea_argc;
+  lseappl_t *eappl_new =
+      lsmalloc(sizeof(lseappl_t) + (argc0 + argc) * sizeof(lsexpr_t *));
+  eappl_new->lea_func = eappl->lea_func;
+  eappl_new->lea_argc = argc0 + argc;
+  for (lssize_t i = 0; i < argc0; i++)
+    eappl_new->lea_args[i] = eappl->lea_args[i];
+  for (lssize_t i = 0; i < argc; i++)
+    eappl_new->lea_args[argc0 + i] = args[i];
+  return eappl_new;
 }
 
 const lsexpr_t *lseappl_get_func(const lseappl_t *eappl) {
-  assert(eappl != NULL);
   return eappl->lea_func;
 }
 
-lssize_t lseappl_get_arg_count(const lseappl_t *eappl) {
-  assert(eappl != NULL);
-  return eappl->lea_args == NULL ? 0 : lselist_count(eappl->lea_args);
-}
+lssize_t lseappl_get_argc(const lseappl_t *eappl) { return eappl->lea_argc; }
 
 const lsexpr_t *lseappl_get_arg(const lseappl_t *eappl, lssize_t i) {
-  assert(eappl != NULL);
-  return eappl->lea_args == NULL ? NULL : lselist_get(eappl->lea_args, i);
+  return eappl->lea_args[i];
+}
+
+const lsexpr_t *const *lseappl_get_args(const lseappl_t *eappl) {
+  return eappl->lea_args;
 }
 
 void lseappl_print(FILE *stream, lsprec_t prec, int indent,
                    const lseappl_t *eappl) {
-  assert(stream != NULL);
-  assert(eappl != NULL);
-  lssize_t argc = lselist_count(eappl->lea_args);
+  lssize_t argc = eappl->lea_argc;
   if (argc == 0) {
     lsexpr_print(stream, prec, indent, eappl->lea_func);
     return;
@@ -59,10 +69,9 @@ void lseappl_print(FILE *stream, lsprec_t prec, int indent,
   if (prec > LSPREC_APPL)
     lsprintf(stream, indent, "(");
   lsexpr_print(stream, LSPREC_APPL + 1, indent, eappl->lea_func);
-  for (const lselist_t *le = eappl->lea_args; le != NULL;
-       le = lselist_get_next(le)) {
+  for (size_t i = 0; i < argc; i++) {
     lsprintf(stream, indent, " ");
-    lsexpr_print(stream, LSPREC_APPL + 1, indent, lselist_get(le, 0));
+    lsexpr_print(stream, LSPREC_APPL + 1, indent, eappl->lea_args[i]);
   }
   if (prec > LSPREC_APPL)
     lsprintf(stream, indent, ")");

@@ -1,7 +1,6 @@
 #include "expr/echoice.h"
 #include "common/io.h"
 #include "common/malloc.h"
-#include <assert.h>
 
 struct lsechoice {
   const lsexpr_t *lec_left;
@@ -9,8 +8,6 @@ struct lsechoice {
 };
 
 const lsechoice_t *lsechoice_new(const lsexpr_t *left, const lsexpr_t *right) {
-  assert(left != NULL);
-  assert(right != NULL);
   lsechoice_t *echoice = lsmalloc(sizeof(lsechoice_t));
   echoice->lec_left = left;
   echoice->lec_right = right;
@@ -18,18 +15,15 @@ const lsechoice_t *lsechoice_new(const lsexpr_t *left, const lsexpr_t *right) {
 }
 
 const lsexpr_t *lsechoice_get_left(const lsechoice_t *echoice) {
-  assert(echoice != NULL);
   return echoice->lec_left;
 }
 
 const lsexpr_t *lsechoice_get_right(const lsechoice_t *echoice) {
-  assert(echoice != NULL);
   return echoice->lec_right;
 }
+
 void lsechoice_print(FILE *fp, lsprec_t prec, int indent,
                      const lsechoice_t *echoice) {
-  assert(fp != NULL);
-  assert(echoice != NULL);
   if (prec > LSPREC_CHOICE)
     lsprintf(fp, indent, "(");
   indent++;

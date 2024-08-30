@@ -1,3 +1,4 @@
+#include "thunk/tref.h"
 #include "common/malloc.h"
 #include "common/ref.h"
 #include "misc/bind.h"
@@ -5,13 +6,14 @@
 #include <assert.h>
 
 struct lstref_bind_entry {
+  lstenv_t *ltrb_env;
   const lspat_t *ltrb_lhs;
-  const lsthunk_t *ltrb_rhs;
+  lsthunk_t *ltrb_rhs;
 };
 
 struct lstref_lambda {
   const lspat_t *ltrl_arg;
-  const lsthunk_t *ltrl_body;
+  lsthunk_t *ltrl_body;
 };
 
 struct lstref_target {
@@ -19,7 +21,7 @@ struct lstref_target {
   union {
     const lstref_bind_entry_t *ltrt_bind_entry;
     const lstref_lambda_t *ltrt_lambda;
-    const lsthunk_t *ltrt_thunk;
+    lsthunk_t *ltrt_thunk;
   };
   const lstref_entry_t *ltrt_entry;
 };
@@ -35,7 +37,7 @@ struct lstref {
   const lstref_entry_t *ltr_entry;
 };
 
-lstref_t *lstref_new_thunk(const lsref_t *ref, const lsthunk_t *thunk) {
+lstref_t *lstref_new_thunk(const lsref_t *ref, lsthunk_t *thunk) {
   assert(ref != NULL);
   assert(thunk != NULL);
   lstref_t *tref = lsmalloc(sizeof(lstref_t));
@@ -47,10 +49,16 @@ lstref_t *lstref_new_thunk(const lsref_t *ref, const lsthunk_t *thunk) {
 }
 
 lstref_t *lstref_new_bind_entry(const lsbind_entry_t *bentry, lstenv_t *tenv) {
+  assert(bentry != NULL);
+  assert(tenv != NULL);
   lstref_t *tref = lsmalloc(sizeof(lstref_t));
   lstref_target_t *target = lsmalloc(sizeof(lstref_target_t));
   target->ltrt_type = LSTRTYPE_BIND_ENTRY;
-  target->ltrt_bind_entry = bentry;
+  lstref_bind_entry_t *trbentry = lsmalloc(sizeof(lstref_bind_entry_t));
+  trbentry->ltrb_env = tenv;
+  trbentry->ltrb_lhs = lsbind_entry_get_lhs(bentry);
+  trbentry->ltrb_rhs = lsthunk_new_expr(lsbind_entry_get_rhs(bentry), tenv);
+  target->ltrt_bind_entry = trbentry;
   return tref;
 }
 
@@ -61,7 +69,23 @@ lstref_t *lstref_new(const lsref_t *ref, lstenv_t *tenv) {
   return lstenv_get(tenv, ename);
 }
 
-lsthunk_t *lstref_eval(lstref_t *tref) {}
+const lsthunk_t *lstref_bind_entry_eval(const lstref_bind_entry_t *bentry) {
+  assert(bentry != NULL);
+  lsmres_t mres  = lsthunk_match_pat(bentry->ltrb_rhs, bentry->ltrb_lhs, tenv);
+  return bentry->ltrb_rhs;
+}
+
+lsthunk_t *lstref_eval(lstref_t *tref) {
+  assert(tref != NULL);
+  switch (tref->ltr_target->ltrt_type) {
+  case LSTRTYPE_THUNK:
+    return tref->ltr_target->ltrt_thunk;
+  case LSTRTYPE_BIND_ENTRY:
+    return lstref_bind_entry_eval(tref->ltr_target->ltrt_bind_entry);
+  case LSTRTYPE_LAMBDA:
+    return lstref_lambda_eval(tref->ltr_target->ltrt_lambda);
+  }
+}
 
 lsthunk_t *lstref_apply(lstref_t *tref, const lstlist_t *args) {
   return NULL; // TODO: implement
@@ -85,8 +109,7 @@ const lstref_entry_t *lstref_entry_add_palge(const lstref_entry_t *entry,
 }
 
 const lstref_entry_t *lstref_entry_add_ref(const lstref_entry_t *entry,
-                                            const lsref_t *ref,
-                                            lstenv_t *tenv) {
+                                           const lsref_t *ref, lstenv_t *tenv) {
   assert(ref != NULL);
   assert(tenv != NULL);
   lstref_entry_t *new_entry = lsmalloc(sizeof(lstref_entry_t));
@@ -103,7 +126,7 @@ const lstref_entry_t *lstref_entry_add_pas(const lstref_entry_t *entry,
   const lspat_t *pat = lspas_get_pat(pas);
   const lsref_t *ref = lspas_get_ref(pas);
   return lstref_entry_add_ref(lstref_entry_add_pat(entry, pat, tenv), ref,
-                               tenv);
+                              tenv);
   if (entry == NULL)
     return NULL;
   return entry;

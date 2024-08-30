@@ -43,3 +43,5 @@ null.d
 
 /confdefs.h
 /conftest.h
+/conftest.c
+/conftest.err

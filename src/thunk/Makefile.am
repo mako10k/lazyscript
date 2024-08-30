@@ -16,4 +16,6 @@ liblsthunk_la_SOURCES = \
     tlambda.c \
     tlambda.h \
     tlist.c \
-    tlist.h
+    tlist.h \
+    tref.c \
+    tref.h

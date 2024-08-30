@@ -17,8 +17,9 @@ lstappl_t *lstappl_new(const lseappl_t *eappl, lstenv_t *tenv) {
   tappl->lta_args = lstlist_new();
   for (const lselist_t *le = lseappl_get_args(eappl); le != NULL;
        le = lselist_get_next(le)) {
-    const lsexpr_t *arg = lselist_get(le, 0);
-    lstlist_push(tappl->lta_args, lsthunk_new_expr(arg, tenv));
+    const lsexpr_t *earg = lselist_get(le, 0);
+    lsthunk_t *targ = lsthunk_new_expr(earg, tenv);
+    lstlist_push(tappl->lta_args, targ);
   }
   return tappl;
 }

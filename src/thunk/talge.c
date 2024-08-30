@@ -12,15 +12,16 @@ struct lstalge {
 lstalge_t *lstalge_new(const lsealge_t *ealge, lstenv_t *tenv) {
   assert(ealge != NULL);
   assert(tenv != NULL);
-  lstalge_t *alge = lsmalloc(sizeof(lstalge_t));
-  alge->lta_constr = lsealge_get_constr(ealge);
-  alge->lta_args = lstlist_new();
+  lstalge_t *talge = lsmalloc(sizeof(lstalge_t));
+  talge->lta_constr = lsealge_get_constr(ealge);
+  talge->lta_args = lstlist_new();
   for (const lselist_t *le = lsealge_get_args(ealge); le != NULL;
        le = lselist_get_next(le)) {
-    const lsexpr_t *arg = lselist_get(le, 0);
-    lstlist_push(alge->lta_args, lsthunk_new_expr(arg, tenv));
+    const lsexpr_t *earg = lselist_get(le, 0);
+    lsthunk_t *targ = lsthunk_new_expr(earg, tenv);
+    lstlist_push(talge->lta_args, targ);
   }
-  return alge;
+  return talge;
 }
 
 lsthunk_t *lstalge_apply(lstalge_t *talge, const lstlist_t *args) {
