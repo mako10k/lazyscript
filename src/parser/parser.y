@@ -14,12 +14,10 @@
 #include "expr/eappl.h"
 #include "expr/eclosure.h"
 #include "expr/elambda.h"
-#include "expr/elist.h"
 #include "misc/bind.h"
 #include "misc/prog.h"
 #include "pat/palge.h"
 #include "pat/pat.h"
-#include "pat/plist.h"
 typedef void *yyscan_t;
 lsscan_t *yyget_extra(yyscan_t yyscanner);
 # define YYLLOC_DEFAULT(Cur, Rhs, N)                      \
@@ -53,12 +51,11 @@ while (0)
     const lsstr_t *strval;
     const lspat_t *pat;
     const lsref_t *ref;
-    lspalge_t *palge;
+    const lspalge_t *palge;
     lsbind_t *bind;
     const lsbind_t *bind_ent;
     const lseclosure_t *eclosure;
-    const lselist_t *elist;
-    const lsplist_t *plist;
+    const lsarray_t *array;
 }
 
 %code {
@@ -84,8 +81,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact
 %nterm <elambda> elambda
-%nterm <elist> earray
-%nterm <plist> parray
+%nterm <array> earray parray
 %nterm <ealge> ealge elist econs etuple
 %nterm <eappl> eappl
 %nterm <pat> pat pat1 pat2 pat3
@@ -140,9 +136,8 @@ expr2:
 
 econs:
       expr1 ':' expr3 {
-        $$ = lsealge_new(lsstr_cstr(":"));
-        lsealge_add_arg($$, $1);
-        lsealge_add_arg($$, $3);
+        const lsexpr_t args[] = { $1, $3 };
+        $$ = lsealge_new(lsstr_cstr(":"), 2, args);
       }
     ;
 
@@ -152,8 +147,8 @@ expr3:
     ;
 
 eappl:
-      efact expr5 { $$ = lseappl_new($1); lseappl_add_arg($$, $2); }
-    | eappl expr5 { $$ = $1; lseappl_add_arg($$, $2); }
+      efact expr5 { $$ = lseappl_new($1, 1, &$2); }
+    | eappl expr5 { $$ = lseappl_add_arg($1, $2); }
     ;
 
 expr4:
@@ -162,8 +157,8 @@ expr4:
     ;
 
 ealge:
-      LSTSYMBOL expr5 { $$ = lsealge_new($1); lsealge_add_arg($$, $2); }
-    | ealge expr5 { $$ = $1; lsealge_add_arg($$, $2); }
+      LSTSYMBOL expr5 { $$ = lsealge_new($$, 1, &$2); }
+    | ealge expr5 { $$ = lsealge_add_arg($1, $2); }
     ;
 
 expr5:
@@ -254,7 +249,10 @@ parray:
 
 plist:
       '[' ']' { $$ = lspalge_new(lsstr_cstr("[]")); }
-    | '[' parray ']' { $$ = lspalge_new(lsstr_cstr("[]")); lsexpr_concat_args($$, $2); }
+    | '[' parray ']' {
+        lssize_t argc = lsarray_get_size($2);
+        const lspat_t *const args = lsarray_get_all($2);
+        $$ = lspalge_new(lsstr_cstr("[]"), argc, args); }
     ;
 
 %%

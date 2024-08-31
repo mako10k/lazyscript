@@ -40,6 +40,13 @@ void lsarray_set(lsarray_t *ary, lssize_t i, lsarray_data_t val);
 lsarray_data_t lsarray_get(const lsarray_t *ary, lssize_t i);
 
 /**
+ * Get a value from an array.
+ * @param ary Array.
+ * @return Array of all values.
+ */
+lsarray_data_t * const lsarray_get_all(const lsarray_t *ary);
+
+/**
  * Get the size of an array.
  * @param ary Array.
  * @return Size.

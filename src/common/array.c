@@ -52,6 +52,10 @@ lsarray_data_t lsarray_get(const lsarray_t *ary, lssize_t i) {
   return ary->la_values[i];
 }
 
+lsarray_data_t *const lsarray_get_all(const lsarray_t *ary) {
+  return ary == NULL ? NULL : ary->la_values;
+}
+
 lssize_t lsarray_get_size(const lsarray_t *ary) {
   return ary == NULL ? 0 : ary->la_size;
 }
