@@ -13,7 +13,8 @@ struct lspalge {
 };
 
 const lspalge_t *lspalge_new(const lsstr_t *constr, lssize_t argc,
-                             const lspat_t *args[]) {
+                             const lspat_t *const *args) {
+  assert(argc == 0 || args != NULL);
   lspalge_t *palge =
       lsmalloc(sizeof(lspalge_t) + argc * sizeof(const lspat_t *));
   palge->lpa_constr = constr;
@@ -36,7 +37,8 @@ const lspalge_t *lspalge_add_arg(const lspalge_t *palge, const lspat_t *arg) {
 }
 
 const lspalge_t *lspalge_concat_args(const lspalge_t *palge, lssize_t argc,
-                                     const lspat_t *args[]) {
+                                     const lspat_t *const *args) {
+  assert(argc == 0 || args != NULL);
   lssize_t argc0 = palge->lpa_argc;
   lspalge_t *palge0 =
       lsmalloc(sizeof(lspalge_t) + (argc0 + argc) * sizeof(const lspat_t *));

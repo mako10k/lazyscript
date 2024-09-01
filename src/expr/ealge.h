@@ -15,10 +15,12 @@ typedef struct lsealge lsealge_t;
 /**
  * Create a new algebraic expression.
  * @param constr The constructor of the algebraic expression.
- * @return The new algebraic expression. (with no args)
+ * @param argc The number of arguments.
+ * @param args The arguments.
+ * @return The new algebraic expression.
  */
 lsapi_ealge_new const lsealge_t *
-lsealge_new(const lsstr_t *constr, lssize_t argc, const lsexpr_t *args[]);
+lsealge_new(const lsstr_t *constr, lssize_t argc, const lsexpr_t *const *args);
 
 /**
  * Add an argument to the algebraic expression.

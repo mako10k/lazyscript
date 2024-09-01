@@ -8,9 +8,9 @@ typedef struct lspalge lspalge_t;
 #include "lazyscript.h"
 #include "pat/pat.h"
 
-#define lsapi_palge_new lsapi_nn13 lsapi_wur
+#define lsapi_palge_new lsapi_nn1 lsapi_wur
 #define lsapi_palge_add_arg lsapi_nn12 lsapi_wur
-#define lsapi_palge_concat_args lsapi_nn13 lsapi_wur
+#define lsapi_palge_concat_args lsapi_nn1 lsapi_wur
 
 /**
  * Create a new pattern algebra.
@@ -21,7 +21,7 @@ typedef struct lspalge lspalge_t;
  * @return the new algebra
  */
 lsapi_palge_new const lspalge_t *
-lspalge_new(const lsstr_t *constr, lssize_t argc, const lspat_t *args[]);
+lspalge_new(const lsstr_t *constr, lssize_t argc, const lspat_t *const *args);
 
 /**
  * Add an argument to a pattern algebra.
@@ -43,7 +43,7 @@ lsapi_palge_add_arg const lspalge_t *lspalge_add_arg(const lspalge_t *palge,
  */
 lsapi_palge_concat_args const lspalge_t *
 lspalge_concat_args(const lspalge_t *palge, lssize_t argc,
-                    const lspat_t *args[]);
+                    const lspat_t *const *args);
 
 /**
  * Get the constructor of a pattern algebra.

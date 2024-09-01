@@ -4,7 +4,7 @@
 typedef struct lsarray lsarray_t;
 
 /** array data type */
-typedef void *lsarray_data_t;
+typedef const void *lsarray_data_t;
 
 #include "lstypes.h"
 
@@ -13,38 +13,17 @@ typedef void *lsarray_data_t;
 // *******************************
 /**
  * Create a new array.
- * @return a new array.
+ * @param size Size.
+ * @param values Values.
  */
-lsarray_t *lsarray_new(void);
-
-/**
- * Free an array.
- * @param ary Array.
- */
-void lsarray_free(lsarray_t *ary);
-
-/**
- * Set a value in an array.
- * @param ary Array.
- * @param i Index.
- * @param val Value.
- */
-void lsarray_set(lsarray_t *ary, lssize_t i, lsarray_data_t val);
+const lsarray_t *lsarray_new(lssize_t size, lsarray_data_t const *values);
 
 /**
  * Get a value from an array.
  * @param ary Array.
- * @param i Index.
- * @return Value.
+ * @return C array of value.
  */
-lsarray_data_t lsarray_get(const lsarray_t *ary, lssize_t i);
-
-/**
- * Get a value from an array.
- * @param ary Array.
- * @return Array of all values.
- */
-lsarray_data_t * const lsarray_get_all(const lsarray_t *ary);
+lsarray_data_t const *lsarray_get(const lsarray_t *ary);
 
 /**
  * Get the size of an array.
@@ -54,59 +33,41 @@ lsarray_data_t * const lsarray_get_all(const lsarray_t *ary);
 lssize_t lsarray_get_size(const lsarray_t *ary);
 
 /**
- * Set the size of an array.
- * @param ary Array.
- * @param new_size New size.
- */
-void lsarray_set_size(lsarray_t *ary, lssize_t new_size);
-
-/**
  * Push a value into an array.
  * @param ary Array.
  * @param val Value.
+ * @return New array.
  */
-void lsarray_push(lsarray_t *ary, lsarray_data_t val);
+const lsarray_t *lsarray_push(const lsarray_t *ary, lsarray_data_t val);
 
 /**
  * Pop a value from an array.
  * @param ary Array.
+ * @param pnew_ary New array.
  * @return Value.
  */
-lsarray_data_t lsarray_pop(lsarray_t *ary);
+lsarray_data_t lsarray_pop(const lsarray_t *ary, const lsarray_t **pnew_ary);
 
 /**
  * Unshift a value into an array.
  * @param ary Array.
  * @param val Value.
+ * @return New array.
  */
-void lsarray_unshift(lsarray_t *ary, lsarray_data_t val);
+const lsarray_t *lsarray_unshift(const lsarray_t *ary, lsarray_data_t val);
 
 /**
  * Shift a value from an array.
  * @param ary Array.
+ * @param pnew_ary New array.
  * @return Value.
  */
-lsarray_data_t lsarray_shift(lsarray_t *ary);
-
-/**
- * Clone an array.
- * @param ary Array.
- * @return Cloned array.
- */
-lsarray_t *lsarray_clone(const lsarray_t *ary);
+lsarray_data_t lsarray_shift(const lsarray_t *ary, const lsarray_t **pnew_ary);
 
 /**
  * Concatenate two arrays.
  * @param ary1 First array.
  * @param ary2 Second array.
- * @return Concatenated array. Same as ary1.
+ * @return Concatenated array.
  */
-lsarray_t *lsarray_concat(lsarray_t *ary1, const lsarray_t *ary2);
-
-/**
- * Concatenate two arrays and clone the result.
- * @param ary1 First array.
- * @param ary2 Second array.
- * @return Cloned concatenated array.
- */
-lsarray_t *lsarray_concat_clone(const lsarray_t *ary1, const lsarray_t *ary2);
+const lsarray_t *lsarray_concat(const lsarray_t *ary1, const lsarray_t *ary2);

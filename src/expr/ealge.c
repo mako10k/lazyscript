@@ -9,7 +9,7 @@ struct lsealge {
 };
 
 const lsealge_t *lsealge_new(const lsstr_t *constr, lssize_t argc,
-                             const lsexpr_t *args[]) {
+                             const lsexpr_t *const *args) {
   lsealge_t *ealge = lsmalloc(sizeof(lsealge_t) + argc * sizeof(lsexpr_t *));
   ealge->lea_constr = constr;
   ealge->lea_argc = argc;

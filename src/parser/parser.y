@@ -44,15 +44,15 @@ while (0)
 %union {
     const lsprog_t *prog;
     const lsexpr_t *expr;
-    lsealge_t *ealge;
-    lseappl_t *eappl;
+    const lsealge_t *ealge;
+    const lseappl_t *eappl;
     const lselambda_t *elambda;
     const lsint_t *intval;
     const lsstr_t *strval;
     const lspat_t *pat;
     const lsref_t *ref;
     const lspalge_t *palge;
-    lsbind_t *bind;
+    const lsbind_t *bind;
     const lsbind_t *bind_ent;
     const lseclosure_t *eclosure;
     const lsarray_t *array;
@@ -183,18 +183,24 @@ closure:
 
 
 etuple:
-      '(' ')' { $$ = lsealge_new(lsstr_cstr(",")); }
-    | '(' earray ')' { $$ = lsealge_new(lsstr_cstr(",")); lsealge_concat_args($$, $2); }
+      '(' ')' { $$ = lsealge_new(lsstr_cstr(","), 1, NULL); }
+    | '(' earray ')' {
+        lssize_t argc = lsarray_get_size($2);
+        const lsexpr_t *const *args = (const lsexpr_t *const *)lsarray_get($2);
+        $$ = lsealge_new(lsstr_cstr(","), argc, args); }
     ;
 
 earray:
-      expr { $$ = lselist_push(NULL, $1); }
-    | earray ',' expr { $$ = lselist_push($1, $3); }
+      expr { $$ = lsarray_new(1, &$1); }
+    | earray ',' expr { $$ = lsarray_push($1, $3); }
     ;
 
 elist:
-      '[' ']' { $$ = lsealge_new(lsstr_cstr("[]")); }
-    | '[' earray ']' { $$ = lsealge_new(lsstr_cstr("[]")); lsealge_concat_args($$, $2); }
+      '[' ']' { $$ = lsealge_new(lsstr_cstr("[]"), 0, NULL); }
+    | '[' earray ']' {
+        lssize_t argc = lsarray_get_size($2);
+        const lsexpr_t *const *args = (const lsexpr_t *const *)lsarray_get($2);
+        $$ = lsealge_new(lsstr_cstr("[]"), argc, args); }
     ;
 
 elambda:
@@ -207,7 +213,9 @@ pat:
     ;
 
 pcons:
-      pat ':' pat { $$ = lspalge_new(lsstr_cstr(":")); lsexpr_add_args($$, $1); lsexpr_add_args($$, $3); }
+      pat ':' pat {
+        const lspat_t *args[] = { $1, $3 };
+        $$ = lspalge_new(lsstr_cstr(":"), 2, args); }
     ;
 
 pat1:
@@ -220,8 +228,8 @@ pat2:
     ;
 
 palge:
-      LSTSYMBOL { $$ = lspalge_new($1); }
-    | palge pat3 { $$ = $1; lsexpr_add_args($$, $2); }
+      LSTSYMBOL { $$ = lspalge_new($1, 0, NULL); }
+    | palge pat3 { $$ = lspalge_add_arg($1, $2); }
     ;
 
 pat3:
@@ -238,20 +246,23 @@ pref:
     ;
 
 ptuple:
-      '(' ')' { $$ = lspalge_new(lsstr_cstr(",")); }
-    | '(' parray ')' { $$ = lspalge_new(lsstr_cstr(",")); lsexpr_concat_args($$, $2); }
+      '(' ')' { $$ = lspalge_new(lsstr_cstr(","), 0, NULL); }
+    | '(' parray ')' {
+      lssize_t argc = lsarray_get_size($2);
+      const lspat_t *const *args = (const lspat_t *const *)lsarray_get($2);
+      $$ = lspalge_new(lsstr_cstr(","), argc, args); }
     ;
 
 parray:
-      pat { $$ = lsplist_push(NULL, $1); }
-    | parray ',' pat { $$ = lsplist_push($1, $3); }
+      pat { $$ = lsarray_new(1, (const void *const *)&$1); }
+    | parray ',' pat { $$ = lsarray_push($1, $3); }
     ;
 
 plist:
-      '[' ']' { $$ = lspalge_new(lsstr_cstr("[]")); }
+      '[' ']' { $$ = lspalge_new(lsstr_cstr("[]"), 0, NULL); }
     | '[' parray ']' {
         lssize_t argc = lsarray_get_size($2);
-        const lspat_t *const args = lsarray_get_all($2);
+        const lspat_t *const *args = (const lspat_t *const *)lsarray_get($2);
         $$ = lspalge_new(lsstr_cstr("[]"), argc, args); }
     ;
 
