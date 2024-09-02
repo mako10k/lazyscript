@@ -1,17 +1,24 @@
 #pragma once
 
 typedef struct lsthunk lsthunk_t;
+typedef struct lstalge lstalge_t;
+typedef struct lstappl lstappl_t;
+typedef struct lstchoice lstchoice_t;
+typedef struct lstbind lstbind_t;
+typedef struct lstlambda lstlambda_t;
+typedef struct lstref lstref_t;
+typedef struct lstref_target lstref_target_t;
+
+typedef enum lstrtype { LSTRTYPE_BIND, LSTRTYPE_LAMBDA } lstrtype_t;
 
 #include "common/int.h"
 #include "common/str.h"
+#include "expr/ealge.h"
 #include "pat/palge.h"
 #include "pat/pas.h"
 #include "pat/pat.h"
-#include "thunk/talge.h"
-#include "thunk/tappl.h"
-#include "thunk/tchoice.h"
-#include "thunk/tlambda.h"
-#include "thunk/tref.h"
+#include "thunk/tenv.h"
+#include "thunk/tpat.h"
 
 typedef enum lsttype {
   LSTTYPE_ALGE,
@@ -29,7 +36,7 @@ typedef enum lsttype {
  * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_alge(const lsealge_t *ealge, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_ealge(const lsealge_t *ealge, lstenv_t *tenv);
 
 /**
  * Create a new thunk for an application data type
@@ -37,7 +44,7 @@ lsthunk_t *lsthunk_new_alge(const lsealge_t *ealge, lstenv_t *tenv);
  * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_appl(const lseappl_t *eappl, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_eappl(const lseappl_t *eappl, lstenv_t *tenv);
 
 /**
  * Create a new thunk for a choice data type
@@ -45,7 +52,7 @@ lsthunk_t *lsthunk_new_appl(const lseappl_t *eappl, lstenv_t *tenv);
  * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_choice(const lsechoice_t *echoice, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_echoice(const lsechoice_t *echoice, lstenv_t *tenv);
 
 /**
  * Create a new thunk for a closure data type
@@ -53,7 +60,7 @@ lsthunk_t *lsthunk_new_choice(const lsechoice_t *echoice, lstenv_t *tenv);
  * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_closure(const lseclosure *eclosure, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_eclosure(const lseclosure_t *eclosure, lstenv_t *tenv);
 
 /**
  * Create a new thunk for an integer data type
@@ -68,7 +75,7 @@ lsthunk_t *lsthunk_new_int(const lsint_t *intval);
  * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_lambda(const lselambda_t *elambda, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_elambda(const lselambda_t *elambda, lstenv_t *tenv);
 
 /**
  * Create a new thunk for a reference data type
@@ -101,25 +108,32 @@ lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr, lstenv_t *tenv);
 lsttype_t lsthunk_get_type(const lsthunk_t *thunk);
 
 /**
- * Get the algebraic value of a thunk
+ * Get the algebraic constructor of a thunk
  * @param thunk The thunk
- * @return The algebraic value
+ * @return The algebraic constructor
  */
-lstalge_t *lsthunk_get_alge(const lsthunk_t *thunk);
+const lsstr_t *lsthunk_get_constr(const lsthunk_t *thunk);
 
 /**
- * Get the application value of a thunk
+ * Get the function of a thunk
  * @param thunk The thunk
- * @return The application value
+ * @return The function
  */
-lstappl_t *lsthunk_get_appl(const lsthunk_t *thunk);
+lsthunk_t *lsthunk_get_func(const lsthunk_t *thunk);
 
 /**
- * Get the choice value of a thunk
+ * Get the arguments of a thunk
  * @param thunk The thunk
- * @return The choice value
+ * @return The arguments
  */
-lstchoice_t *lsthunk_get_choice(const lsthunk_t *thunk);
+lssize_t lsthunk_get_argc(const lsthunk_t *thunk);
+
+/**
+ * Get the arguments of a thunk
+ * @param thunk The thunk
+ * @return The arguments
+ */
+lsthunk_t *const *lsthunk_get_args(const lsthunk_t *thunk);
 
 /**
  * Get the integer value of a thunk
@@ -129,65 +143,56 @@ lstchoice_t *lsthunk_get_choice(const lsthunk_t *thunk);
 const lsint_t *lsthunk_get_int(const lsthunk_t *thunk);
 
 /**
- * Get the lambda value of a thunk
- * @param thunk The thunk
- * @return The lambda value
- */
-lstlambda_t *lsthunk_get_lambda(const lsthunk_t *thunk);
-
-/**
- * Get the reference value of a thunk
- * @param thunk The thunk
- * @return The reference value
- */
-lstref_t *lsthunk_get_ref(const lsthunk_t *thunk);
-
-/**
  * Get the string value of a thunk
  * @param thunk The thunk
  * @return The string value
  */
 const lsstr_t *lsthunk_get_str(const lsthunk_t *thunk);
 
+lssize_t lsthunk_get_argc(const lsthunk_t *thunk);
+
+lsthunk_t *const *lsthunk_get_args(const lsthunk_t *thunk);
+
+lsthunk_t *lsthunk_get_left(const lsthunk_t *thunk);
+
+lsthunk_t *lsthunk_get_right(const lsthunk_t *thunk);
+
+lstpat_t *lsthunk_get_param(const lsthunk_t *thunk);
+
+lsthunk_t *lsthunk_get_body(const lsthunk_t *thunk);
+
+lstref_target_t *lsthunk_get_ref_target(const lsthunk_t *thunk);
 /**
  * Associate a thunk with an algebraic pattern
  * @param thunk The thunk
  * @param alge The algebraic pattern
- * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_palge(lsthunk_t *thunk, const lspalge_t *alge,
-                             lstenv_t *tenv);
+lsmres_t lsthunk_match_palge(lsthunk_t *thunk, const lspalge_t *alge);
 
 /**
  * Associate a thunk with an as pattern
  * @param thunk The thunk
  * @param pas The as pattern
- * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pas(lsthunk_t *thunk, const lspas_t *pas,
-                           lstenv_t *tenv);
+lsmres_t lsthunk_match_pas(lsthunk_t *thunk, const lspas_t *pas);
 
 /**
  * Associate a thunk with a reference pattern
  * @param thunk The thunk
  * @param ref The reference pattern
- * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pref(lsthunk_t *thunk, const lsref_t *ref,
-                            lstenv_t *tenv);
+lsmres_t lsthunk_match_pref(lsthunk_t *thunk, const lsref_t *ref);
 
 /**
  * Associate a thunk with a pattern
  * @param thunk The thunk
  * @param pat The pattern
- * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lspat_t *pat,
-                           lstenv_t *tenv);
+lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lspat_t *pat);
 
 /**
  * Evaluate a thunk to WHNF (Weak Head Normal Form)
@@ -202,4 +207,4 @@ lsthunk_t *lsthunk_eval(lsthunk_t *thunk);
  * @param args The arguments
  * @return The result of the application
  */
-lsthunk_t *lsthunk_apply(lsthunk_t *func, const lstlist_t *args);
+lsthunk_t *lsthunk_apply(lsthunk_t *func, int argc, lsthunk_t *const *args);

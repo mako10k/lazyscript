@@ -87,8 +87,8 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %nterm <pat> pat pat1 pat2 pat3
 %nterm <ref> pref
 %nterm <palge> palge plist pcons ptuple
-%nterm <bind> bind bind_list
-%nterm <bind_ent> bind_single
+%nterm <array> bind bind_list
+%nterm <bind> bind_single
 %nterm <eclosure> closure
 
 
@@ -116,8 +116,8 @@ bind_single:
     ;
 
 bind_list:
-      ';' bind_single { $$ = lsbind_new(); lsbind_push($$, $2); }
-    | bind_list ';' bind_single { $$ = $1; lsbind_push($$, $3); }
+      ';' bind_single { $$ = lsarray(1, &$2); }
+    | bind_list ';' bind_single { $$ = lsarray_push($1, $3); }
     ;
 
 expr:
@@ -136,7 +136,7 @@ expr2:
 
 econs:
       expr1 ':' expr3 {
-        const lsexpr_t args[] = { $1, $3 };
+        const lsexpr_t *args[] = { $1, $3 };
         $$ = lsealge_new(lsstr_cstr(":"), 2, args);
       }
     ;
@@ -157,19 +157,23 @@ expr4:
     ;
 
 ealge:
-      LSTSYMBOL expr5 { $$ = lsealge_new($$, 1, &$2); }
+      LSTSYMBOL expr5 { $$ = lsealge_new($1, 1, &$2); }
     | ealge expr5 { $$ = lsealge_add_arg($1, $2); }
     ;
 
 expr5:
       efact { $$ = $1; }
-    | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1)); }
+    | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1, 0, NULL)); }
     ;
 
 efact:
       LSTINT { $$ = lsexpr_new_int($1); }
     | LSTSTR { $$ = lsexpr_new_str($1); }
-    | etuple { $$ = lsealge_get_arg_count($1) == 1 ? lsealge_get_arg($1, 0) : lsexpr_new_alge($1); }
+    | etuple {
+        lssize_t argc = lsealge_get_argc($1);
+        const lsexpr_t *const *args = lsealge_get_args($1);
+        $$ = argc == 1 ? args[0] : lsexpr_new_alge($1);
+    }
     | elist { $$ = lsexpr_new_alge($1); }
     | closure { $$ = lsexpr_new_closure($1); }
     | '~' LSTSYMBOL { $$ = lsexpr_new_ref(lsref_new($2, @$)); }
@@ -178,7 +182,10 @@ efact:
     ;
 
 closure:
-      '{' expr bind '}' { $$ = lseclosure_new($2, $3); }
+      '{' expr bind '}' {
+          lssize_t bindc = lsarray_get_size($3);
+          const lsbind_t *const *binds = (const lsbind_t *const *)lsarray_get($3);
+          $$ = lseclosure_new($2, bindc, binds); }
     ;
 
 
@@ -191,7 +198,7 @@ etuple:
     ;
 
 earray:
-      expr { $$ = lsarray_new(1, &$1); }
+      expr { $$ = lsarray_new(1, (const void *const *)&$1); }
     | earray ',' expr { $$ = lsarray_push($1, $3); }
     ;
 

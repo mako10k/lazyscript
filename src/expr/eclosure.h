@@ -15,7 +15,14 @@ typedef struct lseclosure lseclosure_t;
  * @return The new expression closure.
  */
 lsapi_eclosure_new const lseclosure_t *
-lseclosure_new(const lsexpr_t *expr, size_t bindc, const lsbind_t *binds[]);
+lseclosure_new(const lsexpr_t *expr, size_t bindc,
+               const lsbind_t *const *binds);
+
+const lsexpr_t *lseclosure_get_expr(const lseclosure_t *eclosure);
+
+lssize_t lseclosure_get_bindc(const lseclosure_t *eclosure);
+
+const lsbind_t *const *lseclosure_get_binds(const lseclosure_t *eclosure);
 
 /**
  * Print an expression closure.

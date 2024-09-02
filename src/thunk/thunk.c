@@ -1,108 +1,192 @@
 #include "thunk/thunk.h"
 #include "common/io.h"
+#include "common/loc.h"
 #include "common/malloc.h"
-#include "thunk/talge.h"
+#include "expr/eclosure.h"
 #include "thunk/tenv.h"
-#include "thunk/tlambda.h"
 #include "thunk/tpat.h"
 #include <assert.h>
 #include <stddef.h>
+
+struct lstalge {
+  const lsstr_t *lta_constr;
+  lssize_t lta_argc;
+  lsthunk_t *lta_args[0];
+};
+
+struct lstappl {
+  lsthunk_t *lta_func;
+  lssize_t lta_argc;
+  lsthunk_t *lta_args[0];
+};
+
+struct lstchoice {
+  lsthunk_t *ltc_left;
+  lsthunk_t *ltc_right;
+};
+
+struct lstbind {
+  lstpat_t *ltb_lhs;
+  lsthunk_t *ltb_rhs;
+};
+
+struct lstlambda {
+  lstpat_t *ltl_param;
+  lsthunk_t *ltl_body;
+};
+
+struct lstref_target {
+  lstrtype_t lrt_type;
+  union {
+    lstbind_t lrt_bind;
+    lstlambda_t lrt_lambda;
+  };
+};
+
+struct lstref {
+  const lsstr_t *ltr_refname;
+  lsthunk_t *ltr_refthunk;
+  lstref_target_t *ltr_target;
+};
 
 struct lsthunk {
   lsttype_t lt_type;
   lsthunk_t *lt_whnf;
   union {
-    struct {
-      union {
-        const lsstr_t *lt_constr;
-        lsthunk_t *lt_func;
-      };
-      lssize_t lt_argc;
-      const lsthunk_t *lt_args[0];
-    };
-    struct {
-      const lsint_t *lt_int;
-      void *lt_intend[0];
-    };
-    struct {
-      const lsstr_t *lt_str;
-      void *lt_strend[0];
-    };
-    lstref_t *lt_ref;
-    struct {
-      const lstpat_t *lt_param;
-      lsthunk_t *lt_body;
-      void *lt_lambdaend[0];
-    };
-    struct {
-      lsthunk_t *lt_left;
-      lsthunk_t *lt_right;
-      void *lt_choiceend[0];
-    };
+    lstalge_t lt_alge;
+    lstappl_t lt_appl;
+    lstchoice_t lt_choice;
+    lstlambda_t lt_lambda;
+    lstref_t lt_ref;
+    const lsint_t *lt_int;
+    const lsstr_t *lt_str;
   };
 };
 
-lsthunk_t *lsthunk_new_alge(const lsealge_t *ealge, lstenv_t *tenv) {
+lsthunk_t *lsthunk_new_ealge(const lsealge_t *ealge, lstenv_t *tenv) {
   lssize_t eargc = lsealge_get_argc(ealge);
   const lsexpr_t *const *eargs = lsealge_get_args(ealge);
   lsthunk_t *thunk =
-      lsmalloc(offsetof(lsthunk_t, lt_argc) + eargc * sizeof(lsthunk_t *));
+      lsmalloc(lssizeof(lsthunk_t, lt_alge) + eargc * sizeof(lsthunk_t *));
   thunk->lt_type = LSTTYPE_ALGE;
-  thunk->lt_whnf = NULL;
-  thunk->lt_constr = lsealge_get_constr(ealge);
-  thunk->lt_argc = eargc;
+  thunk->lt_whnf = thunk;
+  thunk->lt_alge.lta_constr = lsealge_get_constr(ealge);
+  thunk->lt_alge.lta_argc = eargc;
   for (lssize_t i = 0; i < eargc; i++)
-    thunk->lt_args[i] = lsthunk_new_expr(eargs[i], tenv);
+    thunk->lt_alge.lta_args[i] = lsthunk_new_expr(eargs[i], tenv);
   return thunk;
 }
 
-lsthunk_t *lsthunk_new_appl(const lseappl_t *eappl, lstenv_t *tenv) {
+lsthunk_t *lsthunk_new_eappl(const lseappl_t *eappl, lstenv_t *tenv) {
   lssize_t eargc = lseappl_get_argc(eappl);
   const lsexpr_t *const *eargs = lseappl_get_args(eappl);
   lsthunk_t *thunk =
-      lsmalloc(offsetof(lsthunk_t, lt_argc) + eargc * sizeof(lsthunk_t *));
+      lsmalloc(lssizeof(lsthunk_t, lt_appl) + eargc * sizeof(lsthunk_t *));
   thunk->lt_type = LSTTYPE_APPL;
   thunk->lt_whnf = NULL;
-  thunk->lt_func = lsthunk_new_expr(lseappl_get_func(eappl), tenv);
-  thunk->lt_argc = eargc;
+  thunk->lt_appl.lta_func = lsthunk_new_expr(lseappl_get_func(eappl), tenv);
+  thunk->lt_appl.lta_argc = eargc;
   for (lssize_t i = 0; i < eargc; i++)
-    thunk->lt_args[i] = lsthunk_new_expr(eargs[i], tenv);
+    thunk->lt_appl.lta_args[i] = lsthunk_new_expr(eargs[i], tenv);
   return thunk;
 }
 
-lsthunk_t *lsthunk_new_choice(const lsechoice_t *echoice, lstenv_t *tenv) {
-  lsthunk_t *thunk = lsmalloc(offsetof(lsthunk_t, lt_choiceend));
+lsthunk_t *lsthunk_new_echoice(const lsechoice_t *echoice, lstenv_t *tenv) {
+  lsthunk_t *thunk = lsmalloc(offsetof(lsthunk_t, lt_choice));
   thunk->lt_type = LSTTYPE_CHOICE;
   thunk->lt_whnf = NULL;
-  thunk->lt_left = lsthunk_new_expr(lsechoice_get_left(echoice), tenv);
-  thunk->lt_right = lsthunk_new_expr(lsechoice_get_right(echoice), tenv);
+  thunk->lt_choice.ltc_left =
+      lsthunk_new_expr(lsechoice_get_left(echoice), tenv);
+  thunk->lt_choice.ltc_right =
+      lsthunk_new_expr(lsechoice_get_right(echoice), tenv);
   return thunk;
 }
 
-lsthunk_t *lsthunk_new_closure(const lseclosure_t *eclosure, lstenv_t *tenv) {
-  return NULL; // TODO : implement
+lsthunk_t *lsthunk_new_eclosure(const lseclosure_t *eclosure, lstenv_t *tenv) {
+  tenv = lstenv_new(tenv);
+  lssize_t ebindc = lseclosure_get_bindc(eclosure);
+  const lsbind_t *const *ebinds = lseclosure_get_binds(eclosure);
+  lstref_target_t *targets[ebindc];
+  for (lssize_t i = 0; i < ebindc; i++) {
+    const lspat_t *lhs = lsbind_get_lhs(ebinds[i]);
+    targets[i] = lsmalloc(sizeof(lstref_target_t));
+    targets[i]->lrt_type = LSTRTYPE_BIND;
+    targets[i]->lrt_bind.ltb_lhs = lstpat_new_pat(lhs, tenv);
+    if (targets[i]->lrt_bind.ltb_lhs == NULL)
+      return NULL;
+  }
+  for (lssize_t i = 0; i < ebindc; i++) {
+    const lsexpr_t *rhs = lsbind_get_rhs(ebinds[i]);
+    targets[i]->lrt_bind.ltb_rhs = lsthunk_new_expr(rhs, tenv);
+    if (targets[i]->lrt_bind.ltb_rhs == NULL)
+      return NULL;
+  }
+  return lsthunk_new_expr(lseclosure_get_expr(eclosure), tenv);
 }
 
 lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstenv_t *tenv) {
-  lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
+  lstref_target_t *target = lstenv_get(tenv, lsref_get_name(ref));
+  lsthunk_t *thunk = lsmalloc(lssizeof(lsthunk_t, lt_ref));
   thunk->lt_type = LSTTYPE_REF;
   thunk->lt_whnf = NULL;
-  thunk->lt_ref = lstref_new(ref, tenv); // TODO resolve the reference
+  thunk->lt_ref.ltr_refname = lsref_get_name(ref);
+  thunk->lt_ref.ltr_refthunk = NULL;
+  thunk->lt_ref.ltr_target = target;
+  if (target == NULL) {
+    lsprintf(stderr, 0, "E: ");
+    lsloc_print(stderr, lsref_get_loc(ref));
+    lsprintf(stderr, 0, "undefined reference: %s\n", lsref_get_name(ref));
+    lstenv_incr_nerrors(tenv);
+  }
+  return thunk;
+}
+
+lsthunk_t *lsthunk_new_int(const lsint_t *intval) {
+  lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
+  thunk->lt_type = LSTTYPE_INT;
+  thunk->lt_whnf = thunk;
+  thunk->lt_int = intval;
+  return thunk;
+}
+
+lsthunk_t *lsthunk_new_str(const lsstr_t *strval) {
+  lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
+  thunk->lt_type = LSTTYPE_STR;
+  thunk->lt_whnf = thunk;
+  thunk->lt_str = strval;
+  return thunk;
+}
+
+lsthunk_t *lsthunk_new_elambda(const lselambda_t *elambda, lstenv_t *tenv) {
+  const lspat_t *pparam = lselambda_get_param(elambda);
+  const lsexpr_t *ebody = lselambda_get_body(elambda);
+  tenv = lstenv_new(tenv);
+  lstpat_t *tparam = lstpat_new_pat(pparam, tenv);
+  if (tparam == NULL)
+    return NULL;
+  lsthunk_t *tbody = lsthunk_new_expr(ebody, tenv);
+  if (tbody == NULL)
+    return NULL;
+  lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
+  thunk->lt_type = LSTTYPE_LAMBDA;
+  thunk->lt_whnf = thunk;
+  thunk->lt_lambda.ltl_param = tparam;
+  thunk->lt_lambda.ltl_body = tbody;
   return thunk;
 }
 
 lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr, lstenv_t *tenv) {
   switch (lsexpr_get_type(expr)) {
   case LSETYPE_ALGE:
-    return lsthunk_new_alge(lsexpr_get_alge(expr), tenv);
+    return lsthunk_new_ealge(lsexpr_get_alge(expr), tenv);
   case LSETYPE_APPL:
-    return lsthunk_new_appl(lsexpr_get_appl(expr), tenv);
+    return lsthunk_new_eappl(lsexpr_get_appl(expr), tenv);
   case LSETYPE_CHOICE:
-    return lsthunk_new_choice(lsexpr_get_choice(expr), tenv);
+    return lsthunk_new_echoice(lsexpr_get_choice(expr), tenv);
   case LSETYPE_CLOSURE:
-    return lsthunk_new_closure(lsexpr_get_closure(expr), tenv);
+    return lsthunk_new_eclosure(lsexpr_get_closure(expr), tenv);
   case LSETYPE_LAMBDA:
-    return lsthunk_new_lambda(lsexpr_get_lambda(expr), tenv);
+    return lsthunk_new_elambda(lsexpr_get_lambda(expr), tenv);
   case LSETYPE_INT:
     return lsthunk_new_int(lsexpr_get_int(expr));
   case LSETYPE_REF:
@@ -118,29 +202,51 @@ lsttype_t lsthunk_get_type(const lsthunk_t *thunk) {
   return thunk->lt_type;
 }
 
-lstalge_t *lsthunk_get_alge(const lsthunk_t *thunk) {
+const lsstr_t *lsthunk_get_constr(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_ALGE);
-  return thunk->lt_alge;
+  return thunk->lt_alge.lta_constr;
 }
 
-lstappl_t *lsthunk_get_appl(const lsthunk_t *thunk) {
+lsthunk_t *lsthunk_get_func(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_APPL);
-  return thunk->lt_appl;
+  return thunk->lt_appl.lta_func;
 }
 
-lstchoice_t *lsthunk_get_choice(const lsthunk_t *thunk) {
+lssize_t lsthunk_get_argc(const lsthunk_t *thunk) {
+  assert(thunk->lt_type == LSTTYPE_ALGE || thunk->lt_type == LSTTYPE_APPL);
+  return thunk->lt_type == LSTTYPE_ALGE ? thunk->lt_alge.lta_argc
+                                        : thunk->lt_appl.lta_argc;
+}
+
+lsthunk_t *const *lsthunk_get_args(const lsthunk_t *thunk) {
+  assert(thunk->lt_type == LSTTYPE_ALGE || thunk->lt_type == LSTTYPE_APPL);
+  return thunk->lt_type == LSTTYPE_ALGE ? thunk->lt_alge.lta_args
+                                        : thunk->lt_appl.lta_args;
+}
+
+lsthunk_t *lsthunk_get_left(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_CHOICE);
-  return thunk->lt_choice;
+  return thunk->lt_choice.ltc_left;
 }
 
-lstlambda_t *lsthunk_get_lambda(const lsthunk_t *thunk) {
+lsthunk_t *lsthunk_get_right(const lsthunk_t *thunk) {
+  assert(thunk->lt_type == LSTTYPE_CHOICE);
+  return thunk->lt_choice.ltc_right;
+}
+
+lstpat_t *lsthunk_get_param(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_LAMBDA);
-  return thunk->lt_lambda;
+  return thunk->lt_lambda.ltl_param;
 }
 
-lstref_t *lsthunk_get_ref(const lsthunk_t *thunk) {
+lsthunk_t *lsthunk_get_body(const lsthunk_t *thunk) {
+  assert(thunk->lt_type == LSTTYPE_LAMBDA);
+  return thunk->lt_lambda.ltl_body;
+}
+
+lstref_target_t *lsthunk_get_ref_target(const lsthunk_t *thunk) {
   assert(thunk->lt_type == LSTTYPE_REF);
-  return thunk->lt_ref;
+  return thunk->lt_ref.ltr_target;
 }
 
 const lsint_t *lsthunk_get_int(const lsthunk_t *thunk) {
@@ -153,19 +259,17 @@ const lsstr_t *lsthunk_get_str(const lsthunk_t *thunk) {
   return thunk->lt_str;
 }
 
-lsmres_t lsthunk_match_palge(lsthunk_t *thunk, const lspalge_t *palge,
-                             lstenv_t *tenv) {
+lsmres_t lsthunk_match_palge(lsthunk_t *thunk, const lspalge_t *palge) {
   assert(palge != NULL);
   lsthunk_t *thunk_whnf = lsthunk_eval(thunk);
   lsttype_t ttype = lsthunk_get_type(thunk_whnf);
   if (ttype != LSTTYPE_ALGE)
     return LSMATCH_FAILURE;
-  lstalge_t *talge = lsthunk_get_alge(thunk_whnf);
-  const lsstr_t *tconstr = lstalge_get_constr(talge);
+  const lsstr_t *tconstr = lsthunk_get_constr(thunk_whnf);
   const lsstr_t *pconstr = lspalge_get_constr(palge);
   if (lsstrcmp(pconstr, tconstr) != 0)
     return LSMATCH_FAILURE;
-  const lsplist_t *pargs = lspalge_get_args(palge);
+  const lspat_t *pargs = lspalge_get_args(palge);
   lssize_t pargc = lspalge_get_arg_count(palge);
   lssize_t targc = lstalge_get_arg_count(talge);
   if (pargc != targc)

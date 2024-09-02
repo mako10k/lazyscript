@@ -26,7 +26,7 @@ lsapi_eappl_new const lseappl_t *lseappl_new(const lsexpr_t *func, size_t argc,
  * @param arg The argument to add.
  * @return The new application expression.
  */
-lsapi_eappl_add_arg const lseappl_t *lseappl_add_arg(lseappl_t *eappl,
+lsapi_eappl_add_arg const lseappl_t *lseappl_add_arg(const lseappl_t *eappl,
                                                      const lsexpr_t *arg);
 
 /**

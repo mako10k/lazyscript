@@ -10,7 +10,7 @@ struct lseclosure {
 };
 
 const lseclosure_t *lseclosure_new(const lsexpr_t *expr, size_t bindc,
-                                   const lsbind_t *binds[]) {
+                                   const lsbind_t *const *binds) {
   lseclosure_t *eclosure =
       lsmalloc(sizeof(lseclosure_t) + bindc * sizeof(lsbind_t *));
   eclosure->lec_expr = expr;
@@ -18,6 +18,18 @@ const lseclosure_t *lseclosure_new(const lsexpr_t *expr, size_t bindc,
   for (lssize_t i = 0; i < bindc; i++)
     eclosure->lec_binds[i] = binds[i];
   return eclosure;
+}
+
+const lsexpr_t *lseclosure_get_expr(const lseclosure_t *eclosure) {
+  return eclosure->lec_expr;
+}
+
+lssize_t lseclosure_get_bindc(const lseclosure_t *eclosure) {
+  return eclosure->lec_bindc;
+}
+
+const lsbind_t *const *lseclosure_get_binds(const lseclosure_t *eclosure) {
+  return eclosure->lec_binds;
 }
 
 void lseclosure_print(FILE *stream, lsprec_t prec, int indent,

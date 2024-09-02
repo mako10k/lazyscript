@@ -1,6 +1,7 @@
 #include "thunk/tenv.h"
 #include "common/hash.h"
 #include "common/malloc.h"
+#include "thunk/thunk.h"
 #include <assert.h>
 
 typedef struct lscounter {
@@ -30,33 +31,33 @@ lstenv_t *lstenv_new(const lstenv_t *const parent) {
   return tenv;
 }
 
-lstref_t *lstenv_get(const lstenv_t *tenv, const lsstr_t *name) {
+lstref_target_t *lstenv_get(const lstenv_t *tenv, const lsstr_t *name) {
   assert(tenv != NULL);
   assert(name != NULL);
-  lstref_t *tref;
-  int found = lshash_get(tenv->lee_refs, name, (lshash_data_t *)&tref);
+  lstref_target_t *target;
+  int found = lshash_get(tenv->lee_refs, name, (lshash_data_t *)&target);
   if (found)
-    return tref;
+    return target;
   if (tenv->lee_parent != NULL)
     return lstenv_get(tenv->lee_parent, name);
   return NULL;
 }
 
-lstref_t *lstenv_get_self(const lstenv_t *tenv, const lsstr_t *name) {
+lstref_target_t *lstenv_get_self(const lstenv_t *tenv, const lsstr_t *name) {
   assert(tenv != NULL);
   assert(name != NULL);
-  lstref_t *tref;
-  int found = lshash_get(tenv->lee_refs, name, (lshash_data_t *)&tref);
+  lstref_target_t *target;
+  int found = lshash_get(tenv->lee_refs, name, (lshash_data_t *)&target);
   if (found)
-    return tref;
+    return target;
   return NULL;
 }
 
-void lstenv_put(lstenv_t *tenv, const lsstr_t *name, const lstref_t *tref) {
+void lstenv_put(lstenv_t *tenv, const lsstr_t *name, lstref_target_t *target) {
   assert(tenv != NULL);
   assert(name != NULL);
-  assert(tref != NULL);
-  lshash_put(tenv->lee_refs, name, tref, NULL);
+  assert(target != NULL);
+  lshash_put(tenv->lee_refs, name, target, NULL);
 }
 
 void lstenv_incr_nwarnings(lstenv_t *tenv) {

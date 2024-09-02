@@ -22,7 +22,7 @@ lsapi_elambda_new const lselambda_t *lselambda_new(const lspat_t *arg,
  * @param elambda The lambda expression.
  * @return The argument pattern.
  */
-lsapi_get const lspat_t *lselambda_get_arg(const lselambda_t *elambda);
+lsapi_get const lspat_t *lselambda_get_param(const lselambda_t *elambda);
 
 /**
  * Get the body of a lambda expression.

@@ -19,7 +19,7 @@ const lseappl_t *lseappl_new(const lsexpr_t *func, size_t argc,
   return eappl;
 }
 
-const lseappl_t *lseappl_add_arg(lseappl_t *eappl, const lsexpr_t *arg) {
+const lseappl_t *lseappl_add_arg(const lseappl_t *eappl, const lsexpr_t *arg) {
   lssize_t argc = eappl->lea_argc;
   lseappl_t *eappl_new =
       lsmalloc(sizeof(lseappl_t) + (argc + 1) * sizeof(lsexpr_t *));
