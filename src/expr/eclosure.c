@@ -2,6 +2,7 @@
 #include "common/io.h"
 #include "common/malloc.h"
 #include "expr/expr.h"
+#include <assert.h>
 
 struct lseclosure {
   const lsexpr_t *lec_expr;
@@ -11,12 +12,21 @@ struct lseclosure {
 
 const lseclosure_t *lseclosure_new(const lsexpr_t *expr, size_t bindc,
                                    const lsbind_t *const *binds) {
+  assert(bindc == 0 || binds != NULL);
   lseclosure_t *eclosure =
       lsmalloc(sizeof(lseclosure_t) + bindc * sizeof(lsbind_t *));
+#ifdef DEBUG
+  lsprintf(stderr, 0, "D: lseclosure_new: closure=%p, expr=%p, bindc=%zu\n",
+           eclosure, expr, bindc);
+#endif
   eclosure->lec_expr = expr;
   eclosure->lec_bindc = bindc;
-  for (lssize_t i = 0; i < bindc; i++)
+  for (lssize_t i = 0; i < bindc; i++) {
+#ifdef DEBUG
+    lsprintf(stderr, 0, "D: lseclosure_new: binds[%zd]=%p\n", i, binds[i]);
+#endif
     eclosure->lec_binds[i] = binds[i];
+  }
   return eclosure;
 }
 

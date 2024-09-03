@@ -154,7 +154,10 @@ const lsarray_t *lsarray_newv(lssize_t size, va_list ap) {
   const void **values = lsmalloc(size * sizeof(void *));
   for (lssize_t i = 0; i < size; i++)
     values[i] = va_arg(ap, void *);
-  return lsarray_newa(size, values);
+  lsarray_t *ary = lsmalloc(sizeof(lsarray_t));
+  ary->la_size = size;
+  ary->la_values = values;
+  return ary;
 }
 
 const lsarray_t *lsarray_newa(lssize_t size, const void *const *values) {
@@ -170,9 +173,9 @@ const lsarray_t *lsarray_newa(lssize_t size, const void *const *values) {
 const lsarray_t *lsarray_new(lssize_t size, ...) {
   va_list ap;
   va_start(ap, size);
-  const void *const *values = lsa_newv(size, ap);
+  const lsarray_t *ary = lsarray_newv(size, ap);
   va_end(ap);
-  return lsarray_newa(size, values);
+  return ary;
 }
 
 const void *const *lsarray_get(const lsarray_t *ary) {

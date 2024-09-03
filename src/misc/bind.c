@@ -9,10 +9,14 @@ struct lsbind {
 };
 
 const lsbind_t *lsbind_new(const lspat_t *lhs, const lsexpr_t *rhs) {
-  lsbind_t *ent = lsmalloc(sizeof(lsbind_t));
-  ent->lbe_lhs = lhs;
-  ent->lbe_rhs = rhs;
-  return ent;
+  lsbind_t *bind = lsmalloc(sizeof(lsbind_t));
+  bind->lbe_lhs = lhs;
+  bind->lbe_rhs = rhs;
+#ifdef DEBUG
+  lsprintf(stderr, 0, "D: lsbind_new: bind=%p, lhs=%p, rhs=%p\n", bind, lhs,
+           rhs);
+#endif
+  return bind;
 }
 
 void lsbind_print(FILE *fp, lsprec_t prec, int indent, const lsbind_t *bind) {

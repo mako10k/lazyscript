@@ -5,7 +5,7 @@ typedef struct lseclosure lseclosure_t;
 #include "expr/expr.h"
 #include "misc/bind.h"
 
-#define lsapi_eclosure_new lsapi_nn13 lsapi_wur
+#define lsapi_eclosure_new lsapi_nn1 lsapi_wur
 
 /**
  * Create a new expression closure.
