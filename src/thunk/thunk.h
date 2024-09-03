@@ -8,6 +8,7 @@ typedef struct lstbind lstbind_t;
 typedef struct lstlambda lstlambda_t;
 typedef struct lstref lstref_t;
 typedef struct lstref_target lstref_target_t;
+typedef struct lstinternal lstinternal_t;
 
 typedef enum lstrtype { LSTRTYPE_BIND, LSTRTYPE_LAMBDA } lstrtype_t;
 
@@ -28,6 +29,7 @@ typedef enum lsttype {
   LSTTYPE_LAMBDA,
   LSTTYPE_REF,
   LSTTYPE_STR,
+  LSTTYPE_INTERNAL
 } lsttype_t;
 
 /**
@@ -162,29 +164,30 @@ lstpat_t *lsthunk_get_param(const lsthunk_t *thunk);
 lsthunk_t *lsthunk_get_body(const lsthunk_t *thunk);
 
 lstref_target_t *lsthunk_get_ref_target(const lsthunk_t *thunk);
+
 /**
  * Associate a thunk with an algebraic pattern
  * @param thunk The thunk
- * @param alge The algebraic pattern
+ * @param tpat The algebraic pattern
  * @return result
  */
-lsmres_t lsthunk_match_palge(lsthunk_t *thunk, const lspalge_t *alge);
+lsmres_t lsthunk_match_alge(lsthunk_t *thunk, lstpat_t *tpat);
 
 /**
  * Associate a thunk with an as pattern
  * @param thunk The thunk
- * @param pas The as pattern
+ * @param tpat The as pattern
  * @return result
  */
-lsmres_t lsthunk_match_pas(lsthunk_t *thunk, const lspas_t *pas);
+lsmres_t lsthunk_match_pas(lsthunk_t *thunk, lstpat_t *tpat);
 
 /**
  * Associate a thunk with a reference pattern
  * @param thunk The thunk
- * @param ref The reference pattern
+ * @param tpat The reference pattern
  * @return result
  */
-lsmres_t lsthunk_match_pref(lsthunk_t *thunk, const lsref_t *ref);
+lsmres_t lsthunk_match_ref(lsthunk_t *thunk, lstpat_t *tpat);
 
 /**
  * Associate a thunk with a pattern
@@ -192,7 +195,7 @@ lsmres_t lsthunk_match_pref(lsthunk_t *thunk, const lsref_t *ref);
  * @param pat The pattern
  * @return result
  */
-lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lspat_t *pat);
+lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat);
 
 /**
  * Evaluate a thunk to WHNF (Weak Head Normal Form)
@@ -207,4 +210,4 @@ lsthunk_t *lsthunk_eval(lsthunk_t *thunk);
  * @param args The arguments
  * @return The result of the application
  */
-lsthunk_t *lsthunk_apply(lsthunk_t *func, int argc, lsthunk_t *const *args);
+lsthunk_t *lsthunk_apply(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);

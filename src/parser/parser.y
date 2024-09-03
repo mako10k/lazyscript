@@ -116,7 +116,7 @@ bind_single:
     ;
 
 bind_list:
-      ';' bind_single { $$ = lsarray(1, &$2); }
+      ';' bind_single { $$ = lsarray_new(1, &$2); }
     | bind_list ';' bind_single { $$ = lsarray_push($1, $3); }
     ;
 

@@ -4,6 +4,7 @@
 #include "pat/pas.h"
 #include "pat/pat.h"
 #include "thunk/thunk.h"
+#include <assert.h>
 #include <stddef.h>
 
 typedef struct lstpalge lstpalge_t;
@@ -17,12 +18,12 @@ struct lstpalge {
 };
 
 struct lstpref {
-  const lsstr_t *ltpf_refname;
+  const lsref_t *ltpf_ref;
   lsthunk_t *ltpf_refthunk;
 };
 
 struct lstpas {
-  lstpref_t ltpa_ref;
+  lstpat_t *ltpa_ref;
   lstpat_t *ltpa_aspattern;
 };
 
@@ -35,6 +36,7 @@ struct lstpat {
     const lsstr_t *ltp_strval;
     lstpas_t ltp_as;
   };
+  lsmres_t ltp_res;
 };
 
 lstpat_t *lstpat_new_alge(const lsstr_t *constr, lssize_t argc,
@@ -49,19 +51,18 @@ lstpat_t *lstpat_new_alge(const lsstr_t *constr, lssize_t argc,
   return tpat;
 }
 
-lstpat_t *lstpat_new_ref(const lsstr_t *refname) {
+lstpat_t *lstpat_new_ref(const lsref_t *ref) {
   lstpat_t *tpat = lsmalloc(lssizeof(lstpat_t, ltp_ref));
   tpat->type = LSPTYPE_REF;
-  tpat->ltp_ref.ltpf_refname = refname;
+  tpat->ltp_ref.ltpf_ref = ref;
   tpat->ltp_ref.ltpf_refthunk = NULL;
   return tpat;
 }
 
-lstpat_t *lstpat_new_as(const lsstr_t *refname, lstpat_t *aspattern) {
+lstpat_t *lstpat_new_as(const lsref_t *ref, lstpat_t *aspattern) {
   lstpat_t *tpat = lsmalloc(lssizeof(lstpat_t, ltp_as));
   tpat->type = LSPTYPE_AS;
-  tpat->ltp_as.ltpa_ref.ltpf_refname = refname;
-  tpat->ltp_as.ltpa_ref.ltpf_refthunk = NULL;
+  tpat->ltp_as.ltpa_ref = lstpat_new_ref(ref);
   tpat->ltp_as.ltpa_aspattern = aspattern;
   return tpat;
 }
@@ -99,20 +100,51 @@ lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv) {
   }
   case LSPTYPE_REF: {
     const lsref_t *pref = lspat_get_ref(pat);
-    const lsstr_t *refname = lsref_get_name(pref);
-    return lstpat_new_ref(refname);
+    return lstpat_new_ref(pref);
   }
   case LSPTYPE_AS: {
     const lspas_t *pas = lspat_get_as(pat);
     const lsref_t *pref = lspas_get_ref(pas);
-    const lsstr_t *refname = lsref_get_name(pref);
     const lspat_t *paspattern = lspas_get_pat(pas);
     lstpat_t *taspattern = lstpat_new_pat(paspattern, tenv);
-    return lstpat_new_as(refname, taspattern);
+    return lstpat_new_as(pref, taspattern);
   }
   case LSPTYPE_INT:
     return lstpat_new_int(lspat_get_int(pat));
   case LSPTYPE_STR:
     return lstpat_new_str(lspat_get_str(pat));
   }
+}
+
+lsptype_t lstpat_get_type(const lstpat_t *pat) { return pat->type; }
+
+const lsstr_t *lstpat_get_constr(const lstpat_t *pat) {
+  assert(pat->type == LSPTYPE_ALGE);
+  return pat->ltp_alge.ltpa_constr;
+}
+
+lssize_t lstpat_get_argc(const lstpat_t *pat) {
+  assert(pat->type == LSPTYPE_ALGE);
+  return pat->ltp_alge.ltpa_argc;
+}
+
+lstpat_t *const *lstpat_get_args(const lstpat_t *pat) {
+  assert(pat->type == LSPTYPE_ALGE);
+  return pat->ltp_alge.ltpa_args;
+}
+
+lstpat_t *lstpat_get_ref(const lstpat_t *pat) {
+  assert(pat->type == LSPTYPE_AS);
+  return pat->ltp_as.ltpa_ref;
+}
+
+lstpat_t *lstpat_get_aspattern(const lstpat_t *pat) {
+  assert(pat->type == LSPTYPE_AS);
+  return pat->ltp_as.ltpa_aspattern;
+}
+
+void lstpat_set_reftarget(lstpat_t *pat, lsthunk_t *target) {
+  assert(pat->type == LSPTYPE_REF);
+  assert(pat->ltp_ref.ltpf_refthunk == NULL);
+  pat->ltp_ref.ltpf_refthunk = target;
 }
