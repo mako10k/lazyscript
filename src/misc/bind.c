@@ -25,3 +25,7 @@ void lsbind_print(FILE *fp, lsprec_t prec, int indent, const lsbind_t *bind) {
   lsprintf(fp, indent, " = ");
   lsexpr_print(fp, prec, indent, bind->lbe_rhs);
 }
+
+const lspat_t *lsbind_get_lhs(const lsbind_t *bind) { return bind->lbe_lhs; }
+
+const lsexpr_t *lsbind_get_rhs(const lsbind_t *bind) { return bind->lbe_rhs; }

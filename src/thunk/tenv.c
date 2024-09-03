@@ -89,3 +89,14 @@ lssize_t lstenv_get_nfatals(const lstenv_t *tenv) {
   assert(tenv != NULL);
   return tenv->lee_counter->lc_nfatal;
 }
+
+void lstenv_put_builtin(lstenv_t *tenv, const lsstr_t *name, lssize_t arity,
+                        lstbuiltin_func_t func, void *data) {
+  assert(tenv != NULL);
+  assert(name != NULL);
+  assert(func != NULL);
+  lstref_target_origin_t *origin =
+      lstref_target_origin_new_builtin(arity, func, data);
+  lstref_target_t *target = lstref_target_new(origin, NULL);
+  lstenv_put(tenv, name, target);
+}

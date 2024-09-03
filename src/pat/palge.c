@@ -124,3 +124,5 @@ const lspat_t *const *lspalge_get_args(const lspalge_t *alge) {
   assert(alge != NULL);
   return alge->lpa_args;
 }
+
+lssize_t lspalge_get_argc(const lspalge_t *palge) { return palge->lpa_argc; }

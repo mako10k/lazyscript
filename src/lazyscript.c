@@ -1,6 +1,7 @@
 #include "lazyscript.h"
 #include "misc/prog.h"
 #include "parser/parser.h"
+#include "thunk/thunk.h"
 #include <string.h>
 
 #include "parser/lexer.h"
@@ -87,7 +88,25 @@ int main(int argc, char **argv) {
     if (strcmp(filename, "-") == 0)
       filename = "/dev/stdin";
     const lsprog_t *prog = lsparse_file(argv[i]);
-    if (prog != NULL)
+    if (prog != NULL) {
+#ifdef DEBUG
       lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+#endif
+      lstenv_t *tenv = lstenv_new(NULL);
+      lstbuiltin_func_t lsbuiltin_print;
+      lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
+      lsprog_eval(prog, tenv);
+    }
   }
+}
+
+static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
+                                  void *data) {
+  assert(args != NULL);
+  for (lssize_t i = 0; i < argc; i++) {
+    if (i > 0)
+      printf(" ");
+    lsthunk_print(stdout, LSPREC_LOWEST, 0, args[i]);
+  }
+  return args[0];
 }

@@ -9,13 +9,23 @@ typedef struct lstlambda lstlambda_t;
 typedef struct lstref lstref_t;
 typedef struct lstref_target lstref_target_t;
 typedef struct lstref_target_origin lstref_target_origin_t;
-typedef struct lstinternal lstinternal_t;
+typedef struct lstbuiltin lstbuiltin_t;
 
-typedef enum lstrtype { LSTRTYPE_BIND, LSTRTYPE_LAMBDA } lstrtype_t;
+typedef enum lstrtype {
+  LSTRTYPE_BIND,
+  LSTRTYPE_LAMBDA,
+  LSTRTYPE_BUILTIN
+} lstrtype_t;
+
+#include "lstypes.h"
+
+typedef lsthunk_t *(*lstbuiltin_func_t)(lsthunk_t *, lssize_t,
+                                        lsthunk_t *const *, void *);
 
 #include "common/int.h"
 #include "common/str.h"
 #include "expr/ealge.h"
+#include "misc/prog.h"
 #include "pat/palge.h"
 #include "pat/pas.h"
 #include "pat/pat.h"
@@ -30,7 +40,7 @@ typedef enum lsttype {
   LSTTYPE_LAMBDA,
   LSTTYPE_REF,
   LSTTYPE_STR,
-  LSTTYPE_INTERNAL
+  LSTTYPE_BUILTIN
 } lsttype_t;
 
 /**
@@ -213,4 +223,13 @@ lsthunk_t *lsthunk_eval0(lsthunk_t *thunk);
  */
 lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
 
-lstref_target_t *lstref_target_new(lstref_target_origin_t *origin, lstpat_t *tpat);
+lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
+                                   lstpat_t *tpat);
+
+lstref_target_origin_t *lstref_target_origin_new_builtin(lssize_t arity,
+                                                         lstbuiltin_func_t func,
+                                                         void *data);
+
+lsthunk_t *lsprog_eval(const lsprog_t *prog, lstenv_t *tenv);
+
+void lsthunk_print(FILE *fp, lsprec_t prec, int indent, const lsthunk_t *thunk);

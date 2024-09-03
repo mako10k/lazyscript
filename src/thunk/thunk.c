@@ -41,6 +41,7 @@ struct lstref_target_origin {
   union {
     lstbind_t lrto_bind;
     lstlambda_t lrto_lambda;
+    lsthunk_t *lrto_builtin;
   };
 };
 
@@ -54,9 +55,9 @@ struct lstref {
   lstref_target_t *ltr_target;
 };
 
-struct lstinternal {
-  lssize_t lti_affinity;
-  lsthunk_t *(*lti_func)(lsthunk_t *, lssize_t, lsthunk_t *const *, void *);
+struct lstbuiltin {
+  lssize_t lti_arity;
+  lstbuiltin_func_t lti_func;
   void *lti_data;
 };
 
@@ -71,7 +72,7 @@ struct lsthunk {
     lstref_t lt_ref;
     const lsint_t *lt_int;
     const lsstr_t *lt_str;
-    const lstinternal_t lt_internal;
+    const lstbuiltin_t *lt_builtin;
   };
 };
 
@@ -421,6 +422,32 @@ static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
   return lsthunk_eval(body, argc - 1, args1);
 }
 
+static lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
+                                       lsthunk_t *const *args) {
+  assert(thunk != NULL);
+  assert(thunk->lt_type == LSTTYPE_BUILTIN);
+  if (argc == 0)
+    return thunk;
+  lssize_t arity = thunk->lt_builtin->lti_arity;
+  lstbuiltin_func_t func = thunk->lt_builtin->lti_func;
+  void *data = thunk->lt_builtin->lti_data;
+  if (argc < arity) {
+    lsthunk_t *ret =
+        lsmalloc(lssizeof(lsthunk_t, lt_appl) + argc * sizeof(lsthunk_t *));
+    ret->lt_type = LSTTYPE_APPL;
+    ret->lt_whnf = ret;
+    ret->lt_appl.lta_func = thunk;
+    ret->lt_appl.lta_argc = argc;
+    for (lssize_t i = 0; i < argc; i++)
+      ret->lt_appl.lta_args[i] = args[i];
+    return ret;
+  }
+  lsthunk_t *ret = func(thunk, arity, args, data);
+  if (ret == NULL)
+    return NULL;
+  return lsthunk_eval(ret, argc - arity, args + arity);
+}
+
 static lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
                                    lsthunk_t *const *args) {
   // apply ~r x y ... = apply (eval ~r) x y ...
@@ -455,6 +482,8 @@ static lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
     assert(refbound != NULL);
     return lsthunk_eval(refbound, argc, args);
   }
+  case LSTRTYPE_BUILTIN:
+    return lsthunk_eval_builtin(origin->lrto_builtin, argc, args);
   }
 }
 
@@ -483,33 +512,6 @@ static lsthunk_t *lsthunk_eval_choice(lsthunk_t *thunk, lssize_t argc,
   return choice;
 }
 
-static lsthunk_t *lsthunk_eval_internal(lsthunk_t *thunk, lssize_t argc,
-                                        lsthunk_t *const *args) {
-  assert(thunk != NULL);
-  assert(thunk->lt_type == LSTTYPE_INTERNAL);
-  if (argc == 0)
-    return thunk;
-  lssize_t affinity = thunk->lt_internal.lti_affinity;
-  lsthunk_t *(*func)(lsthunk_t *, lssize_t, lsthunk_t *const *, void *) =
-      thunk->lt_internal.lti_func;
-  void *data = thunk->lt_internal.lti_data;
-  if (argc < affinity) {
-    lsthunk_t *ret =
-        lsmalloc(lssizeof(lsthunk_t, lt_appl) + argc * sizeof(lsthunk_t *));
-    ret->lt_type = LSTTYPE_APPL;
-    ret->lt_whnf = ret;
-    ret->lt_appl.lta_func = thunk;
-    ret->lt_appl.lta_argc = argc;
-    for (lssize_t i = 0; i < argc; i++)
-      ret->lt_appl.lta_args[i] = args[i];
-    return ret;
-  }
-  lsthunk_t *ret = func(thunk, affinity, args, data);
-  if (ret == NULL)
-    return NULL;
-  return lsthunk_eval(ret, argc - affinity, args + affinity);
-}
-
 lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc,
                         lsthunk_t *const *args) {
   assert(func != NULL);
@@ -532,8 +534,8 @@ lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc,
   case LSTTYPE_STR:
     lsprintf(stderr, 0, "F: cannot apply for string\n");
     return NULL;
-  case LSTTYPE_INTERNAL:
-    return lsthunk_eval_internal(func, argc, args);
+  case LSTTYPE_BUILTIN:
+    return lsthunk_eval_builtin(func, argc, args);
   }
 }
 
@@ -553,8 +555,8 @@ lsthunk_t *lsthunk_eval0(lsthunk_t *thunk) {
   case LSTTYPE_CHOICE:
     thunk->lt_whnf = lsthunk_eval_choice(thunk, 0, NULL);
     break;
-  case LSTTYPE_INTERNAL:
-    thunk->lt_whnf = lsthunk_eval_internal(thunk, 0, NULL);
+  case LSTTYPE_BUILTIN:
+    thunk->lt_whnf = lsthunk_eval_builtin(thunk, 0, NULL);
     break;
   default:
     // it already is in WHNF
@@ -570,4 +572,103 @@ lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
   target->lrt_origin = origin;
   target->lrt_pat = tpat;
   return target;
+}
+
+static lsthunk_t *lsthunk_new_builtin(lssize_t arity, lstbuiltin_func_t func,
+                                      void *data) {
+  lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
+  thunk->lt_type = LSTTYPE_BUILTIN;
+  thunk->lt_whnf = thunk;
+  lstbuiltin_t *builtin = lsmalloc(sizeof(lstbuiltin_t));
+  builtin->lti_arity = arity;
+  builtin->lti_func = func;
+  builtin->lti_data = data;
+  thunk->lt_builtin = builtin;
+  return thunk;
+}
+
+lstref_target_origin_t *lstref_target_origin_new_builtin(lssize_t arity,
+                                                         lstbuiltin_func_t func,
+                                                         void *data) {
+  lstref_target_origin_t *origin = lsmalloc(sizeof(lstref_target_origin_t));
+  origin->lrto_type = LSTRTYPE_BUILTIN;
+  origin->lrto_builtin = lsthunk_new_builtin(arity, func, data);
+  return origin;
+}
+
+lsthunk_t *lsprog_eval(const lsprog_t *prog, lstenv_t *tenv) {
+  lsthunk_t *thunk = lsthunk_new_expr(lsprog_get_expr(prog), tenv);
+  if (thunk == NULL)
+    return NULL;
+  return lsthunk_eval0(thunk);
+}
+
+void lsthunk_print(FILE *fp, lsprec_t prec, int indent,
+                   const lsthunk_t *thunk) {
+  switch (thunk->lt_type) {
+  case LSTTYPE_ALGE:
+    if (thunk->lt_alge.lta_argc == 0) {
+      lsstr_print_bare(fp, prec, indent, thunk->lt_alge.lta_constr);
+      return;
+    }
+    if (prec > LSPREC_APPL)
+      lsprintf(fp, indent, "(");
+    lsstr_print_bare(fp, prec, indent, thunk->lt_alge.lta_constr);
+    for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
+      if (i > 0)
+        lsprintf(fp, indent, " ");
+      lsthunk_print(fp, LSPREC_APPL + 1, indent, thunk->lt_alge.lta_args[i]);
+    }
+    if (prec > LSPREC_APPL)
+      lsprintf(fp, 0, ")");
+    break;
+  case LSTTYPE_APPL:
+    if (thunk->lt_appl.lta_argc == 0) {
+      lsthunk_print(fp, prec, indent, thunk->lt_appl.lta_func);
+      return;
+    }
+    if (prec > LSPREC_APPL)
+      lsprintf(fp, 0, "(");
+    lsthunk_print(fp, LSPREC_APPL + 1, indent, thunk->lt_appl.lta_func);
+    lsprintf(fp, 0, " ");
+    for (lssize_t i = 0; i < thunk->lt_appl.lta_argc; i++) {
+      if (i > 0)
+        lsprintf(fp, 0, " ");
+      lsthunk_print(fp, LSPREC_APPL + 1, indent, thunk->lt_appl.lta_args[i]);
+    }
+    if (prec > LSPREC_APPL)
+      lsprintf(fp, 0, ")");
+    break;
+  case LSTTYPE_CHOICE:
+    if (prec > LSPREC_CHOICE)
+      lsprintf(fp, 0, "(");
+    lsthunk_print(fp, LSPREC_CHOICE + 1, indent, thunk->lt_choice.ltc_left);
+    lsprintf(fp, 0, " | ");
+    lsthunk_print(fp, LSPREC_CHOICE, indent, thunk->lt_choice.ltc_right);
+    if (prec > LSPREC_CHOICE)
+      lsprintf(fp, 0, ")");
+    break;
+  case LSTTYPE_LAMBDA:
+    if (prec > LSPREC_LAMBDA)
+      lsprintf(fp, 0, "(");
+    lsprintf(fp, 0, "\\");
+    lstpat_print(fp, LSPREC_APPL+1, indent, thunk->lt_lambda.ltl_param);
+    lsprintf(fp, 0, " -> ");
+    lsthunk_print(fp, LSPREC_LAMBDA, indent, thunk->lt_lambda.ltl_body);
+    if (prec > LSPREC_LAMBDA)
+      lsprintf(fp, 0, ")");
+    break;
+  case LSTTYPE_REF:
+    lsprintf(fp, indent, "~%s", thunk->lt_ref.ltr_refname);
+    break;
+  case LSTTYPE_INT:
+    lsint_print(fp, prec, indent, thunk->lt_int);
+    break;
+  case LSTTYPE_STR:
+    lsstr_print(fp, prec, indent, thunk->lt_str);
+    break;
+  case LSTTYPE_BUILTIN:
+    lsprintf(fp, 0, "<builtin>");
+    break;
+  }
 }

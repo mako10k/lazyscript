@@ -5,8 +5,9 @@ typedef struct lsscan lsscan_t;
 
 #include "expr/expr.h"
 
-lsprog_t *lsprog_new(const lsexpr_t *expr);
+const lsprog_t *lsprog_new(const lsexpr_t *expr);
 void lsprog_print(FILE *fp, int prec, int indent, const lsprog_t *prog);
+const lsexpr_t *lsprog_get_expr(const lsprog_t *prog);
 
 void yyerror(lsloc_t *loc, lsscan_t *scanner, const char *s);
 

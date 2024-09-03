@@ -18,6 +18,10 @@ const lspat_t *lselambda_get_param(const lselambda_t *elambda) {
   return elambda->lel_param;
 }
 
+const lsexpr_t *lselambda_get_body(const lselambda_t *elambda) {
+  return elambda->lel_body;
+}
+
 void lselambda_print(FILE *fp, lsprec_t prec, int indent,
                      const lselambda_t *elambda) {
   (void)prec;

@@ -12,7 +12,7 @@ struct lsscan {
   const char *ls_filename;
 };
 
-lsprog_t *lsprog_new(const lsexpr_t *expr) {
+const lsprog_t *lsprog_new(const lsexpr_t *expr) {
   lsprog_t *prog = lsmalloc(sizeof(lsprog_t));
   prog->lp_expr = expr;
   return prog;
@@ -22,6 +22,8 @@ void lsprog_print(FILE *fp, int prec, int indent, const lsprog_t *prog) {
   lsexpr_print(fp, prec, indent, prog->lp_expr);
   lsprintf(fp, 0, ";\n");
 }
+
+const lsexpr_t *lsprog_get_expr(const lsprog_t *prog) { return prog->lp_expr; }
 
 void yyerror(lsloc_t *loc, lsscan_t *scanner, const char *s) {
   (void)scanner;
@@ -36,7 +38,9 @@ lsscan_t *lsscan_new(const char *filename) {
   return scanner;
 }
 
-const lsprog_t *lsscan_get_prog(const lsscan_t *scanner) { return scanner->ls_prog; }
+const lsprog_t *lsscan_get_prog(const lsscan_t *scanner) {
+  return scanner->ls_prog;
+}
 
 void lsscan_set_prog(lsscan_t *scanner, const lsprog_t *prog) {
   scanner->ls_prog = prog;

@@ -1,6 +1,8 @@
 #include "thunk/tpat.h"
+#include "common/io.h"
 #include "common/malloc.h"
 #include "common/ref.h"
+#include "lstypes.h"
 #include "pat/palge.h"
 #include "pat/pas.h"
 #include "pat/pat.h"
@@ -158,4 +160,49 @@ void lstpat_set_refbound(lstpat_t *pat, lsthunk_t *thunk) {
   assert(pat->type == LSPTYPE_REF);
   assert(pat->ltp_ref.ltpf_refthunk == NULL);
   pat->ltp_ref.ltpf_refthunk = thunk;
+}
+
+const lsstr_t *lstpat_get_str(const lstpat_t *pat) {
+  assert(pat->type == LSPTYPE_STR);
+  return pat->ltp_strval;
+}
+
+const lsint_t *lstpat_get_int(const lstpat_t *pat) {
+  assert(pat->type == LSPTYPE_INT);
+  return pat->ltp_intval;
+}
+
+void lstpat_print(FILE *fp, lsprec_t prec, int indent, const lstpat_t *pat) {
+  switch (pat->type) {
+  case LSPTYPE_ALGE:
+    if (pat->ltp_alge.ltpa_argc == 0) {
+      lsstr_print_bare(fp, prec, indent, pat->ltp_alge.ltpa_constr);
+      return;
+    }
+    if (prec > LSPREC_APPL)
+      lsprintf(fp, indent, "(");
+    lsstr_print_bare(fp, LSPREC_APPL + 1, indent, pat->ltp_alge.ltpa_constr);
+    for (lssize_t i = 0; i < pat->ltp_alge.ltpa_argc; i++) {
+      lsprintf(fp, indent, " ");
+      lstpat_print(fp, LSPREC_APPL + 1, indent, pat->ltp_alge.ltpa_args[i]);
+    }
+    if (prec > LSPREC_APPL)
+      lsprintf(fp, indent, ")");
+    break;
+  case LSPTYPE_REF:
+    lsref_print(fp, prec, indent, pat->ltp_ref.ltpf_ref);
+    break;
+  case LSPTYPE_AS:
+    lstpat_print(fp, LSPREC_LOWEST, indent, pat->ltp_as.ltpa_ref);
+    lsprintf(fp, indent, "@");
+    lstpat_print(fp, LSPREC_APPL + 1, indent, pat->ltp_as.ltpa_aspattern);
+    lsprintf(fp, indent, ")");
+    break;
+  case LSPTYPE_INT:
+    lsint_print(fp, prec, indent, pat->ltp_intval);
+    break;
+  case LSPTYPE_STR:
+    lsstr_print(fp, prec, indent, pat->ltp_strval);
+    break;
+  }
 }

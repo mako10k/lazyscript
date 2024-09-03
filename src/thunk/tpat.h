@@ -41,3 +41,5 @@ lstpat_t *lstpat_get_aspattern(const lstpat_t *pat);
 const lsint_t *lstpat_get_int(const lstpat_t *pat);
 
 const lsstr_t *lstpat_get_str(const lstpat_t *pat);
+
+void lstpat_print(FILE *fp, lsprec_t prec, int indent, const lstpat_t *pat);
