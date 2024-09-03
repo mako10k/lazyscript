@@ -172,7 +172,7 @@ const lsarray_t *lsarray_new(lssize_t size, ...) {
   va_start(ap, size);
   const void *const *values = lsa_newv(size, ap);
   va_end(ap);
-  return lsarray_new(size, values);
+  return lsarray_newa(size, values);
 }
 
 const void *const *lsarray_get(const lsarray_t *ary) {

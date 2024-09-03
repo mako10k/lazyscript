@@ -1,5 +1,6 @@
 #include "thunk/tpat.h"
 #include "common/malloc.h"
+#include "common/ref.h"
 #include "pat/palge.h"
 #include "pat/pas.h"
 #include "pat/pat.h"
@@ -83,7 +84,8 @@ lstpat_t *lstpat_new_str(const lsstr_t *strval) {
   return tpat;
 }
 
-lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv) {
+lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv,
+                         lstref_target_origin_t *origin) {
   switch (lspat_get_type(pat)) {
   case LSPTYPE_ALGE: {
     const lspalge_t *palge = lspat_get_alge(pat);
@@ -92,7 +94,7 @@ lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv) {
     const lspat_t *const *pargs = lspalge_get_args(palge);
     lstpat_t *targs[argc];
     for (lssize_t i = 0; i < argc; i++) {
-      targs[i] = lstpat_new_pat(pargs[i], tenv);
+      targs[i] = lstpat_new_pat(pargs[i], tenv, origin);
       if (targs[i] == NULL)
         return NULL;
     }
@@ -100,13 +102,17 @@ lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv) {
   }
   case LSPTYPE_REF: {
     const lsref_t *pref = lspat_get_ref(pat);
-    return lstpat_new_ref(pref);
+    const lsstr_t *name = lsref_get_name(pref);
+    lstpat_t *tpat = lstpat_new_ref(pref);
+    lstref_target_t *target = lstref_target_new(origin, tpat);
+    lstenv_put(tenv, name, target);
+    return tpat;
   }
   case LSPTYPE_AS: {
     const lspas_t *pas = lspat_get_as(pat);
     const lsref_t *pref = lspas_get_ref(pas);
     const lspat_t *paspattern = lspas_get_pat(pas);
-    lstpat_t *taspattern = lstpat_new_pat(paspattern, tenv);
+    lstpat_t *taspattern = lstpat_new_pat(paspattern, tenv, origin);
     return lstpat_new_as(pref, taspattern);
   }
   case LSPTYPE_INT:
@@ -143,8 +149,13 @@ lstpat_t *lstpat_get_aspattern(const lstpat_t *pat) {
   return pat->ltp_as.ltpa_aspattern;
 }
 
-void lstpat_set_reftarget(lstpat_t *pat, lsthunk_t *target) {
+lsthunk_t *lstpat_get_refbound(const lstpat_t *pat) {
+  assert(pat->type == LSPTYPE_REF);
+  return pat->ltp_ref.ltpf_refthunk;
+}
+
+void lstpat_set_refbound(lstpat_t *pat, lsthunk_t *thunk) {
   assert(pat->type == LSPTYPE_REF);
   assert(pat->ltp_ref.ltpf_refthunk == NULL);
-  pat->ltp_ref.ltpf_refthunk = target;
+  pat->ltp_ref.ltpf_refthunk = thunk;
 }

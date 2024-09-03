@@ -15,8 +15,8 @@ const lsbind_t *lsbind_new(const lspat_t *lhs, const lsexpr_t *rhs) {
   return ent;
 }
 
-void lsbind_print(FILE *fp, lsprec_t prec, int indent, const lsbind_t *ent) {
-  lspat_print(fp, prec, indent, ent->lbe_lhs);
+void lsbind_print(FILE *fp, lsprec_t prec, int indent, const lsbind_t *bind) {
+  lspat_print(fp, prec, indent, bind->lbe_lhs);
   lsprintf(fp, indent, " = ");
-  lsexpr_print(fp, prec, indent, ent->lbe_rhs);
+  lsexpr_print(fp, prec, indent, bind->lbe_rhs);
 }

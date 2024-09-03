@@ -8,6 +8,7 @@ typedef struct lstbind lstbind_t;
 typedef struct lstlambda lstlambda_t;
 typedef struct lstref lstref_t;
 typedef struct lstref_target lstref_target_t;
+typedef struct lstref_target_origin lstref_target_origin_t;
 typedef struct lstinternal lstinternal_t;
 
 typedef enum lstrtype { LSTRTYPE_BIND, LSTRTYPE_LAMBDA } lstrtype_t;
@@ -202,7 +203,7 @@ lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat);
  * @param thunk The thunk
  * @return The new thunk evaluate to WHNF
  */
-lsthunk_t *lsthunk_eval(lsthunk_t *thunk);
+lsthunk_t *lsthunk_eval0(lsthunk_t *thunk);
 
 /**
  * Apply a thunk to a list of arguments
@@ -210,4 +211,6 @@ lsthunk_t *lsthunk_eval(lsthunk_t *thunk);
  * @param args The arguments
  * @return The result of the application
  */
-lsthunk_t *lsthunk_apply(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
+lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
+
+lstref_target_t *lstref_target_new(lstref_target_origin_t *origin, lstpat_t *tpat);

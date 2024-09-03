@@ -190,7 +190,7 @@ closure:
 
 
 etuple:
-      '(' ')' { $$ = lsealge_new(lsstr_cstr(","), 1, NULL); }
+      '(' ')' { $$ = lsealge_new(lsstr_cstr(","), 0, NULL); }
     | '(' earray ')' {
         lssize_t argc = lsarray_get_size($2);
         const lsexpr_t *const *args = (const lsexpr_t *const *)lsarray_get($2);

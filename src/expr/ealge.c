@@ -1,6 +1,7 @@
 #include "expr/ealge.h"
 #include "common/io.h"
 #include "common/malloc.h"
+#include <assert.h>
 
 struct lsealge {
   const lsstr_t *lea_constr;
@@ -10,6 +11,7 @@ struct lsealge {
 
 const lsealge_t *lsealge_new(const lsstr_t *constr, lssize_t argc,
                              const lsexpr_t *const *args) {
+  assert(argc == 0 || args != NULL);
   lsealge_t *ealge = lsmalloc(sizeof(lsealge_t) + argc * sizeof(lsexpr_t *));
   ealge->lea_constr = constr;
   ealge->lea_argc = argc;
