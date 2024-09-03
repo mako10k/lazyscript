@@ -116,7 +116,7 @@ bind_single:
     ;
 
 bind_list:
-      ';' bind_single { $$ = lsarray_new(1, &$2); }
+      ';' bind_single { $$ = lsarray_new(1, $2); }
     | bind_list ';' bind_single { $$ = lsarray_push($1, $3); }
     ;
 
@@ -198,7 +198,7 @@ etuple:
     ;
 
 earray:
-      expr { $$ = lsarray_new(1, (const void *const *)&$1); }
+      expr { $$ = lsarray_new(1, $1); }
     | earray ',' expr { $$ = lsarray_push($1, $3); }
     ;
 
@@ -261,7 +261,7 @@ ptuple:
     ;
 
 parray:
-      pat { $$ = lsarray_new(1, (const void *const *)&$1); }
+      pat { $$ = lsarray_new(1, $1); }
     | parray ',' pat { $$ = lsarray_push($1, $3); }
     ;
 

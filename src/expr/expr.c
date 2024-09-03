@@ -148,5 +148,5 @@ void lsexpr_print(FILE *fp, lsprec_t prec, int indent, const lsexpr_t *expr) {
     lsechoice_print(fp, prec, indent, expr->le_choice);
     return;
   }
-  lsprintf(fp, indent, "Unknown expression type\n");
+  lsprintf(fp, indent, "Unknown expression type %d\n", expr->le_type);
 }

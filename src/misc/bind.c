@@ -13,8 +13,9 @@ const lsbind_t *lsbind_new(const lspat_t *lhs, const lsexpr_t *rhs) {
   bind->lbe_lhs = lhs;
   bind->lbe_rhs = rhs;
 #ifdef DEBUG
-  lsprintf(stderr, 0, "D: lsbind_new: bind=%p, lhs=%p, rhs=%p\n", bind, lhs,
-           rhs);
+  lsprintf(stderr, 0, "D: lsbind_new: ");
+  lsbind_print(stderr, 0, 0, bind);
+  lsprintf(stderr, 0, "\n");
 #endif
   return bind;
 }
