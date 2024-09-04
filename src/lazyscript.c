@@ -1,4 +1,5 @@
 #include "lazyscript.h"
+#include "common/str.h"
 #include "misc/prog.h"
 #include "parser/parser.h"
 #include "thunk/thunk.h"
@@ -41,15 +42,45 @@ static const lsprog_t *lsparse_string(const char *filename, const char *str) {
   return prog;
 }
 
+static lsthunk_t *lsbuiltin_dump(lssize_t argc, lsthunk_t *const *args,
+                                 void *data) {
+  assert(argc == 1);
+  assert(args != NULL);
+  lsthunk_print(stdout, LSPREC_LOWEST, 0, args[0]);
+  lsprintf(stdout, 0, "\n");
+  return args[0];
+}
+
+static lsthunk_t *lsbuiltin_to_string(lssize_t argc, lsthunk_t *const *args,
+                                      void *data) {
+  assert(argc == 1);
+  assert(args != NULL);
+  size_t len = 0;
+  char *buf = NULL;
+  FILE *fp = open_memstream(&buf, &len);
+  lsthunk_print(fp, LSPREC_LOWEST, 0, args[0]);
+  fclose(fp);
+  const lsstr_t *str = lsstr_new(buf, len);
+  free(buf);
+  return lsthunk_new_str(str);
+}
+
 static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
                                   void *data) {
+  assert(argc == 1);
   assert(args != NULL);
-  for (lssize_t i = 0; i < argc; i++) {
-    if (i > 0)
-      printf(" ");
-    lsthunk_print(stdout, LSPREC_LOWEST, 0, args[i]);
-  }
+  lsthunk_t *thunk_str = args[0];
+  if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
+    thunk_str = lsbuiltin_to_string(1, args, data);
+  const lsstr_t *str = lsthunk_get_str(thunk_str);
+  lsstr_print_bare(stdout, LSPREC_LOWEST, 0, str);
   return args[0];
+}
+
+static void lsbuiltin_prelude(lstenv_t *tenv) {
+  lstenv_put_builtin(tenv, lsstr_cstr("dump"), 1, lsbuiltin_dump, NULL);
+  lstenv_put_builtin(tenv, lsstr_cstr("to_str"), 1, lsbuiltin_to_string, NULL);
+  lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
 }
 
 int main(int argc, char **argv) {
@@ -73,7 +104,7 @@ int main(int argc, char **argv) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
 #endif
         lstenv_t *tenv = lstenv_new(NULL);
-        lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
+        lsbuiltin_prelude(tenv);
         lsprog_eval(prog, tenv);
       }
       break;
@@ -110,7 +141,7 @@ int main(int argc, char **argv) {
       lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
 #endif
       lstenv_t *tenv = lstenv_new(NULL);
-      lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
+      lsbuiltin_prelude(tenv);
       lsprog_eval(prog, tenv);
     }
   }
