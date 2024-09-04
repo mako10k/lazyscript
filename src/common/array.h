@@ -72,7 +72,7 @@ const void *const *lsa_unshift(lssize_t size, const void *const *ary,
  * Create a new C-array without the first element.
  * @param size Size. (must be greater than 0)
  * @param ary C-array. (it must not be NULL)
- * @param pary Pointer to returning the new C-array.
+ * @param pval Pointer to returning the first value.
  * @return Value. (it may be NULL, when size is 1)
  */
 const void *const *lsa_shift(lssize_t size, const void *const *ary,
