@@ -96,16 +96,6 @@ static void lsstr_ht_resize(lsstr_ht_t *str_ht, lssize_t new_capacity) {
   str_ht->lsth_cap = new_str_hash.lsth_cap;
 }
 
-static const lsstr_t **lsstr_ht_put_raw(lsstr_ht_t *str_ht, const char *buf,
-                                        lssize_t len) {
-  assert(str_ht != NULL);
-  assert(buf != NULL);
-  const lsstr_t **pstr = lsstr_ht_get_raw(str_ht, buf, len);
-  *pstr = lsstr_new_raw(buf, len);
-  str_ht->lsth_size++;
-  return pstr;
-}
-
 static const lsstr_t *lsstr_ht_del_raw(lsstr_ht_t *str_ht, const char *buf,
                                        lssize_t len) {
   assert(str_ht != NULL);
@@ -135,18 +125,6 @@ static const lsstr_t *lsstr_ht_del_raw(lsstr_ht_t *str_ht, const char *buf,
   return str;
 }
 
-static const lsstr_t *
-lsstr_ht_put_raw_resizable(lsstr_ht_t *str_ht, const char *buf, lssize_t len) {
-  assert(str_ht != NULL);
-  assert(buf != NULL);
-  lssize_t cap = str_ht->lsth_cap;
-  while ((str_ht->lsth_size + 1) * 2 >= cap)
-    cap *= 2;
-  if (cap != str_ht->lsth_cap)
-    lsstr_ht_resize(str_ht, cap);
-  return *lsstr_ht_put_raw(str_ht, buf, len);
-}
-
 static const lsstr_t *lsstr_ht_del_raw_resizable(lsstr_ht_t *str_hash,
                                                  const lsstr_t *str) {
   assert(str_hash != NULL);
@@ -170,6 +148,31 @@ static void lsstr_finalizer(void *ptr, void *data) {
   assert(str == str2);
 }
 
+static const lsstr_t **lsstr_ht_put_raw(lsstr_ht_t *str_ht, const char *buf,
+                                        lssize_t len) {
+  assert(str_ht != NULL);
+  assert(buf != NULL);
+  const lsstr_t **pstr = lsstr_ht_get_raw(str_ht, buf, len);
+  if (*pstr != NULL)
+    return pstr;
+  *pstr = lsstr_new_raw(buf, len);
+  str_ht->lsth_size++;
+  GC_REGISTER_FINALIZER((void *)*pstr, lsstr_finalizer, NULL, NULL, NULL);
+  return pstr;
+}
+
+static const lsstr_t *
+lsstr_ht_put_raw_resizable(lsstr_ht_t *str_ht, const char *buf, lssize_t len) {
+  assert(str_ht != NULL);
+  assert(buf != NULL);
+  lssize_t cap = str_ht->lsth_cap;
+  while ((str_ht->lsth_size + 1) * 2 >= cap)
+    cap *= 2;
+  if (cap != str_ht->lsth_cap)
+    lsstr_ht_resize(str_ht, cap);
+  return *lsstr_ht_put_raw(str_ht, buf, len);
+}
+
 __attribute__((constructor)) static void lsstr_init(void) {
   g_str_ht.lsth_ents = lsmalloc_atomic(sizeof(const lsstr_t *) * 16);
   g_str_ht.lsth_cap = 16;
@@ -181,7 +184,6 @@ __attribute__((constructor)) static void lsstr_init(void) {
 const lsstr_t *lsstr_new(const char *buf, lssize_t len) {
   assert(buf != NULL);
   const lsstr_t *str = lsstr_ht_put_raw_resizable(&g_str_ht, buf, len);
-  GC_REGISTER_FINALIZER((void *)str, lsstr_finalizer, NULL, NULL, NULL);
   return str;
 }
 
@@ -334,7 +336,7 @@ const lsstr_t *lsstr_parse(const char *cstr, lssize_t slen) {
   size_t len = 0;
   size_t cap = 16;
   while (1) {
-    c = i < len ? cstr[i++] : -1;
+    c = i < slen ? cstr[i++] : -1;
     if (c == '"')
       break;
     if (c == '\\')
