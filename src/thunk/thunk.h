@@ -19,8 +19,7 @@ typedef enum lstrtype {
 
 #include "lstypes.h"
 
-typedef lsthunk_t *(*lstbuiltin_func_t)(lsthunk_t *, lssize_t,
-                                        lsthunk_t *const *, void *);
+typedef lsthunk_t *(*lstbuiltin_func_t)(lssize_t, lsthunk_t *const *, void *);
 
 #include "common/int.h"
 #include "common/str.h"

@@ -41,6 +41,17 @@ static const lsprog_t *lsparse_string(const char *filename, const char *str) {
   return prog;
 }
 
+static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
+                                  void *data) {
+  assert(args != NULL);
+  for (lssize_t i = 0; i < argc; i++) {
+    if (i > 0)
+      printf(" ");
+    lsthunk_print(stdout, LSPREC_LOWEST, 0, args[i]);
+  }
+  return args[0];
+}
+
 int main(int argc, char **argv) {
   struct option longopts[] = {
       {"eval", required_argument, NULL, 'e'},
@@ -57,8 +68,14 @@ int main(int argc, char **argv) {
       char name[32];
       snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
       const lsprog_t *prog = lsparse_string(name, optarg);
-      if (prog != NULL)
+      if (prog != NULL) {
+#ifdef DEBUG
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+#endif
+        lstenv_t *tenv = lstenv_new(NULL);
+        lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
+        lsprog_eval(prog, tenv);
+      }
       break;
     }
     case 'd':
@@ -93,20 +110,8 @@ int main(int argc, char **argv) {
       lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
 #endif
       lstenv_t *tenv = lstenv_new(NULL);
-      lstbuiltin_func_t lsbuiltin_print;
       lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
       lsprog_eval(prog, tenv);
     }
   }
-}
-
-static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
-                                  void *data) {
-  assert(args != NULL);
-  for (lssize_t i = 0; i < argc; i++) {
-    if (i > 0)
-      printf(" ");
-    lsthunk_print(stdout, LSPREC_LOWEST, 0, args[i]);
-  }
-  return args[0];
 }

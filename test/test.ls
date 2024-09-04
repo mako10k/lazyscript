@@ -2,7 +2,7 @@
 {-
 -}
 {
-  "abc";
+  ~print "abc";
   {- \~args -> ~go ~args; -}
   ~go = \[] -> ~prelude exit 0 |
   \(~hd : ~tl) -> ~prelude chain (~prelude println hd) \() -> ~go ~tl;

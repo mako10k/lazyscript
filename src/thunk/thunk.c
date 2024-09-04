@@ -147,7 +147,9 @@ lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstenv_t *tenv) {
   if (target == NULL) {
     lsprintf(stderr, 0, "E: ");
     lsloc_print(stderr, lsref_get_loc(ref));
-    lsprintf(stderr, 0, "undefined reference: %s\n", lsref_get_name(ref));
+    lsprintf(stderr, 0, "undefined reference: ");
+    lsref_print(stderr, LSPREC_LOWEST, 0, ref);
+    lsprintf(stderr, 0, "\n");
     lstenv_incr_nerrors(tenv);
   }
   return thunk;
@@ -442,7 +444,7 @@ static lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
       ret->lt_appl.lta_args[i] = args[i];
     return ret;
   }
-  lsthunk_t *ret = func(thunk, arity, args, data);
+  lsthunk_t *ret = func(arity, args, data);
   if (ret == NULL)
     return NULL;
   return lsthunk_eval(ret, argc - arity, args + arity);
@@ -454,15 +456,15 @@ static lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_REF);
   assert(args != NULL);
-  lstpat_t *pat_ref = lsthunk_get_ref_target(thunk)->lrt_pat;
-  assert(pat_ref != NULL);
-  lsthunk_t *refbound = lstpat_get_refbound(pat_ref);
-  if (refbound != NULL)
-    return lsthunk_eval(refbound, argc, args);
   lstref_target_t *target = thunk->lt_ref.ltr_target;
   assert(target != NULL);
   lstref_target_origin_t *origin = target->lrt_origin;
   assert(origin != NULL);
+  lstpat_t *pat_ref = target->lrt_pat;
+  assert(pat_ref != NULL);
+  lsthunk_t *refbound = lstpat_get_refbound(pat_ref);
+  if (refbound != NULL)
+    return lsthunk_eval(refbound, argc, args);
   switch (origin->lrto_type) {
   case LSTRTYPE_BIND: {
     lsmres_t mres =
@@ -546,8 +548,8 @@ lsthunk_t *lsthunk_eval0(lsthunk_t *thunk) {
   switch (thunk->lt_type) {
   case LSTTYPE_APPL:
     thunk->lt_whnf =
-        lsthunk_eval_appl(thunk->lt_appl.lta_func, thunk->lt_appl.lta_argc,
-                          thunk->lt_appl.lta_args);
+        lsthunk_eval(thunk->lt_appl.lta_func, thunk->lt_appl.lta_argc,
+                     thunk->lt_appl.lta_args);
     break;
   case LSTTYPE_REF:
     thunk->lt_whnf = lsthunk_eval_ref(thunk, 0, NULL);
