@@ -33,7 +33,7 @@ const lsealge_t *lsealge_add_arg(const lsealge_t *ealge, const lsexpr_t *arg) {
 }
 
 const lsealge_t *lsealge_concat_args(const lsealge_t *ealge, lssize_t argc,
-                                     const lsexpr_t *args[]) {
+                                     const lsexpr_t *const *args) {
   lssize_t argc0 = ealge->lea_argc;
   lsealge_t *ealge_new =
       lsmalloc(sizeof(lsealge_t) + (argc0 + argc) * sizeof(lsexpr_t *));

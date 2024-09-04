@@ -34,12 +34,13 @@ lsapi_ealge_add_arg const lsealge_t *lsealge_add_arg(const lsealge_t *ealge,
 /**
  * Concatenate arguments to the algebraic expression.
  * @param ealge The algebraic expression.
+ * @param argc The number of arguments.
  * @param args The arguments to concatenate.
  * @return The algebraic expression with the arguments concatenated.
  */
 lsapi_ealge_concat_args const lsealge_t *
 lsealge_concat_args(const lsealge_t *ealge, lssize_t argc,
-                    const lsexpr_t *args[]);
+                    const lsexpr_t *const *args);
 
 /**
  * Get the constructor of the algebraic expression.

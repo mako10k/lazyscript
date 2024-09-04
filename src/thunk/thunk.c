@@ -311,7 +311,7 @@ lsmres_t lsthunk_match_pas(lsthunk_t *thunk, lstpat_t *tpat) {
 /**
  * Match an integer value with a thunk
  * @param thunk The thunk
- * @param intval The integer value
+ * @param tpat The integer value
  * @return The result
  */
 static lsmres_t lsthunk_match_int(lsthunk_t *thunk, lstpat_t *tpat) {
@@ -327,7 +327,7 @@ static lsmres_t lsthunk_match_int(lsthunk_t *thunk, lstpat_t *tpat) {
 /**
  * Match a string value with a thunk
  * @param thunk The thunk
- * @param strval The string value
+ * @param tpat The string value
  * @return The result
  */
 static lsmres_t lsthunk_match_str(lsthunk_t *thunk, const lstpat_t *tpat) {
@@ -413,9 +413,9 @@ static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
   assert(args != NULL);
   lstpat_t *param = lsthunk_get_param(thunk);
   lsthunk_t *body = lsthunk_get_body(thunk);
-  lsthunk_t *const *args1;
-  lsthunk_t *arg = (lsthunk_t *)lsa_shift(argc, (const void *const *)args,
-                                          (const void *const **)&args1);
+  lsthunk_t *arg;
+  lsthunk_t *const *args1 = (lsthunk_t *const *)lsa_shift(
+      argc, (const void *const *)args, (const void **)&args);
   lsmres_t mres = lsthunk_match_pat(arg, param);
   if (mres != LSMATCH_SUCCESS)
     return NULL;
@@ -652,7 +652,7 @@ void lsthunk_print(FILE *fp, lsprec_t prec, int indent,
     if (prec > LSPREC_LAMBDA)
       lsprintf(fp, 0, "(");
     lsprintf(fp, 0, "\\");
-    lstpat_print(fp, LSPREC_APPL+1, indent, thunk->lt_lambda.ltl_param);
+    lstpat_print(fp, LSPREC_APPL + 1, indent, thunk->lt_lambda.ltl_param);
     lsprintf(fp, 0, " -> ");
     lsthunk_print(fp, LSPREC_LAMBDA, indent, thunk->lt_lambda.ltl_body);
     if (prec > LSPREC_LAMBDA)

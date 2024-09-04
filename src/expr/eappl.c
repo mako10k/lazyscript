@@ -51,10 +51,6 @@ const lsexpr_t *lseappl_get_func(const lseappl_t *eappl) {
 
 lssize_t lseappl_get_argc(const lseappl_t *eappl) { return eappl->lea_argc; }
 
-const lsexpr_t *lseappl_get_arg(const lseappl_t *eappl, lssize_t i) {
-  return eappl->lea_args[i];
-}
-
 const lsexpr_t *const *lseappl_get_args(const lseappl_t *eappl) {
   return eappl->lea_args;
 }

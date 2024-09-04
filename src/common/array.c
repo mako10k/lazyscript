@@ -1,8 +1,6 @@
 #include "common/array.h"
 #include "common/malloc.h"
-#include "lstypes.h"
 #include <assert.h>
-#include <stdarg.h>
 #include <stdio.h>
 
 const void *const *lsa_newv(lssize_t size, va_list ap) {
@@ -36,15 +34,13 @@ const void *const *lsa_push(lssize_t size, const void *const *ary,
   return new_ary;
 }
 
-const void *lsa_pop(lssize_t size, const void *const *ary,
-                    const void *const **pary) {
+const void *const *lsa_pop(lssize_t size, const void *const *ary,
+                           const void **pval) {
   assert(size > 0);
-  if (size == 1) {
-    *pary = NULL;
-    return ary[0];
-  }
-  *pary = ary;
-  return ary[size - 1];
+  const void *const *new_ary = size == 1 ? NULL : ary;
+  if (pval != NULL)
+    *pval = ary[size - 1];
+  return new_ary;
 }
 
 const void *const *lsa_unshift(lssize_t size, const void *const *ary,
@@ -56,19 +52,21 @@ const void *const *lsa_unshift(lssize_t size, const void *const *ary,
   return new_ary;
 }
 
-const void *lsa_shift(lssize_t size, const void *const *ary,
-                      const void *const **pary) {
+const void *const *lsa_shift(lssize_t size, const void *const *ary,
+                             const void **pval) {
   assert(size > 0);
-  if (size == 1) {
-    *pary = NULL;
-    return ary[0];
-  }
-  *pary = ary + 1;
-  return ary[0];
+  const void *const *new_ary = size == 1 ? NULL : ary + 1;
+  if (pval != NULL)
+    *pval = ary[0];
+  return new_ary;
 }
 
 const void *const *lsa_concatv(lssize_t size1, const void *const *ary1,
                                lssize_t size2, va_list ap) {
+  if (size1 == 0)
+    return lsa_newv(size2, ap);
+  if (size2 == 0)
+    return ary1;
   const void **new_ary = lsmalloc((size1 + size2) * sizeof(void *));
   for (lssize_t i = 0; i < size1; i++)
     new_ary[i] = ary1[i];
@@ -88,6 +86,10 @@ const void *const *lsa_concat(lssize_t size1, const void *const *ary1,
 
 const void *const *lsa_concata(lssize_t size1, const void *const *ary1,
                                lssize_t size2, const void *const *ary2) {
+  if (size1 == 0)
+    return ary2;
+  if (size2 == 0)
+    return ary1;
   const void **new_ary = lsmalloc((size1 + size2) * sizeof(void *));
   for (lssize_t i = 0; i < size1; i++)
     new_ary[i] = ary1[i];
@@ -96,14 +98,30 @@ const void *const *lsa_concata(lssize_t size1, const void *const *ary1,
   return new_ary;
 }
 
+const void *const *lsa_slice(lssize_t size, const void *const *ary,
+                             lssize_t start, lssize_t end) {
+  assert(start >= 0 && start <= size);
+  assert(end >= 0 && end <= size);
+  assert(start <= end);
+  return ary + start;
+}
+
 const void *const *lsa_splicev(lssize_t size, const void *const *ary,
                                lssize_t start, lssize_t end, lssize_t insize,
                                va_list ap) {
   assert(start >= 0 && start <= size);
   assert(end >= 0 && end <= size);
   assert(start <= end);
-  if (start == end && insize == 0)
-    return ary;
+  if (start == 0 && end == size)
+    return lsa_newv(insize, ap);
+  if (insize == 0) {
+    if (start == end)
+      return ary;
+    if (start == 0)
+      return lsa_slice(size, ary, end, size);
+    if (end == size)
+      return lsa_slice(size, ary, 0, start);
+  }
   const void **new_ary =
       lsmalloc((size - end + start + insize) * sizeof(void *));
   for (lssize_t i = 0; i < start; i++)
@@ -197,44 +215,33 @@ const lsarray_t *lsarray_push(const lsarray_t *ary, const void *val) {
   return new_ary;
 }
 
-const void *lsarray_pop(const lsarray_t *ary, const lsarray_t **pnew_ary) {
-  assert(ary != NULL && ary->la_size > 0);
-  if (pnew_ary == NULL)
-    return ary->la_values[ary->la_size - 1];
-  if (ary->la_size == 1) {
-    *pnew_ary = NULL;
-    return ary->la_values[0];
-  }
+const lsarray_t *lsarray_pop(const lsarray_t *ary, const void **pval) {
+  assert(ary->la_size > 0);
+  const void *const *new_values = lsa_pop(ary->la_size, ary->la_values, pval);
+  if (new_values == NULL)
+    return NULL;
   lsarray_t *new_ary = lsmalloc(sizeof(lsarray_t));
-  const void *val = lsa_pop(ary->la_size, ary->la_values, &new_ary->la_values);
+  new_ary->la_values = new_values;
   new_ary->la_size = ary->la_size - 1;
-  *pnew_ary = new_ary;
-  return val;
+  return new_ary;
 }
 
 const lsarray_t *lsarray_unshift(const lsarray_t *ary, const void *val) {
-  if (ary == NULL || ary->la_size == 0)
-    return lsarray_new(1, &val);
   lsarray_t *new_ary = lsmalloc(sizeof(lsarray_t));
-  new_ary->la_values = lsa_push(ary->la_size, ary->la_values, val);
+  new_ary->la_values = lsa_push(lsarray_get_size(ary), lsarray_get(ary), val);
   new_ary->la_size = ary->la_size + 1;
   return new_ary;
 }
 
-const void *lsarray_shift(const lsarray_t *ary, const lsarray_t **pnew_ary) {
-  assert(ary != NULL && ary->la_size > 0);
-  if (pnew_ary == NULL)
-    return ary->la_values[0];
-  if (ary->la_size == 1) {
-    *pnew_ary = NULL;
-    return ary->la_values[0];
-  }
+const lsarray_t *lsarray_shift(const lsarray_t *ary, const void **pval) {
+  assert(ary->la_size > 0);
+  const void *const *new_values = lsa_shift(ary->la_size, ary->la_values, pval);
+  if (new_values == NULL)
+    return NULL;
   lsarray_t *new_ary = lsmalloc(sizeof(lsarray_t));
-  const void *val =
-      lsa_shift(ary->la_size, ary->la_values, &new_ary->la_values);
+  new_ary->la_values = new_values;
   new_ary->la_size = ary->la_size - 1;
-  *pnew_ary = new_ary;
-  return val;
+  return new_ary;
 }
 
 const lsarray_t *lsarray_concat(const lsarray_t *ary1, const lsarray_t *ary2) {

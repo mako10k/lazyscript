@@ -47,13 +47,6 @@ lseappl_concat_args(lseappl_t *eappl, size_t argc, const lsexpr_t *args[]);
 lsapi_get lssize_t lseappl_get_argc(const lseappl_t *eappl);
 
 /**
- * Get the function of an application expression.
- * @param eappl The application expression.
- * @return The function.
- */
-lsapi_get const lsexpr_t *lseappl_get_arg(const lseappl_t *eappl, lssize_t i);
-
-/**
  * Get the arguments of an application expression.
  * @param eappl The application expression.
  * @return The arguments.

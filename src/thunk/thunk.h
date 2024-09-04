@@ -53,7 +53,7 @@ lsthunk_t *lsthunk_new_ealge(const lsealge_t *ealge, lstenv_t *tenv);
 
 /**
  * Create a new thunk for an application data type
- * @param tappl The application expression
+ * @param eappl The application expression
  * @param tenv The environment
  * @return The new thunk
  */
@@ -203,7 +203,7 @@ lsmres_t lsthunk_match_ref(lsthunk_t *thunk, lstpat_t *tpat);
 /**
  * Associate a thunk with a pattern
  * @param thunk The thunk
- * @param pat The pattern
+ * @param tpat The pattern
  * @return result
  */
 lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat);
@@ -218,6 +218,7 @@ lsthunk_t *lsthunk_eval0(lsthunk_t *thunk);
 /**
  * Apply a thunk to a list of arguments
  * @param func The function thunk
+ * @param argc The number of arguments
  * @param args The arguments
  * @return The result of the application
  */
