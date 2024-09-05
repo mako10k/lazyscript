@@ -158,7 +158,7 @@ lsthunk_t *lstpat_get_refbound(const lstpat_t *pat) {
 
 void lstpat_set_refbound(lstpat_t *pat, lsthunk_t *thunk) {
   assert(pat->type == LSPTYPE_REF);
-  assert(pat->ltp_ref.ltpf_refthunk == NULL);
+  assert(pat->ltp_ref.ltpf_refthunk == NULL); // TODO: Lambda have to assign with its Copy...
   pat->ltp_ref.ltpf_refthunk = thunk;
 }
 

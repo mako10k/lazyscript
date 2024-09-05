@@ -35,3 +35,19 @@ int lsint_eq(const lsint_t *restrict val1, const lsint_t *restrict val2) {
     return val1->li_val == 0;
   return val1->li_val == val2->li_val;
 }
+
+const lsint_t *lsint_add(const lsint_t *val1, const lsint_t *val2) {
+  if (val1 == NULL)
+    return val2;
+  if (val2 == NULL)
+    return val1;
+  return lsint_new(val1->li_val + val2->li_val);
+}
+
+const lsint_t *lsint_sub(const lsint_t *val1, const lsint_t *val2) {
+  if (val1 == NULL)
+    return val2;
+  if (val2 == NULL)
+    return val1;
+  return lsint_new(val1->li_val - val2->li_val);
+}

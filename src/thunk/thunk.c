@@ -412,7 +412,7 @@ static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
   lsthunk_t *body = lsthunk_get_body(thunk);
   lsthunk_t *arg;
   lsthunk_t *const *args1 = (lsthunk_t *const *)lsa_shift(
-      argc, (const void *const *)args, (const void **)&args);
+      argc, (const void *const *)args, (const void **)&arg);
   lsmres_t mres = lsthunk_match_pat(arg, param);
   if (mres != LSMATCH_SUCCESS)
     return NULL;
@@ -489,10 +489,11 @@ static lsthunk_t *lsthunk_eval_choice(lsthunk_t *thunk, lssize_t argc,
   // eval (l | r) x y ... = eval l x y ... | <differed> eval r x y ...
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_CHOICE);
-  assert(args != NULL);
+  assert(argc == 0 || args != NULL);
   lsthunk_t *left = lsthunk_eval(thunk->lt_choice.ltc_left, argc, args);
   if (left == NULL)
     return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
+  // TODO: if left is fixed type, then we can skip right???
   lsthunk_t *right =
       lsmalloc(lssizeof(lsthunk_t, lt_appl) + (argc + 1) * sizeof(lsthunk_t *));
   right->lt_type = LSTTYPE_APPL;
@@ -718,7 +719,7 @@ static void lsthunk_print_internal(FILE *fp, lsprec_t prec, int indent,
   assert(colle_found != NULL);
 
   if (has_dup)
-    lsprintf(fp, ++indent, "{\n");
+    lsprintf(fp, ++indent, "(\n");
 
   if (!force_print && colle_found->ltc_count > 1)
     lsprintf(fp, 0, "~__ref%u", colle_found->ltc_id);
@@ -772,8 +773,7 @@ static void lsthunk_print_internal(FILE *fp, lsprec_t prec, int indent,
         lsprintf(fp, indent, "(");
       lsstr_print_bare(fp, prec, indent, thunk->lt_alge.lta_constr);
       for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
-        if (i > 0)
-          lsprintf(fp, indent, " ");
+        lsprintf(fp, indent, " ");
         lsthunk_print_internal(fp, LSPREC_APPL + 1, indent,
                                thunk->lt_alge.lta_args[i], level + 1, colle,
                                mode, 0);
@@ -790,16 +790,14 @@ static void lsthunk_print_internal(FILE *fp, lsprec_t prec, int indent,
       if (prec > LSPREC_APPL)
         lsprintf(fp, 0, "(");
       lsthunk_print(fp, LSPREC_APPL + 1, indent, thunk->lt_appl.lta_func);
-      lsprintf(fp, 0, " ");
       for (lssize_t i = 0; i < thunk->lt_appl.lta_argc; i++) {
-        if (i > 0)
-          lsprintf(fp, 0, " ");
+        lsprintf(fp, indent, " ");
         lsthunk_print_internal(fp, LSPREC_APPL + 1, indent,
                                thunk->lt_appl.lta_args[i], level + 1, colle,
                                mode, 0);
       }
       if (prec > LSPREC_APPL)
-        lsprintf(fp, 0, ")");
+        lsprintf(fp, indent, ")");
       break;
     case LSTTYPE_CHOICE:
       if (prec > LSPREC_CHOICE)
@@ -816,15 +814,15 @@ static void lsthunk_print_internal(FILE *fp, lsprec_t prec, int indent,
       break;
     case LSTTYPE_LAMBDA:
       if (prec > LSPREC_LAMBDA)
-        lsprintf(fp, 0, "(");
-      lsprintf(fp, 0, "\\");
+        lsprintf(fp, indent, "(");
+      lsprintf(fp, indent, "\\");
       lstpat_print(fp, LSPREC_APPL + 1, indent, thunk->lt_lambda.ltl_param);
-      lsprintf(fp, 0, " -> ");
+      lsprintf(fp, indent, " -> ");
       lsthunk_print_internal(fp, LSPREC_LAMBDA, indent,
                              thunk->lt_lambda.ltl_body, level + 1, colle, mode,
                              0);
       if (prec > LSPREC_LAMBDA)
-        lsprintf(fp, 0, ")");
+        lsprintf(fp, indent, ")");
       break;
     case LSTTYPE_REF:
       lsref_print(fp, prec, indent, thunk->lt_ref.ltr_ref);
@@ -836,7 +834,7 @@ static void lsthunk_print_internal(FILE *fp, lsprec_t prec, int indent,
       lsstr_print(fp, prec, indent, thunk->lt_str);
       break;
     case LSTTYPE_BUILTIN:
-      lsprintf(fp, 0, "~%s{-builtin/%d-}",
+      lsprintf(fp, indent, "~%s{-builtin/%d-}",
                lsstr_get_buf(thunk->lt_builtin->lti_name),
                thunk->lt_builtin->lti_arity);
       break;
@@ -849,7 +847,7 @@ static void lsthunk_print_internal(FILE *fp, lsprec_t prec, int indent,
                                level + 1, colle, mode, 1);
       }
     }
-    lsprintf(fp, --indent, "\n}");
+    lsprintf(fp, --indent, "\n)");
   }
 }
 

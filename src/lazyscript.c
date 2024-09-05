@@ -103,6 +103,38 @@ static lsthunk_t *lsbuiltin_seq(lssize_t argc, lsthunk_t *const *args,
   }
 }
 
+static lsthunk_t *lsbuiltin_add(lssize_t argc, lsthunk_t *const *args,
+                                void *data) {
+  assert(argc == 2);
+  assert(args != NULL);
+  lsthunk_t *lhs = lsthunk_eval0(args[0]);
+  lsthunk_t *rhs = lsthunk_eval0(args[1]);
+  if (lhs == NULL || rhs == NULL)
+    return NULL;
+  if (lsthunk_get_type(lhs) != LSTTYPE_INT ||
+      lsthunk_get_type(rhs) != LSTTYPE_INT) {
+    lsprintf(stderr, 0, "E: add: invalid type\n");
+    return NULL;
+  }
+  return lsthunk_new_int(lsint_add(lsthunk_get_int(lhs), lsthunk_get_int(rhs)));
+}
+
+static lsthunk_t *lsbuiltin_sub(lssize_t argc, lsthunk_t *const *args,
+                                void *data) {
+  assert(argc == 2);
+  assert(args != NULL);
+  lsthunk_t *lhs = lsthunk_eval0(args[0]);
+  lsthunk_t *rhs = lsthunk_eval0(args[1]);
+  if (lhs == NULL || rhs == NULL)
+    return NULL;
+  if (lsthunk_get_type(lhs) != LSTTYPE_INT ||
+      lsthunk_get_type(rhs) != LSTTYPE_INT) {
+    lsprintf(stderr, 0, "E: sub: invalid type\n");
+    return NULL;
+  }
+  return lsthunk_new_int(lsint_sub(lsthunk_get_int(lhs), lsthunk_get_int(rhs)));
+}
+
 static void lsbuiltin_prelude(lstenv_t *tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("dump"), 1, lsbuiltin_dump, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("to_str"), 1, lsbuiltin_to_string, NULL);
@@ -111,6 +143,8 @@ static void lsbuiltin_prelude(lstenv_t *tenv) {
                      (void *)LSSEQ_SIMPLE);
   lstenv_put_builtin(tenv, lsstr_cstr("seqc"), 2, lsbuiltin_seq,
                      (void *)LSSEQ_CHAIN);
+  lstenv_put_builtin(tenv, lsstr_cstr("add"), 2, lsbuiltin_add, NULL);
+  lstenv_put_builtin(tenv, lsstr_cstr("sub"), 2, lsbuiltin_sub, NULL);
 }
 
 int main(int argc, char **argv) {

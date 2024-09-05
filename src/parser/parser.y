@@ -182,7 +182,7 @@ efact:
     ;
 
 closure:
-      '{' expr bind '}' {
+      '(' expr bind ')' {
           lssize_t bindc = lsarray_get_size($3);
           const lsbind_t *const *binds = (const lsbind_t *const *)lsarray_get($3);
           $$ = lseclosure_new($2, bindc, binds); }

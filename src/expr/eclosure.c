@@ -44,11 +44,11 @@ const lsbind_t *const *lseclosure_get_binds(const lseclosure_t *eclosure) {
 
 void lseclosure_print(FILE *stream, lsprec_t prec, int indent,
                       const lseclosure_t *eclosure) {
-  lsprintf(stream, indent + 1, "{\n");
+  lsprintf(stream, indent + 1, "(\n");
   lsexpr_print(stream, prec, indent + 1, eclosure->lec_expr);
   for (lssize_t i = 0; i < eclosure->lec_bindc; i++) {
     lsprintf(stream, indent + 1, ";\n");
     lsbind_print(stream, prec, indent + 1, eclosure->lec_binds[i]);
   }
-  lsprintf(stream, indent, "\n}");
+  lsprintf(stream, indent, "\n)");
 }

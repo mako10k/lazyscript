@@ -25,8 +25,12 @@ const lsexpr_t *lselambda_get_body(const lselambda_t *elambda) {
 void lselambda_print(FILE *fp, lsprec_t prec, int indent,
                      const lselambda_t *elambda) {
   (void)prec;
+  if (prec > LSPREC_LAMBDA)
+    lsprintf(fp, indent, "(");
   lsprintf(fp, indent, "\\");
   lspat_print(fp, LSPREC_APPL + 1, indent, elambda->lel_param);
   lsprintf(fp, indent, " -> ");
   lsexpr_print(fp, LSPREC_LAMBDA + 1, indent, elambda->lel_body);
+  if (prec > LSPREC_LAMBDA)
+    lsprintf(fp, indent, ")");
 }
