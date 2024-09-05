@@ -58,7 +58,7 @@ static lsthunk_t *lsbuiltin_to_string(lssize_t argc, lsthunk_t *const *args,
   size_t len = 0;
   char *buf = NULL;
   FILE *fp = open_memstream(&buf, &len);
-  lsthunk_print(fp, LSPREC_LOWEST, 0, args[0]);
+  lsthunk_dprint(fp, LSPREC_LOWEST, 0, args[0]);
   fclose(fp);
   const lsstr_t *str = lsstr_new(buf, len);
   free(buf);
@@ -69,7 +69,7 @@ static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
                                   void *data) {
   assert(argc == 1);
   assert(args != NULL);
-  lsthunk_t *thunk_str = args[0];
+  lsthunk_t *thunk_str = lsthunk_eval0(args[0]);
   if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
     thunk_str = lsbuiltin_to_string(1, args, data);
   const lsstr_t *str = lsthunk_get_str(thunk_str);

@@ -244,4 +244,6 @@ lstref_target_origin_t *lstref_target_origin_new_builtin(const lsstr_t *name,
 
 lsthunk_t *lsprog_eval(const lsprog_t *prog, lstenv_t *tenv);
 
-void lsthunk_print(FILE *fp, lsprec_t prec, int indent, const lsthunk_t *thunk);
+void lsthunk_print(FILE *fp, lsprec_t prec, int indent, lsthunk_t *thunk);
+
+void lsthunk_dprint(FILE *fp, lsprec_t prec, int indent, lsthunk_t *thunk);

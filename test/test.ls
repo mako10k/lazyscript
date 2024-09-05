@@ -10,7 +10,9 @@
 {
   ~seqc (~print "abc\n")
         (~print "def\n")
+        (~lambda "hoge\n")
         ();
+  ~lambda = \~x -> ~print ~x;
   {- \~args -> ~go ~args; -}
   ~go = \[] -> ~prelude exit 0 |
   \(~hd : ~tl) -> ~prelude chain (~prelude println hd) \() -> ~go ~tl;

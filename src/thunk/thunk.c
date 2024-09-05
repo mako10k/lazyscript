@@ -447,10 +447,10 @@ static lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
 
 static lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
                                    lsthunk_t *const *args) {
-  // apply ~r x y ... = apply (eval ~r) x y ...
+  // eval ~r x y ... = eval (eval ~r) x y ...
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_REF);
-  assert(args != NULL);
+  assert(argc == 0 || args != NULL);
   lstref_target_t *target = thunk->lt_ref.ltr_target;
   assert(target != NULL);
   lstref_target_origin_t *origin = target->lrt_origin;
@@ -602,105 +602,265 @@ lsthunk_t *lsprog_eval(const lsprog_t *prog, lstenv_t *tenv) {
   return lsthunk_eval0(thunk);
 }
 
-void lsthunk_print(FILE *fp, lsprec_t prec, int indent,
-                   const lsthunk_t *thunk) {
-  switch (thunk->lt_type) {
-  case LSTTYPE_ALGE:
-    if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr("[]")) == 0) {
-      lsprintf(fp, 0, "[");
-      for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
-        if (i > 0)
-          lsprintf(fp, 0, ", ");
-        lsthunk_print(fp, LSPREC_LOWEST, indent, thunk->lt_alge.lta_args[i]);
-      }
-      lsprintf(fp, 0, "]");
-      return;
-    }
-    if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(",")) == 0) {
-      lsprintf(fp, 0, "(");
-      for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
-        if (i > 0)
-          lsprintf(fp, 0, ", ");
-        lsthunk_print(fp, LSPREC_LOWEST, indent, thunk->lt_alge.lta_args[i]);
-      }
-      lsprintf(fp, 0, ")");
-      return;
-    }
-    if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
-        thunk->lt_alge.lta_argc == 2) {
-      if (prec > LSPREC_CONS)
-        lsprintf(fp, 0, "(");
-      lsthunk_print(fp, LSPREC_CONS + 1, indent, thunk->lt_alge.lta_args[0]);
-      lsprintf(fp, 0, " : ");
-      lsthunk_print(fp, LSPREC_CONS, indent, thunk->lt_alge.lta_args[1]);
-      if (prec > LSPREC_CONS)
-        lsprintf(fp, 0, ")");
-      return;
-    }
-    if (thunk->lt_alge.lta_argc == 0) {
-      lsstr_print_bare(fp, prec, indent, thunk->lt_alge.lta_constr);
-      return;
-    }
-    if (prec > LSPREC_APPL)
-      lsprintf(fp, indent, "(");
-    lsstr_print_bare(fp, prec, indent, thunk->lt_alge.lta_constr);
-    for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
-      if (i > 0)
-        lsprintf(fp, indent, " ");
-      lsthunk_print(fp, LSPREC_APPL + 1, indent, thunk->lt_alge.lta_args[i]);
-    }
-    if (prec > LSPREC_APPL)
-      lsprintf(fp, 0, ")");
+typedef enum lsprint_mode { LSPM_SHARROW, LSPM_ASIS, LSPM_DEEP } lsprint_mode_t;
+
+typedef struct lsthunk_colle {
+  // thunk entry
+  lsthunk_t *ltc_thunk;
+  // thunk id
+  lssize_t ltc_id;
+  // duplicated count
+  lssize_t ltc_count;
+  // minimal level
+  lssize_t ltc_level;
+  // next thunk entry
+  struct lsthunk_colle *ltc_next;
+} lsthunk_colle_t;
+
+lsthunk_colle_t **lsthunk_colle_find(lsthunk_colle_t **pcolle,
+                                     const lsthunk_t *thunk) {
+  assert(pcolle != NULL);
+  while (*pcolle != NULL) {
+    if ((*pcolle)->ltc_thunk == thunk)
+      break;
+    pcolle = &(*pcolle)->ltc_next;
+  }
+  return pcolle;
+}
+
+static lsthunk_colle_t *lsthunk_colle_new(lsthunk_t *thunk,
+                                          lsthunk_colle_t *head, lssize_t *pid,
+                                          lssize_t level, lsprint_mode_t mode) {
+  switch (mode) {
+  case LSPM_SHARROW:
     break;
-  case LSTTYPE_APPL:
-    if (thunk->lt_appl.lta_argc == 0) {
-      lsthunk_print(fp, prec, indent, thunk->lt_appl.lta_func);
-      return;
-    }
-    if (prec > LSPREC_APPL)
-      lsprintf(fp, 0, "(");
-    lsthunk_print(fp, LSPREC_APPL + 1, indent, thunk->lt_appl.lta_func);
-    lsprintf(fp, 0, " ");
-    for (lssize_t i = 0; i < thunk->lt_appl.lta_argc; i++) {
-      if (i > 0)
-        lsprintf(fp, 0, " ");
-      lsthunk_print(fp, LSPREC_APPL + 1, indent, thunk->lt_appl.lta_args[i]);
-    }
-    if (prec > LSPREC_APPL)
-      lsprintf(fp, 0, ")");
+  case LSPM_ASIS:
+    thunk = thunk->lt_whnf != NULL ? thunk->lt_whnf : thunk;
     break;
-  case LSTTYPE_CHOICE:
-    if (prec > LSPREC_CHOICE)
-      lsprintf(fp, 0, "(");
-    lsthunk_print(fp, LSPREC_CHOICE + 1, indent, thunk->lt_choice.ltc_left);
-    lsprintf(fp, 0, " | ");
-    lsthunk_print(fp, LSPREC_CHOICE, indent, thunk->lt_choice.ltc_right);
-    if (prec > LSPREC_CHOICE)
-      lsprintf(fp, 0, ")");
-    break;
-  case LSTTYPE_LAMBDA:
-    if (prec > LSPREC_LAMBDA)
-      lsprintf(fp, 0, "(");
-    lsprintf(fp, 0, "\\");
-    lstpat_print(fp, LSPREC_APPL + 1, indent, thunk->lt_lambda.ltl_param);
-    lsprintf(fp, 0, " -> ");
-    lsthunk_print(fp, LSPREC_LAMBDA, indent, thunk->lt_lambda.ltl_body);
-    if (prec > LSPREC_LAMBDA)
-      lsprintf(fp, 0, ")");
-    break;
-  case LSTTYPE_REF:
-    lsref_print(fp, prec, indent, thunk->lt_ref.ltr_ref);
-    break;
-  case LSTTYPE_INT:
-    lsint_print(fp, prec, indent, thunk->lt_int);
-    break;
-  case LSTTYPE_STR:
-    lsstr_print(fp, prec, indent, thunk->lt_str);
-    break;
-  case LSTTYPE_BUILTIN:
-    lsprintf(fp, 0, "<builtin:%s/%d>",
-             lsstr_get_buf(thunk->lt_builtin->lti_name),
-             thunk->lt_builtin->lti_arity);
+  case LSPM_DEEP:
+    thunk = lsthunk_eval0(thunk);
     break;
   }
+  lsthunk_colle_t **pcolle = lsthunk_colle_find(&head, thunk);
+  if (*pcolle != NULL) {
+    (*pcolle)->ltc_id = (*pid)++;
+    (*pcolle)->ltc_count++;
+    if ((*pcolle)->ltc_level > level)
+      (*pcolle)->ltc_level = level;
+    return head;
+  }
+  *pcolle = lsmalloc(sizeof(lsthunk_colle_t));
+  (*pcolle)->ltc_thunk = thunk;
+  (*pcolle)->ltc_id = 0;
+  (*pcolle)->ltc_count = 1;
+  (*pcolle)->ltc_level = level;
+  (*pcolle)->ltc_next = NULL;
+  switch (thunk->lt_type) {
+  case LSTTYPE_ALGE:
+    for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++)
+      head = lsthunk_colle_new(thunk->lt_alge.lta_args[i], head, pid, level + 1,
+                               mode);
+    break;
+  case LSTTYPE_APPL:
+    head =
+        lsthunk_colle_new(thunk->lt_appl.lta_func, head, pid, level + 1, mode);
+    for (lssize_t i = 0; i < thunk->lt_appl.lta_argc; i++)
+      head = lsthunk_colle_new(thunk->lt_appl.lta_args[i], head, pid, level + 1,
+                               mode);
+    break;
+  case LSTTYPE_CHOICE:
+    head = lsthunk_colle_new(thunk->lt_choice.ltc_left, head, pid, level + 1,
+                             mode);
+    head = lsthunk_colle_new(thunk->lt_choice.ltc_right, head, pid, level + 1,
+                             mode);
+    break;
+  case LSTTYPE_LAMBDA:
+    head = lsthunk_colle_new(thunk->lt_lambda.ltl_body, head, pid, level + 1,
+                             mode);
+    break;
+  case LSTTYPE_REF:
+  case LSTTYPE_INT:
+  case LSTTYPE_STR:
+  case LSTTYPE_BUILTIN:
+    break;
+  }
+  return head;
+}
+
+static void lsthunk_print_internal(FILE *fp, lsprec_t prec, int indent,
+                                   lsthunk_t *thunk, lssize_t level,
+                                   lsthunk_colle_t *colle, lsprint_mode_t mode,
+                                   int force_print) {
+  switch (mode) {
+  case LSPM_SHARROW:
+    break;
+  case LSPM_ASIS:
+    thunk = thunk->lt_whnf != NULL ? thunk->lt_whnf : thunk;
+    break;
+  case LSPM_DEEP:
+    thunk = lsthunk_eval0(thunk);
+    break;
+  }
+  int has_dup = 0;
+  lsthunk_colle_t *colle_found = NULL;
+  for (lsthunk_colle_t *c = colle; c != NULL; c = c->ltc_next) {
+    if (c->ltc_count > 1 && c->ltc_level == level) {
+      has_dup = 1;
+      if (colle_found != NULL)
+        break;
+    }
+    if (c->ltc_thunk == thunk) {
+      colle_found = c;
+      if (has_dup)
+        break;
+    }
+  }
+  assert(colle_found != NULL);
+
+  if (has_dup)
+    lsprintf(fp, ++indent, "{\n");
+
+  if (!force_print && colle_found->ltc_count > 1)
+    lsprintf(fp, 0, "~__ref%u", colle_found->ltc_id);
+  else
+    switch (thunk->lt_type) {
+    case LSTTYPE_ALGE:
+      if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr("[]")) == 0) {
+        lsprintf(fp, 0, "[");
+        for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
+          if (i > 0)
+            lsprintf(fp, 0, ", ");
+          lsthunk_print_internal(fp, LSPREC_LOWEST, indent,
+                                 thunk->lt_alge.lta_args[i], level + 1, colle,
+                                 mode, 0);
+        }
+        lsprintf(fp, 0, "]");
+        return;
+      }
+      if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(",")) == 0) {
+        lsprintf(fp, 0, "(");
+        for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
+          if (i > 0)
+            lsprintf(fp, 0, ", ");
+          lsthunk_print_internal(fp, LSPREC_LOWEST, indent,
+                                 thunk->lt_alge.lta_args[i], level + 1, colle,
+                                 mode, 0);
+        }
+        lsprintf(fp, 0, ")");
+        return;
+      }
+      if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
+          thunk->lt_alge.lta_argc == 2) {
+        if (prec > LSPREC_CONS)
+          lsprintf(fp, 0, "(");
+        lsthunk_print_internal(fp, LSPREC_CONS + 1, indent,
+                               thunk->lt_alge.lta_args[0], level + 1, colle,
+                               mode, 0);
+        lsprintf(fp, 0, " : ");
+        lsthunk_print_internal(fp, LSPREC_CONS, indent,
+                               thunk->lt_alge.lta_args[1], level + 1, colle,
+                               mode, 0);
+        if (prec > LSPREC_CONS)
+          lsprintf(fp, 0, ")");
+        return;
+      }
+      if (thunk->lt_alge.lta_argc == 0) {
+        lsstr_print_bare(fp, prec, indent, thunk->lt_alge.lta_constr);
+        return;
+      }
+      if (prec > LSPREC_APPL)
+        lsprintf(fp, indent, "(");
+      lsstr_print_bare(fp, prec, indent, thunk->lt_alge.lta_constr);
+      for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
+        if (i > 0)
+          lsprintf(fp, indent, " ");
+        lsthunk_print_internal(fp, LSPREC_APPL + 1, indent,
+                               thunk->lt_alge.lta_args[i], level + 1, colle,
+                               mode, 0);
+      }
+      if (prec > LSPREC_APPL)
+        lsprintf(fp, 0, ")");
+      break;
+    case LSTTYPE_APPL:
+      if (thunk->lt_appl.lta_argc == 0) {
+        lsthunk_print_internal(fp, prec, indent, thunk->lt_appl.lta_func,
+                               level + 1, colle, mode, 0);
+        return;
+      }
+      if (prec > LSPREC_APPL)
+        lsprintf(fp, 0, "(");
+      lsthunk_print(fp, LSPREC_APPL + 1, indent, thunk->lt_appl.lta_func);
+      lsprintf(fp, 0, " ");
+      for (lssize_t i = 0; i < thunk->lt_appl.lta_argc; i++) {
+        if (i > 0)
+          lsprintf(fp, 0, " ");
+        lsthunk_print_internal(fp, LSPREC_APPL + 1, indent,
+                               thunk->lt_appl.lta_args[i], level + 1, colle,
+                               mode, 0);
+      }
+      if (prec > LSPREC_APPL)
+        lsprintf(fp, 0, ")");
+      break;
+    case LSTTYPE_CHOICE:
+      if (prec > LSPREC_CHOICE)
+        lsprintf(fp, 0, "(");
+      lsthunk_print_internal(fp, LSPREC_CHOICE + 1, indent,
+                             thunk->lt_choice.ltc_left, level + 1, colle, mode,
+                             0);
+      lsprintf(fp, 0, " | ");
+      lsthunk_print_internal(fp, LSPREC_CHOICE, indent,
+                             thunk->lt_choice.ltc_right, level + 1, colle, mode,
+                             0);
+      if (prec > LSPREC_CHOICE)
+        lsprintf(fp, 0, ")");
+      break;
+    case LSTTYPE_LAMBDA:
+      if (prec > LSPREC_LAMBDA)
+        lsprintf(fp, 0, "(");
+      lsprintf(fp, 0, "\\");
+      lstpat_print(fp, LSPREC_APPL + 1, indent, thunk->lt_lambda.ltl_param);
+      lsprintf(fp, 0, " -> ");
+      lsthunk_print_internal(fp, LSPREC_LAMBDA, indent,
+                             thunk->lt_lambda.ltl_body, level + 1, colle, mode,
+                             0);
+      if (prec > LSPREC_LAMBDA)
+        lsprintf(fp, 0, ")");
+      break;
+    case LSTTYPE_REF:
+      lsref_print(fp, prec, indent, thunk->lt_ref.ltr_ref);
+      break;
+    case LSTTYPE_INT:
+      lsint_print(fp, prec, indent, thunk->lt_int);
+      break;
+    case LSTTYPE_STR:
+      lsstr_print(fp, prec, indent, thunk->lt_str);
+      break;
+    case LSTTYPE_BUILTIN:
+      lsprintf(fp, 0, "~%s{-builtin/%d-}",
+               lsstr_get_buf(thunk->lt_builtin->lti_name),
+               thunk->lt_builtin->lti_arity);
+      break;
+    }
+  if (has_dup) {
+    for (lsthunk_colle_t *c = colle; c != NULL; c = c->ltc_next) {
+      if (c->ltc_level == level && c->ltc_count > 1) {
+        lsprintf(fp, indent, ";\n~__ref%u = ", c->ltc_id);
+        lsthunk_print_internal(fp, LSPREC_LOWEST, indent, c->ltc_thunk,
+                               level + 1, colle, mode, 1);
+      }
+    }
+    lsprintf(fp, --indent, "\n}");
+  }
+}
+
+void lsthunk_print(FILE *fp, lsprec_t prec, int indent, lsthunk_t *thunk) {
+  lssize_t id = 0;
+  lsthunk_colle_t *colle = lsthunk_colle_new(thunk, NULL, &id, 0, 0);
+  lsthunk_print_internal(fp, prec, indent, thunk, 0, colle, LSPM_SHARROW, 0);
+}
+
+void lsthunk_dprint(FILE *fp, lsprec_t prec, int indent, lsthunk_t *thunk) {
+  lssize_t id = 0;
+  lsthunk_colle_t *colle = lsthunk_colle_new(thunk, NULL, &id, 0, 1);
+  lsthunk_print_internal(fp, prec, indent, thunk, 0, colle, LSPM_ASIS, 0);
 }
