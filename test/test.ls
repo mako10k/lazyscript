@@ -1,8 +1,16 @@
 #!/usr/local/bin/lazyscript
+# Single Line Comment
+{- Multi Line Comment (1) -}
 {-
--}
+ - Multi Line Comment (2)
+ -   second line
+ -   third line
+ -}
+{--{ Multi Line Comment (3) }--}
 {
-  ~print "abc";
+  ~seqc (~print "abc\n")
+        (~print "def\n")
+        ();
   {- \~args -> ~go ~args; -}
   ~go = \[] -> ~prelude exit 0 |
   \(~hd : ~tl) -> ~prelude chain (~prelude println hd) \() -> ~go ~tl;

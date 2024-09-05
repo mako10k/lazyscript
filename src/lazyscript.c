@@ -77,10 +77,40 @@ static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
   return args[0];
 }
 
+typedef enum lsseq_type {
+  LSSEQ_SIMPLE,
+  LSSEQ_CHAIN,
+} lsseq_type_t;
+
+static lsthunk_t *lsbuiltin_seq(lssize_t argc, lsthunk_t *const *args,
+                                void *data) {
+  assert(argc == 2);
+  assert(args != NULL);
+  lsthunk_t *fst = args[0];
+  lsthunk_t *snd = args[1];
+  lsthunk_t *fst_evaled = lsthunk_eval0(fst);
+  if (fst_evaled == NULL)
+    return NULL;
+  switch ((lsseq_type_t)(intptr_t)data) {
+  case LSSEQ_SIMPLE: // Simple seq
+    return snd;
+  case LSSEQ_CHAIN: { // Chain seq
+    lsthunk_t *fst_new = lsthunk_new_builtin(
+        lsstr_cstr("seqc"), 2, lsbuiltin_seq, (void *)LSSEQ_CHAIN);
+    lsthunk_t *ret = lsthunk_eval(fst_new, 1, &snd);
+    return ret;
+  }
+  }
+}
+
 static void lsbuiltin_prelude(lstenv_t *tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("dump"), 1, lsbuiltin_dump, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("to_str"), 1, lsbuiltin_to_string, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
+  lstenv_put_builtin(tenv, lsstr_cstr("seq"), 2, lsbuiltin_seq,
+                     (void *)LSSEQ_SIMPLE);
+  lstenv_put_builtin(tenv, lsstr_cstr("seqc"), 2, lsbuiltin_seq,
+                     (void *)LSSEQ_CHAIN);
 }
 
 int main(int argc, char **argv) {
@@ -105,7 +135,11 @@ int main(int argc, char **argv) {
 #endif
         lstenv_t *tenv = lstenv_new(NULL);
         lsbuiltin_prelude(tenv);
-        lsprog_eval(prog, tenv);
+        lsthunk_t *ret = lsprog_eval(prog, tenv);
+        if (ret != NULL) {
+          lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
+          lsprintf(stdout, 0, "\n");
+        }
       }
       break;
     }
@@ -142,7 +176,11 @@ int main(int argc, char **argv) {
 #endif
       lstenv_t *tenv = lstenv_new(NULL);
       lsbuiltin_prelude(tenv);
-      lsprog_eval(prog, tenv);
+      lsthunk_t *ret = lsprog_eval(prog, tenv);
+      if (ret != NULL) {
+        lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
+        lsprintf(stdout, 0, "\n");
+      }
     }
   }
 }

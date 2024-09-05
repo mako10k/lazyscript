@@ -51,11 +51,12 @@ struct lstref_target {
 };
 
 struct lstref {
-  const lsstr_t *ltr_refname;
+  const lsref_t *ltr_ref;
   lstref_target_t *ltr_target;
 };
 
 struct lstbuiltin {
+  const lsstr_t *lti_name;
   lssize_t lti_arity;
   lstbuiltin_func_t lti_func;
   void *lti_data;
@@ -142,7 +143,7 @@ lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstenv_t *tenv) {
   lsthunk_t *thunk = lsmalloc(lssizeof(lsthunk_t, lt_ref));
   thunk->lt_type = LSTTYPE_REF;
   thunk->lt_whnf = NULL;
-  thunk->lt_ref.ltr_refname = lsref_get_name(ref);
+  thunk->lt_ref.ltr_ref = ref;
   thunk->lt_ref.ltr_target = target;
   if (target == NULL) {
     lsprintf(stderr, 0, "E: ");
@@ -570,12 +571,13 @@ lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
   return target;
 }
 
-static lsthunk_t *lsthunk_new_builtin(lssize_t arity, lstbuiltin_func_t func,
-                                      void *data) {
+lsthunk_t *lsthunk_new_builtin(const lsstr_t *name, lssize_t arity,
+                               lstbuiltin_func_t func, void *data) {
   lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type = LSTTYPE_BUILTIN;
   thunk->lt_whnf = thunk;
   lstbuiltin_t *builtin = lsmalloc(sizeof(lstbuiltin_t));
+  builtin->lti_name = name;
   builtin->lti_arity = arity;
   builtin->lti_func = func;
   builtin->lti_data = data;
@@ -583,12 +585,13 @@ static lsthunk_t *lsthunk_new_builtin(lssize_t arity, lstbuiltin_func_t func,
   return thunk;
 }
 
-lstref_target_origin_t *lstref_target_origin_new_builtin(lssize_t arity,
+lstref_target_origin_t *lstref_target_origin_new_builtin(const lsstr_t *name,
+                                                         lssize_t arity,
                                                          lstbuiltin_func_t func,
                                                          void *data) {
   lstref_target_origin_t *origin = lsmalloc(sizeof(lstref_target_origin_t));
   origin->lrto_type = LSTRTYPE_BUILTIN;
-  origin->lrto_builtin = lsthunk_new_builtin(arity, func, data);
+  origin->lrto_builtin = lsthunk_new_builtin(name, arity, func, data);
   return origin;
 }
 
@@ -603,6 +606,37 @@ void lsthunk_print(FILE *fp, lsprec_t prec, int indent,
                    const lsthunk_t *thunk) {
   switch (thunk->lt_type) {
   case LSTTYPE_ALGE:
+    if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr("[]")) == 0) {
+      lsprintf(fp, 0, "[");
+      for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
+        if (i > 0)
+          lsprintf(fp, 0, ", ");
+        lsthunk_print(fp, LSPREC_LOWEST, indent, thunk->lt_alge.lta_args[i]);
+      }
+      lsprintf(fp, 0, "]");
+      return;
+    }
+    if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(",")) == 0) {
+      lsprintf(fp, 0, "(");
+      for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {
+        if (i > 0)
+          lsprintf(fp, 0, ", ");
+        lsthunk_print(fp, LSPREC_LOWEST, indent, thunk->lt_alge.lta_args[i]);
+      }
+      lsprintf(fp, 0, ")");
+      return;
+    }
+    if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
+        thunk->lt_alge.lta_argc == 2) {
+      if (prec > LSPREC_CONS)
+        lsprintf(fp, 0, "(");
+      lsthunk_print(fp, LSPREC_CONS + 1, indent, thunk->lt_alge.lta_args[0]);
+      lsprintf(fp, 0, " : ");
+      lsthunk_print(fp, LSPREC_CONS, indent, thunk->lt_alge.lta_args[1]);
+      if (prec > LSPREC_CONS)
+        lsprintf(fp, 0, ")");
+      return;
+    }
     if (thunk->lt_alge.lta_argc == 0) {
       lsstr_print_bare(fp, prec, indent, thunk->lt_alge.lta_constr);
       return;
@@ -655,7 +689,7 @@ void lsthunk_print(FILE *fp, lsprec_t prec, int indent,
       lsprintf(fp, 0, ")");
     break;
   case LSTTYPE_REF:
-    lsprintf(fp, indent, "~%s", thunk->lt_ref.ltr_refname);
+    lsref_print(fp, prec, indent, thunk->lt_ref.ltr_ref);
     break;
   case LSTTYPE_INT:
     lsint_print(fp, prec, indent, thunk->lt_int);
@@ -664,7 +698,9 @@ void lsthunk_print(FILE *fp, lsprec_t prec, int indent,
     lsstr_print(fp, prec, indent, thunk->lt_str);
     break;
   case LSTTYPE_BUILTIN:
-    lsprintf(fp, 0, "<builtin>");
+    lsprintf(fp, 0, "<builtin:%s/%d>",
+             lsstr_get_buf(thunk->lt_builtin->lti_name),
+             thunk->lt_builtin->lti_arity);
     break;
   }
 }

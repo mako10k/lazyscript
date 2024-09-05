@@ -105,6 +105,17 @@ lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstenv_t *tenv);
 lsthunk_t *lsthunk_new_str(const lsstr_t *strval);
 
 /**
+ * Create a new thunk for a builtin data type
+ * @param name The name of the builtin (only for debugging)
+ * @param arity The number of arguments
+ * @param func The function
+ * @param data The data
+ * @return The new thunk
+ */
+lsthunk_t *lsthunk_new_builtin(const lsstr_t *name, lssize_t arity,
+                               lstbuiltin_func_t func, void *data);
+
+/**
  * Create a new thunk for an expression
  * @param expr The expression
  * @param tenv The environment
@@ -226,7 +237,8 @@ lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
 lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
                                    lstpat_t *tpat);
 
-lstref_target_origin_t *lstref_target_origin_new_builtin(lssize_t arity,
+lstref_target_origin_t *lstref_target_origin_new_builtin(const lsstr_t *name,
+                                                         lssize_t arity,
                                                          lstbuiltin_func_t func,
                                                          void *data);
 

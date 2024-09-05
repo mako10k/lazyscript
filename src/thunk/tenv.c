@@ -115,7 +115,7 @@ void lstenv_put_builtin(lstenv_t *tenv, const lsstr_t *name, lssize_t arity,
   assert(name != NULL);
   assert(func != NULL);
   lstref_target_origin_t *origin =
-      lstref_target_origin_new_builtin(arity, func, data);
+      lstref_target_origin_new_builtin(name, arity, func, data);
   lsloc_t loc = lsloc("<builtin>", 1, 1, 1, 1);
   lstpat_t *tpat = lstpat_new_ref(lsref_new(name, loc));
   lstref_target_t *target = lstref_target_new(origin, tpat);
