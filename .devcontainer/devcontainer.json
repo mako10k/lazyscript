@@ -58,7 +58,8 @@
                 "ms-vscode.remote-repositories",
                 "llvm-vs-code-extensions.vscode-clangd",
                 "llvm-vs-code-extensions.lldb-dap",
-                "ms-vscode.cpptools"
+                "ms-vscode.cpptools",
+                "ms-vscode.makefile-tools"
             ]
         }
     }

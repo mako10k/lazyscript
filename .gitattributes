@@ -1,0 +1,3 @@
+*.am -lf
+*.ac -lf
+*.sh -lf
