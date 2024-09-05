@@ -387,23 +387,17 @@ static lsthunk_t *lsthunk_eval_alge(lsthunk_t *thunk, lssize_t argc,
 
 static lsthunk_t *lsthunk_eval_appl(lsthunk_t *thunk, lssize_t argc,
                                     lsthunk_t *const *args) {
-  // eval (f a b ...) x y ... => eval (f a b ... x y ...)
+  // eval (f a b ...) x y ... => eval f a b ... x y ...
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_APPL);
   if (argc == 0)
     return lsthunk_eval0(thunk);
-  lssize_t targc = lsthunk_get_argc(thunk);
-  lsthunk_t *thunk_new = lsmalloc(lssizeof(lsthunk_t, lt_appl) +
-                                  (targc + targc) * sizeof(lsthunk_t *));
-  thunk_new->lt_type = LSTTYPE_APPL;
-  thunk_new->lt_whnf = NULL;
-  thunk_new->lt_appl.lta_func = thunk->lt_appl.lta_func;
-  thunk_new->lt_appl.lta_argc = targc + argc;
-  for (lssize_t i = 0; i < targc; i++)
-    thunk_new->lt_appl.lta_args[i] = thunk->lt_appl.lta_args[i];
-  for (lssize_t i = 0; i < argc; i++)
-    thunk_new->lt_appl.lta_args[targc + i] = args[i];
-  return lsthunk_eval0(thunk_new);
+  lsthunk_t *func1 = thunk->lt_appl.lta_func;
+  lssize_t argc1 = thunk->lt_appl.lta_argc + argc;
+  lsthunk_t *const *args1 = (lsthunk_t *const *)lsa_concata(
+      thunk->lt_appl.lta_argc, (const void *const *)thunk->lt_appl.lta_args,
+      argc, (const void *const *)args);
+  return lsthunk_eval(func1, argc1, args1);
 }
 
 static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
