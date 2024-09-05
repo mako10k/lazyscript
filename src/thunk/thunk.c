@@ -403,7 +403,7 @@ static lsthunk_t *lsthunk_eval_appl(lsthunk_t *thunk, lssize_t argc,
     thunk_new->lt_appl.lta_args[i] = thunk->lt_appl.lta_args[i];
   for (lssize_t i = 0; i < argc; i++)
     thunk_new->lt_appl.lta_args[targc + i] = args[i];
-  return lsthunk_eval0(thunk);
+  return lsthunk_eval0(thunk_new);
 }
 
 static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
