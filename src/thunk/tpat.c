@@ -141,7 +141,7 @@ lstpat_t *const *lstpat_get_args(const lstpat_t *pat) {
   return pat->ltp_alge.ltpa_args;
 }
 
-lstpat_t *lstpat_get_ref(const lstpat_t *pat) {
+lstpat_t *lstpat_get_asref(const lstpat_t *pat) {
   assert(pat->type == LSPTYPE_AS);
   return pat->ltp_as.ltpa_ref;
 }
@@ -151,15 +151,9 @@ lstpat_t *lstpat_get_aspattern(const lstpat_t *pat) {
   return pat->ltp_as.ltpa_aspattern;
 }
 
-lsthunk_t *lstpat_get_refbound(const lstpat_t *pat) {
+const lsref_t *lstpat_get_ref(const lstpat_t *pat) {
   assert(pat->type == LSPTYPE_REF);
-  return pat->ltp_ref.ltpf_refthunk;
-}
-
-void lstpat_set_refbound(lstpat_t *pat, lsthunk_t *thunk) {
-  assert(pat->type == LSPTYPE_REF);
-  assert(pat->ltp_ref.ltpf_refthunk == NULL); // TODO: Lambda have to assign with its Copy...
-  pat->ltp_ref.ltpf_refthunk = thunk;
+  return pat->ltp_ref.ltpf_ref;
 }
 
 const lsstr_t *lstpat_get_str(const lstpat_t *pat) {

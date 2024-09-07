@@ -14,7 +14,7 @@ typedef struct lstbuiltin lstbuiltin_t;
 typedef enum lstrtype {
   LSTRTYPE_BIND,
   LSTRTYPE_LAMBDA,
-  LSTRTYPE_BUILTIN
+  LSTRTYPE_THUNK
 } lstrtype_t;
 
 #include "lstypes.h"
@@ -95,7 +95,7 @@ lsthunk_t *lsthunk_new_elambda(const lselambda_t *elambda, lstenv_t *tenv);
  * @param tenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_eref(const lsref_t *ref, lstenv_t *tenv);
 
 /**
  * Create a new thunk for a string data type
@@ -190,33 +190,37 @@ lstref_target_t *lsthunk_get_ref_target(const lsthunk_t *thunk);
  * Associate a thunk with an algebraic pattern
  * @param thunk The thunk
  * @param tpat The algebraic pattern
+ * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_alge(lsthunk_t *thunk, lstpat_t *tpat);
+lsmres_t lsthunk_match_alge(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
 
 /**
  * Associate a thunk with an as pattern
  * @param thunk The thunk
  * @param tpat The as pattern
+ * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pas(lsthunk_t *thunk, lstpat_t *tpat);
+lsmres_t lsthunk_match_pas(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
 
 /**
  * Associate a thunk with a reference pattern
  * @param thunk The thunk
  * @param tpat The reference pattern
+ * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_ref(lsthunk_t *thunk, lstpat_t *tpat);
+lsmres_t lsthunk_match_ref(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
 
 /**
  * Associate a thunk with a pattern
  * @param thunk The thunk
  * @param tpat The pattern
+ * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat);
+lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
 
 /**
  * Evaluate a thunk to WHNF (Weak Head Normal Form)
