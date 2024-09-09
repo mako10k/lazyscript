@@ -86,8 +86,8 @@ lstpat_t *lstpat_new_str(const lsstr_t *strval) {
   return tpat;
 }
 
-lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv,
-                         lstref_target_origin_t *origin) {
+lstpat_t *lstpat_new_pat(const lspat_t *pat, lseenv_t *tenv,
+                         lseref_target_origin_t *origin) {
   switch (lspat_get_type(pat)) {
   case LSPTYPE_ALGE: {
     const lspalge_t *palge = lspat_get_alge(pat);
@@ -106,8 +106,8 @@ lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv,
     const lsref_t *pref = lspat_get_ref(pat);
     const lsstr_t *name = lsref_get_name(pref);
     lstpat_t *tpat = lstpat_new_ref(pref);
-    lstref_target_t *target = lstref_target_new(origin, tpat);
-    lstenv_put(tenv, name, target);
+    const lseref_target_t *target = lseref_target_new(origin, tpat);
+    lseenv_put(tenv, name, target);
     return tpat;
   }
   case LSPTYPE_AS: {

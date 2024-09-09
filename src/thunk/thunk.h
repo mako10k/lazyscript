@@ -28,6 +28,7 @@ typedef lsthunk_t *(*lstbuiltin_func_t)(lssize_t, lsthunk_t *const *, void *);
 #include "pat/palge.h"
 #include "pat/pas.h"
 #include "pat/pat.h"
+#include "thunk/eenv.h"
 #include "thunk/tenv.h"
 #include "thunk/tpat.h"
 
@@ -42,37 +43,99 @@ typedef enum lsttype {
   LSTTYPE_BUILTIN
 } lsttype_t;
 
+#define lsapi_beta lsapi_nn12 lsapi_wur
+
+lsthunk_t *lsthunk_new_alge(const lsstr_t *constr, lssize_t argc,
+                            lsthunk_t *const *args);
+
+lsthunk_t *lsthunk_new_appl(lsthunk_t *func, lssize_t argc,
+                            lsthunk_t *const *args);
+
+lsthunk_t *lsthunk_new_choice(lsthunk_t *left, lsthunk_t *right);
+
+lsthunk_t *lsthunk_new_lambda(lstpat_t *param, lsthunk_t *body);
+
+lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lseref_target_t *target);
+
 /**
- * Create a new thunk for an algebraic data type
+ * Beta reduction for thunk and make a copy of thunk and replace the thunk with
+ * the new thunk
+ * @param thunk The thunk
+ * @param tenv The environment
+ */
+lsapi_beta lsthunk_t *lsthunk_beta(lsthunk_t *thunk, lstenv_t *tenv);
+
+/**
+ * Beta reduction for algebraic thunk
+ * @param thunk The thunk
+ * @param tenv The environment
+ * @return The new thunk
+ */
+lsapi_beta lsthunk_t *lsthunk_beta_alge(lsthunk_t *thunk, lstenv_t *tenv);
+
+/**
+ * Beta reduction for application thunk
+ * @param thunk The thunk
+ * @param tenv The environment
+ * @return The new thunk
+ */
+lsapi_beta lsthunk_t *lsthunk_beta_appl(lsthunk_t *thunk, lstenv_t *tenv);
+
+/**
+ * Beta reduction for lambda thunk
+ * @param thunk The thunk
+ * @param tenv The environment
+ * @return The new thunk
+ */
+lsapi_beta lsthunk_t *lsthunk_beta_lambda(lsthunk_t *thunk, lstenv_t *tenv);
+
+/**
+ * Create new thunk from algebraic expression
  * @param ealge The algebraic expression
- * @param tenv The environment
+ * @param eenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_ealge(const lsealge_t *ealge, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_ealge(const lsealge_t *ealge, lseenv_t *eenv);
 
 /**
- * Create a new thunk for an application data type
+ * Create a new thunk from an application expression
  * @param eappl The application expression
- * @param tenv The environment
+ * @param eenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_eappl(const lseappl_t *eappl, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_eappl(const lseappl_t *eappl, lseenv_t *eenv);
 
 /**
- * Create a new thunk for a choice data type
+ * Create a new thunk from a choice expression
  * @param echoice The choice expression
- * @param tenv The environment
+ * @param eenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_echoice(const lsechoice_t *echoice, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_echoice(const lsechoice_t *echoice, lseenv_t *eenv);
 
 /**
- * Create a new thunk for a closure data type
+ * Create a new thunk from a closure expression
  * @param eclosure The closure expression
- * @param tenv The environment
+ * @param eenv The environment
  * @return The new thunk
  */
-lsthunk_t *lsthunk_new_eclosure(const lseclosure_t *eclosure, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_eclosure(const lseclosure_t *eclosure, lseenv_t *eenv);
+
+/**
+ * Create a new thunk from a lambda expression
+ * @param elambda The lambda expression
+ * @param eenv The environment
+ * @return The new thunk
+ */
+lsthunk_t *lsthunk_new_elambda(const lselambda_t *elambda, lseenv_t *eenv);
+
+/**
+ * Create a new thunk from a reference expression
+ * @param ref The reference expression
+ * @param eenv The environment
+ * @return The new thunk
+ */
+lsthunk_t *lsthunk_new_eref(const lsref_t *ref, lseenv_t *eenv);
 
 /**
  * Create a new thunk for an integer data type
@@ -80,22 +143,6 @@ lsthunk_t *lsthunk_new_eclosure(const lseclosure_t *eclosure, lstenv_t *tenv);
  * @return The new thunk
  */
 lsthunk_t *lsthunk_new_int(const lsint_t *intval);
-
-/**
- * Create a new thunk for a lambda data type
- * @param elambda The lambda expression
- * @param tenv The environment
- * @return The new thunk
- */
-lsthunk_t *lsthunk_new_elambda(const lselambda_t *elambda, lstenv_t *tenv);
-
-/**
- * Create a new thunk for a reference data type
- * @param ref The reference value
- * @param tenv The environment
- * @return The new thunk
- */
-lsthunk_t *lsthunk_new_eref(const lsref_t *ref, lstenv_t *tenv);
 
 /**
  * Create a new thunk for a string data type
@@ -118,10 +165,10 @@ lsthunk_t *lsthunk_new_builtin(const lsstr_t *name, lssize_t arity,
 /**
  * Create a new thunk for an expression
  * @param expr The expression
- * @param tenv The environment
+ * @param eenv The environment
  * @return The new thunk (If null, the expr has errors)
  */
-lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr, lstenv_t *tenv);
+lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr, lseenv_t *eenv);
 
 /**
  * Get the type of a thunk
@@ -238,6 +285,62 @@ lsthunk_t *lsthunk_eval0(lsthunk_t *thunk);
  */
 lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
 
+/**
+ * Evaluate an algebratic thunk to WHNF (Weak Head Normal Form)
+ * @param thunk The thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new thunk evaluate to WHNF
+ */
+lsthunk_t *lsthunk_eval_alge(lsthunk_t *thunk, lssize_t argc,
+                             lsthunk_t *const *args);
+
+/**
+ * Evaluate an application thunk to WHNF (Weak Head Normal Form)
+ * @param thunk The thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new thunk evaluate to WHNF
+ */
+lsthunk_t *lsthunk_eval_appl(lsthunk_t *thunk, lssize_t argc,
+                             lsthunk_t *const *args);
+
+/**
+ * Evaluate a lambda thunk to WHNF (Weak Head Normal Form)
+ * @param thunk The thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new thunk evaluate to WHNF
+ */
+lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
+                               lsthunk_t *const *args);
+
+/**
+ * Evaluate a builtin function thunk to WHNF (Weak Head Normal Form)
+ * @param thunk The thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new thunk evaluate to WHNF
+ */
+lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
+                                lsthunk_t *const *args);
+/**
+ * Evaluate a reference thunk to WHNF (Weak Head Normal Form)
+ * @param thunk The thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new thunk evaluate to WHNF
+ */
+lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
+                            lsthunk_t *const *args);
+
+/**
+ * Evaluate a choice thunk to WHNF (Weak Head Normal Form)
+ * @param thunk The thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new thunk evaluate to WHNF
+ */
 lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
                                    lstpat_t *tpat);
 

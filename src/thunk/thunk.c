@@ -126,7 +126,7 @@ lsthunk_t *lsthunk_new_lambda(lstpat_t *param, lsthunk_t *body) {
   return thunk;
 }
 
-lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstref_target_t *target) {
+lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lseref_target_t *target) {
   lsthunk_t *thunk = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type = LSTTYPE_REF;
   thunk->lt_whnf = NULL;
@@ -136,77 +136,82 @@ lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstref_target_t *target) {
   return thunk;
 }
 
-lsthunk_t *lsthunk_new_ealge(const lsealge_t *ealge, lstenv_t *tenv) {
+lsthunk_t *lsthunk_new_ealge(const lsealge_t *ealge, lseenv_t *eenv) {
   lssize_t eargc = lsealge_get_argc(ealge);
   const lsexpr_t *const *eargs = lsealge_get_args(ealge);
   lsthunk_t *targs[eargc];
   for (lssize_t i = 0; i < eargc; i++) {
-    targs[i] = lsthunk_new_expr(eargs[i], tenv);
+    targs[i] = lsthunk_new_expr(eargs[i], eenv);
     if (targs[i] == NULL)
       return NULL;
   }
   return lsthunk_new_alge(lsealge_get_constr(ealge), eargc, targs);
 }
 
-lsthunk_t *lsthunk_new_eappl(const lseappl_t *eappl, lstenv_t *tenv) {
+lsthunk_t *lsthunk_new_eappl(const lseappl_t *eappl, lseenv_t *eenv) {
   const lsexpr_t *efunc = lseappl_get_func(eappl);
-  lsthunk_t *tfunc = lsthunk_new_expr(efunc, tenv);
+  lsthunk_t *tfunc = lsthunk_new_expr(efunc, eenv);
   if (tfunc == NULL)
     return NULL;
   lssize_t eargc = lseappl_get_argc(eappl);
   const lsexpr_t *const *eargs = lseappl_get_args(eappl);
   lsthunk_t *targs[eargc];
   for (lssize_t i = 0; i < eargc; i++) {
-    targs[i] = lsthunk_new_expr(eargs[i], tenv);
+    targs[i] = lsthunk_new_expr(eargs[i], eenv);
     if (targs[i] == NULL)
       return NULL;
   }
   return lsthunk_new_appl(tfunc, eargc, targs);
 }
 
-lsthunk_t *lsthunk_new_echoice(const lsechoice_t *echoice, lstenv_t *tenv) {
+lsthunk_t *lsthunk_new_echoice(const lsechoice_t *echoice, lseenv_t *eenv) {
   const lsexpr_t *eleft = lsechoice_get_left(echoice);
-  lsthunk_t *tleft = lsthunk_new_expr(eleft, tenv);
+  lsthunk_t *tleft = lsthunk_new_expr(eleft, eenv);
   if (tleft == NULL)
     return NULL;
   const lsexpr_t *eright = lsechoice_get_right(echoice);
-  lsthunk_t *tright = lsthunk_new_expr(eright, tenv);
+  lsthunk_t *tright = lsthunk_new_expr(eright, eenv);
   if (tright == NULL)
     return NULL;
   return lsthunk_new_choice(tleft, tright);
 }
 
-lsthunk_t *lsthunk_new_eclosure(const lseclosure_t *eclosure, lstenv_t *tenv) {
-  tenv = lstenv_new(tenv);
+lsthunk_t *lsthunk_new_eclosure(const lseclosure_t *eclosure, lseenv_t *eenv) {
+  eenv = lseenv_new(eenv);
   lssize_t ebindc = lseclosure_get_bindc(eclosure);
   const lsbind_t *const *ebinds = lseclosure_get_binds(eclosure);
-  lstref_target_origin_t *origins[ebindc];
+  lseref_target_origin_t *origins[ebindc];
   for (lssize_t i = 0; i < ebindc; i++) {
     const lspat_t *lhs = lsbind_get_lhs(ebinds[i]);
-    origins[i] = lsmalloc(sizeof(lstref_target_origin_t));
-    origins[i]->lrto_type = LSTRTYPE_BIND;
-    origins[i]->lrto_bind.ltb_lhs = lstpat_new_pat(lhs, tenv, origins[i]);
-    if (origins[i]->lrto_bind.ltb_lhs == NULL)
+    lstpat_t *lhs_new = lstpat_new_pat(lhs, eenv, NULL);
+    if (lhs_new == NULL)
       return NULL;
+    origins[i] = lseref_target_origin_new_bind(lhs_new, NULL);
   }
   for (lssize_t i = 0; i < ebindc; i++) {
     const lsexpr_t *rhs = lsbind_get_rhs(ebinds[i]);
-    origins[i]->lrto_bind.ltb_rhs = lsthunk_new_expr(rhs, tenv);
-    if (origins[i]->lrto_bind.ltb_rhs == NULL)
+    lsthunk_t *rhs_new = lsthunk_new_expr(rhs, eenv);
+    if (rhs_new == NULL)
       return NULL;
+    origins[i] = lseref_target_origin_set_rhs(origins[i], rhs_new);
   }
-  return lsthunk_new_expr(lseclosure_get_expr(eclosure), tenv);
+  return lsthunk_new_expr(lseclosure_get_expr(eclosure), eenv);
 }
 
-lsthunk_t *lsthunk_new_eref(const lsref_t *ref, lstenv_t *tenv) {
-  lstref_target_t *target = lstenv_get(tenv, lsref_get_name(ref));
+lsthunk_t *lsthunk_new_eref(const lsref_t *ref, lseenv_t *eenv) {
+  lseref_target_t *target = lseenv_get(eenv, lsref_get_name(ref));
+  // target will be one of below:
+  //     1. lambda parameter reference
+  //     2. bind reference
+  //     3. direct expression / pre-resolved bind reference
+  //     4. direct expression / builtin function
   if (target == NULL) {
     lsprintf(stderr, 0, "E: ");
     lsloc_print(stderr, lsref_get_loc(ref));
     lsprintf(stderr, 0, "undefined reference: ");
     lsref_print(stderr, LSPREC_LOWEST, 0, ref);
     lsprintf(stderr, 0, "\n");
-    lstenv_incr_nerrors(tenv);
+    lseenv_incr_nerrors(eenv);
   }
   return lsthunk_new_ref(ref, target);
 }
@@ -227,39 +232,39 @@ lsthunk_t *lsthunk_new_str(const lsstr_t *strval) {
   return thunk;
 }
 
-lsthunk_t *lsthunk_new_elambda(const lselambda_t *elambda, lstenv_t *tenv) {
+lsthunk_t *lsthunk_new_elambda(const lselambda_t *elambda, lseenv_t *eenv) {
   const lspat_t *pparam = lselambda_get_param(elambda);
   const lsexpr_t *ebody = lselambda_get_body(elambda);
-  tenv = lstenv_new(tenv);
+  eenv = lseenv_new(eenv);
   lstref_target_origin_t *origin = lsmalloc(sizeof(lstref_target_origin_t));
   origin->lrto_type = LSTRTYPE_LAMBDA;
-  lstpat_t *param = lstpat_new_pat(pparam, tenv, NULL);
+  lstpat_t *param = lstpat_new_pat(pparam, eenv, NULL);
   if (param == NULL)
     return NULL;
   origin->lrto_lambda.ltl_param = param;
-  lsthunk_t *body = lsthunk_new_expr(ebody, tenv);
+  lsthunk_t *body = lsthunk_new_expr(ebody, eenv);
   if (body == NULL)
     return NULL;
   origin->lrto_lambda.ltl_body = body;
   return lsthunk_new_lambda(param, body);
 }
 
-lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr, lstenv_t *tenv) {
+lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr, lseenv_t *eenv) {
   switch (lsexpr_get_type(expr)) {
   case LSETYPE_ALGE:
-    return lsthunk_new_ealge(lsexpr_get_alge(expr), tenv);
+    return lsthunk_new_ealge(lsexpr_get_alge(expr), eenv);
   case LSETYPE_APPL:
-    return lsthunk_new_eappl(lsexpr_get_appl(expr), tenv);
+    return lsthunk_new_eappl(lsexpr_get_appl(expr), eenv);
   case LSETYPE_CHOICE:
-    return lsthunk_new_echoice(lsexpr_get_choice(expr), tenv);
+    return lsthunk_new_echoice(lsexpr_get_choice(expr), eenv);
   case LSETYPE_CLOSURE:
-    return lsthunk_new_eclosure(lsexpr_get_closure(expr), tenv);
+    return lsthunk_new_eclosure(lsexpr_get_closure(expr), eenv);
   case LSETYPE_LAMBDA:
-    return lsthunk_new_elambda(lsexpr_get_lambda(expr), tenv);
+    return lsthunk_new_elambda(lsexpr_get_lambda(expr), eenv);
   case LSETYPE_INT:
     return lsthunk_new_int(lsexpr_get_int(expr));
   case LSETYPE_REF:
-    return lsthunk_new_ref(lsexpr_get_ref(expr), tenv);
+    return lsthunk_new_eref(lsexpr_get_ref(expr), eenv);
   case LSETYPE_STR:
     return lsthunk_new_str(lsexpr_get_str(expr));
   }
@@ -421,9 +426,7 @@ lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv) {
   return LSMATCH_FAILURE;
 }
 
-static lsthunk_t *lsthunk_beta(lsthunk_t *thunk, lstenv_t *tenv);
-
-static lsthunk_t *lsthunk_beta_alge(lsthunk_t *thunk, lstenv_t *tenv) {
+lsthunk_t *lsthunk_beta_alge(lsthunk_t *thunk, lstenv_t *tenv) {
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_ALGE);
   lssize_t argc = lsthunk_get_argc(thunk);
@@ -471,13 +474,49 @@ lsthunk_t *lsthunk_beta_lambda(lsthunk_t *thunk, lstenv_t *tenv) {
   lstpat_t *param = lsthunk_get_param(thunk);
   lsthunk_t *body = lsthunk_get_body(thunk);
   lstenv_t *tenv_new = lstenv_new(tenv);
-  lsmres_t mres = lstenv_put(tenv_new, lstpat_get_ref(param), thunk);
+  lsmres_t mres = lsthunk_match_pat(thunk, param, tenv_new);
   if (mres != LSMATCH_SUCCESS)
     return NULL;
   lsthunk_t *body_new = lsthunk_beta(body, tenv_new);
   if (body_new == NULL)
     return NULL;
   return lsthunk_new_lambda(param, body_new);
+}
+
+lsthunk_t *lsthunk_beta_ref(lsthunk_t *thunk, lstenv_t *tenv) {
+  assert(thunk != NULL);
+  assert(thunk->lt_type == LSTTYPE_REF);
+  lstref_target_t *target = lsthunk_get_ref_target(thunk);
+  assert(target != NULL);
+  lstref_target_origin_t *origin = target->lrt_origin;
+  assert(origin != NULL);
+  lstpat_t *pat_ref = target->lrt_pat_ref;
+  assert(pat_ref != NULL);
+  lsthunk_t *refbound = lstpat_get_refbound(pat_ref);
+  if (refbound != NULL)
+    return lsthunk_beta(refbound, tenv);
+  switch (origin->lrto_type) {
+  case LSTRTYPE_BIND: {
+    lsmres_t mres =
+        lsthunk_match_pat(origin->lrto_bind.ltb_rhs, origin->lrto_bind.ltb_lhs);
+    if (mres != LSMATCH_SUCCESS)
+      return NULL;
+    refbound = lstpat_get_refbound(pat_ref);
+    assert(refbound != NULL);
+    return lsthunk_beta(refbound, tenv);
+  }
+  case LSTRTYPE_LAMBDA: {
+    lsmres_t mres = lsthunk_match_pat(origin->lrto_lambda.ltl_body,
+                                      origin->lrto_lambda.ltl_param);
+    if (mres != LSMATCH_SUCCESS)
+      return NULL;
+    refbound = lstpat_get_refbound(pat_ref);
+    assert(refbound != NULL);
+    return lsthunk_beta(refbound, tenv);
+  }
+  case LSTRTYPE_THUNK:
+    return lsthunk_beta(origin->lrto_thunk, tenv);
+  }
 }
 
 lsthunk_t *lsthunk_beta(lsthunk_t *thunk, lstenv_t *tenv) {
@@ -498,8 +537,8 @@ lsthunk_t *lsthunk_beta(lsthunk_t *thunk, lstenv_t *tenv) {
   }
 }
 
-static lsthunk_t *lsthunk_eval_alge(lsthunk_t *thunk, lssize_t argc,
-                                    lsthunk_t *const *args) {
+lsthunk_t *lsthunk_eval_alge(lsthunk_t *thunk, lssize_t argc,
+                             lsthunk_t *const *args) {
   // eval (C a b ...) x y ... = C a b ... x y ...
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_ALGE);
@@ -519,8 +558,8 @@ static lsthunk_t *lsthunk_eval_alge(lsthunk_t *thunk, lssize_t argc,
   return thunk_new;
 }
 
-static lsthunk_t *lsthunk_eval_appl(lsthunk_t *thunk, lssize_t argc,
-                                    lsthunk_t *const *args) {
+lsthunk_t *lsthunk_eval_appl(lsthunk_t *thunk, lssize_t argc,
+                             lsthunk_t *const *args) {
   // eval (f a b ...) x y ... => eval f a b ... x y ...
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_APPL);
@@ -534,8 +573,8 @@ static lsthunk_t *lsthunk_eval_appl(lsthunk_t *thunk, lssize_t argc,
   return lsthunk_eval(func1, argc1, args1);
 }
 
-static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
-                                      lsthunk_t *const *args) {
+lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
+                               lsthunk_t *const *args) {
   // eval (\param -> body) x y ... = eval (body[param := x]) y ...
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_LAMBDA);
@@ -556,8 +595,8 @@ static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
   return lsthunk_eval(body_new, argc - 1, args1);
 }
 
-static lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
-                                       lsthunk_t *const *args) {
+lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
+                                lsthunk_t *const *args) {
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_BUILTIN);
   if (argc == 0)
@@ -582,8 +621,8 @@ static lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
   return lsthunk_eval(ret, argc - arity, args + arity);
 }
 
-static lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
-                                   lsthunk_t *const *args) {
+lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
+                            lsthunk_t *const *args) {
   // eval ~r x y ... = eval (eval ~r) x y ...
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_REF);
