@@ -209,7 +209,7 @@ const char *lsstr_get_buf(const lsstr_t *str) {
   return str->ls_buf;
 }
 
-lssize_t lsstr_get_len(const lsstr_t *str) {
+lssize_t lsstrlen(const lsstr_t *str) {
   assert(str != NULL);
   return str->ls_len;
 }

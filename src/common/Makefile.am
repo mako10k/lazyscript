@@ -5,6 +5,8 @@ liblscommon_la_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS) -I..
 liblscommon_la_SOURCES = \
     array.c \
     array.h \
+    const.c \
+    const.h \
     hash.c \
     hash.h \
     int.c \

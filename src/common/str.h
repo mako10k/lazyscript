@@ -12,7 +12,7 @@ const lsstr_t *lsstr_sub(const lsstr_t *str, lssize_t pos, lssize_t len);
 const lsstr_t *lsstr_cstr(const char *str);
 const lsstr_t *lsstr_parse(const char *str, lssize_t len);
 const char *lsstr_get_buf(const lsstr_t *str);
-lssize_t lsstr_get_len(const lsstr_t *str);
+lsapi_get lsapi_pure lssize_t lsstrlen(const lsstr_t *str);
 int lsstrcmp(const lsstr_t *str1, const lsstr_t *str2);
 
 /**

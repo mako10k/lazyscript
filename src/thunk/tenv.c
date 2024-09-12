@@ -121,3 +121,17 @@ void lstenv_put_builtin(lstenv_t *tenv, const lsstr_t *name, lssize_t arity,
   lstref_target_t *target = lstref_target_new(origin, tpat);
   lstenv_put(tenv, name, target);
 }
+
+struct lstref_target_origin {
+  lstrtype_t lrto_type;
+};
+
+struct lstref_target {
+  lstref_target_origin_t *lrt_origin;
+  const lsref_t *lrt_ref;
+};
+
+lstrtype_t lstref_target_get_type(lstref_target_t *target) {
+  assert(target != NULL);
+  return target->lrt_origin->lrto_type;
+}

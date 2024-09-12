@@ -22,22 +22,30 @@ lstpat_t *lstpat_new_str(const lsstr_t *strval);
 lstpat_t *lstpat_new_pat(const lspat_t *pat, lseenv_t *tenv,
                          lseref_target_origin_t *origin);
 
-lsptype_t lstpat_get_type(const lstpat_t *pat);
+lsptype_t lstpat_get_type(const lstpat_t *tpat);
 
-const lsstr_t *lstpat_get_constr(const lstpat_t *pat);
+lsapi_get lsapi_pure lsbool_t lstpat_is_list(const lstpat_t *tpat);
 
-lssize_t lstpat_get_argc(const lstpat_t *pat);
+lsapi_get lsapi_pure lsbool_t lstpat_is_cons(const lstpat_t *tpat);
 
-lstpat_t *const *lstpat_get_args(const lstpat_t *pat);
+lsapi_get lsapi_pure lsbool_t lstpat_is_nil(const lstpat_t *tpat);
 
-lstpat_t *lstpat_get_asref(const lstpat_t *pat);
+lsapi_pure const lstpat_t *lstpat_get_nil(void);
 
-lstpat_t *lstpat_get_aspattern(const lstpat_t *pat);
+const lsstr_t *lstpat_get_constr(const lstpat_t *tpat);
 
-const lsref_t *lstpat_get_ref(const lstpat_t *pat);
+lssize_t lstpat_get_argc(const lstpat_t *tpat);
 
-const lsint_t *lstpat_get_int(const lstpat_t *pat);
+lstpat_t *const *lstpat_get_args(const lstpat_t *tpat);
 
-const lsstr_t *lstpat_get_str(const lstpat_t *pat);
+lstpat_t *lstpat_get_asref(const lstpat_t *tpat);
 
-void lstpat_print(FILE *fp, lsprec_t prec, int indent, const lstpat_t *pat);
+lstpat_t *lstpat_get_aspattern(const lstpat_t *tpat);
+
+const lsref_t *lstpat_get_ref(const lstpat_t *tpat);
+
+const lsint_t *lstpat_get_int(const lstpat_t *tpat);
+
+const lsstr_t *lstpat_get_str(const lstpat_t *tpat);
+
+void lstpat_print(FILE *fp, lsprec_t prec, int indent, const lstpat_t *tpat);

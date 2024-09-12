@@ -6,16 +6,10 @@ typedef struct lstappl lstappl_t;
 typedef struct lstchoice lstchoice_t;
 typedef struct lstbind lstbind_t;
 typedef struct lstlambda lstlambda_t;
-typedef struct lstref lstref_t;
-typedef struct lstref_target lstref_target_t;
-typedef struct lstref_target_origin lstref_target_origin_t;
+typedef struct lstbindref lstbindref_t;
+typedef struct lstparamref lstparamref_t;
+typedef struct lstthunkref lstthunkref_t;
 typedef struct lstbuiltin lstbuiltin_t;
-
-typedef enum lstrtype {
-  LSTRTYPE_BIND,
-  LSTRTYPE_LAMBDA,
-  LSTRTYPE_THUNK
-} lstrtype_t;
 
 #include "lstypes.h"
 
@@ -35,59 +29,119 @@ typedef lsthunk_t *(*lstbuiltin_func_t)(lssize_t, lsthunk_t *const *, void *);
 typedef enum lsttype {
   LSTTYPE_ALGE,
   LSTTYPE_APPL,
+  LSTTYPE_BINDREF,
+  LSTTYPE_BUILTIN,
   LSTTYPE_CHOICE,
   LSTTYPE_INT,
   LSTTYPE_LAMBDA,
-  LSTTYPE_REF,
+  LSTTYPE_PARAMREF,
+  LSTTYPE_THUNKREF,
   LSTTYPE_STR,
-  LSTTYPE_BUILTIN
 } lsttype_t;
 
 #define lsapi_beta lsapi_nn12 lsapi_wur
-
-lsthunk_t *lsthunk_new_alge(const lsstr_t *constr, lssize_t argc,
-                            lsthunk_t *const *args);
-
-lsthunk_t *lsthunk_new_appl(lsthunk_t *func, lssize_t argc,
-                            lsthunk_t *const *args);
-
-lsthunk_t *lsthunk_new_choice(lsthunk_t *left, lsthunk_t *right);
-
-lsthunk_t *lsthunk_new_lambda(lstpat_t *param, lsthunk_t *body);
-
-lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lseref_target_t *target);
+#define lsapi_new_thunk_alge lsapi_nn1 lsapi_wur
+#define lsapi_new_thunk_appl lsapi_nn1 lsapi_wur
+#define lsapi_new_thunk_bindref lsapi_nn12 lsapi_wur
+#define lsapi_new_thunk_builtin lsapi_nn13 lsapi_wur
+#define lsapi_new_thunk_choice lsapi_wur
+#define lsapi_new_thunk_int lsapi_wur
+#define lsapi_new_thunk_lambda lsapi_nn12 lsapi_wur
+#define lsapi_new_thunk_paramref lsapi_nn1 lsapi_wur
+#define lsapi_new_thunk_str lsapi_wur
+#define lsapi_new_thunk_thunkref lsapi_wur
 
 /**
- * Beta reduction for thunk and make a copy of thunk and replace the thunk with
- * the new thunk
- * @param thunk The thunk
- * @param tenv The environment
- */
-lsapi_beta lsthunk_t *lsthunk_beta(lsthunk_t *thunk, lstenv_t *tenv);
-
-/**
- * Beta reduction for algebraic thunk
- * @param thunk The thunk
- * @param tenv The environment
+ * Create a new thunk for an algebraic data type
+ * @param constr The constructor
+ * @param argc The number of arguments
+ * @param args The arguments
  * @return The new thunk
  */
-lsapi_beta lsthunk_t *lsthunk_beta_alge(lsthunk_t *thunk, lstenv_t *tenv);
+lsapi_new_thunk_alge lsthunk_t *
+lsthunk_new_alge(const lsstr_t *constr, lssize_t argc, lsthunk_t *const *args);
 
 /**
- * Beta reduction for application thunk
- * @param thunk The thunk
- * @param tenv The environment
+ * Create a new thunk for an application
+ * @param func The function
+ * @param argc The number of arguments
+ * @param args The arguments
  * @return The new thunk
  */
-lsapi_beta lsthunk_t *lsthunk_beta_appl(lsthunk_t *thunk, lstenv_t *tenv);
+lsapi_new_thunk_appl lsthunk_t *lsthunk_new_appl(lsthunk_t *func, lssize_t argc,
+                                                 lsthunk_t *const *args);
 
 /**
- * Beta reduction for lambda thunk
- * @param thunk The thunk
- * @param tenv The environment
+ * Create a new thunk for a bind reference
+ * @param bind The bind
+ * @param ref The reference
+ * @param bound The bound thunk
  * @return The new thunk
  */
-lsapi_beta lsthunk_t *lsthunk_beta_lambda(lsthunk_t *thunk, lstenv_t *tenv);
+lsapi_new_thunk_bindref lsthunk_t *
+lsthunk_new_bindref(lstbind_t *bind, const lsref_t *ref, lsthunk_t *bound);
+
+/**
+ * Create a new thunk for a builtin data type
+ * @param name The name of the builtin (only for debugging)
+ * @param arity The number of arguments
+ * @param func The function
+ * @param data The data
+ * @return The new thunk
+ */
+lsapi_new_thunk_builtin lsthunk_t *lsthunk_new_builtin(const lsstr_t *name,
+                                                       lssize_t arity,
+                                                       lstbuiltin_func_t func,
+                                                       void *data);
+
+/**
+ * Create a new thunk for a choice
+ * @param left The left thunk
+ * @param right The right thunk
+ * @return The new thunk
+ */
+lsapi_new_thunk_choice lsthunk_t *lsthunk_new_choice(lsthunk_t *left,
+                                                     lsthunk_t *right);
+
+/**
+ * Create a new thunk for an integer data type
+ * @param intval The integer value
+ * @return The new thunk
+ */
+lsapi_new_thunk_int lsthunk_t *lsthunk_new_int(const lsint_t *intval);
+
+/**
+ * Create a new thunk for a lambda
+ * @param param The parameter
+ * @param body The body
+ * @return The new thunk
+ */
+lsapi_new_thunk_lambda lsthunk_t *lsthunk_new_lambda(lstpat_t *param,
+                                                     lsthunk_t *body);
+
+/**
+ * Create a new thunk for a parameter reference
+ * @param param The parameter
+ * @param bound The bound thunk
+ * @return The new thunk
+ */
+lsapi_new_thunk_paramref lsthunk_t *
+lsthunk_new_paramref(lsthunk_t *lambda, const lsref_t *ref, lsthunk_t *bound);
+
+/**
+ * Create a new thunk for a string data type
+ * @param strval The string value
+ * @return The new thunk
+ */
+lsapi_new_thunk_str lsthunk_t *lsthunk_new_str(const lsstr_t *strval);
+
+/**
+ * Create a new thunk for a thunk reference
+ * @param ref The reference
+ * @return The new thunk
+ */
+lsapi_new_thunk_thunkref lsthunk_t *lsthunk_new_thunkref(const lsref_t *ref,
+                                                         lsthunk_t *bound);
 
 /**
  * Create new thunk from algebraic expression
@@ -138,31 +192,6 @@ lsthunk_t *lsthunk_new_elambda(const lselambda_t *elambda, lseenv_t *eenv);
 lsthunk_t *lsthunk_new_eref(const lsref_t *ref, lseenv_t *eenv);
 
 /**
- * Create a new thunk for an integer data type
- * @param intval The integer value
- * @return The new thunk
- */
-lsthunk_t *lsthunk_new_int(const lsint_t *intval);
-
-/**
- * Create a new thunk for a string data type
- * @param strval The string value
- * @return The new thunk
- */
-lsthunk_t *lsthunk_new_str(const lsstr_t *strval);
-
-/**
- * Create a new thunk for a builtin data type
- * @param name The name of the builtin (only for debugging)
- * @param arity The number of arguments
- * @param func The function
- * @param data The data
- * @return The new thunk
- */
-lsthunk_t *lsthunk_new_builtin(const lsstr_t *name, lssize_t arity,
-                               lstbuiltin_func_t func, void *data);
-
-/**
  * Create a new thunk for an expression
  * @param expr The expression
  * @param eenv The environment
@@ -175,63 +204,178 @@ lsthunk_t *lsthunk_new_expr(const lsexpr_t *expr, lseenv_t *eenv);
  * @param thunk The thunk
  * @return The type of the thunk
  */
-lsttype_t lsthunk_get_type(const lsthunk_t *thunk);
+lsapi_get lsapi_pure lsttype_t lsthunk_get_type(const lsthunk_t *thunk);
+
+/**
+ * Check if a thunk is a list thunk
+ * @param thunk The thunk
+ * @return True if the thunk is a list thunk
+ */
+lsapi_get lsapi_pure lsbool_t lsthunk_is_list(const lsthunk_t *thunk);
+
+/**
+ * Check if a thunk is a cons thunk
+ * @param thunk The thunk
+ * @return True if the thunk is a cons thunk
+ */
+lsapi_get lsapi_pure lsbool_t lsthunk_is_cons(const lsthunk_t *thunk);
+
+/**
+ * Check if a thunk is a nil list thunk
+ * @param thunk The thunk
+ * @return True if the thunk is a nil list thunk
+ */
+lsapi_get lsapi_pure lsbool_t lsthunk_is_nil(const lsthunk_t *thunk);
+
+/**
+ * Get the nil list thunk
+ * @return The nil list thunk
+ */
+lsapi_pure const lsthunk_t *lsthunk_get_nil(void);
+
+/**
+ * Create a new list thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new list thunk
+ */
+lsthunk_t *lsthunk_new_list(lssize_t argc, lsthunk_t *const *args);
+
+/**
+ * Create a new cons thunk
+ * @param head The head
+ * @param tail The tail
+ * @return The new cons thunk
+ */
+lsapi_nn12 lsthunk_t *lsthunk_new_cons(lsthunk_t *head, lsthunk_t *tail);
 
 /**
  * Get the algebraic constructor of a thunk
  * @param thunk The thunk
  * @return The algebraic constructor
  */
-const lsstr_t *lsthunk_get_constr(const lsthunk_t *thunk);
+lsapi_get lsapi_pure const lsstr_t *lsthunk_get_constr(const lsthunk_t *thunk);
 
 /**
  * Get the function of a thunk
  * @param thunk The thunk
  * @return The function
  */
-lsthunk_t *lsthunk_get_func(const lsthunk_t *thunk);
+lsapi_get lsapi_pure lsthunk_t *lsthunk_get_func(const lsthunk_t *thunk);
 
 /**
  * Get the arguments of a thunk
  * @param thunk The thunk
  * @return The arguments
  */
-lssize_t lsthunk_get_argc(const lsthunk_t *thunk);
+lsapi_get lsapi_pure lssize_t lsthunk_get_argc(const lsthunk_t *thunk);
 
 /**
  * Get the arguments of a thunk
  * @param thunk The thunk
  * @return The arguments
  */
-lsthunk_t *const *lsthunk_get_args(const lsthunk_t *thunk);
+lsapi_get lsapi_pure lsthunk_t *const *lsthunk_get_args(const lsthunk_t *thunk);
 
 /**
  * Get the integer value of a thunk
  * @param thunk The thunk
  * @return The integer value
  */
-const lsint_t *lsthunk_get_int(const lsthunk_t *thunk);
+lsapi_get lsapi_pure const lsint_t *lsthunk_get_int(const lsthunk_t *thunk);
 
 /**
  * Get the string value of a thunk
  * @param thunk The thunk
  * @return The string value
  */
-const lsstr_t *lsthunk_get_str(const lsthunk_t *thunk);
+lsapi_get lsapi_pure const lsstr_t *lsthunk_get_str(const lsthunk_t *thunk);
 
-lssize_t lsthunk_get_argc(const lsthunk_t *thunk);
+/**
+ * Get the left thunk of a choice thunk
+ * @param thunk The thunk
+ * @return The left thunk
+ */
+lsapi_get lsapi_pure lsthunk_t *lsthunk_get_left(const lsthunk_t *thunk);
 
-lsthunk_t *const *lsthunk_get_args(const lsthunk_t *thunk);
+/**
+ * Get the right thunk of a choice thunk
+ * @param thunk The thunk
+ * @return The right thunk
+ */
+lsapi_get lsapi_pure lsthunk_t *lsthunk_get_right(const lsthunk_t *thunk);
 
-lsthunk_t *lsthunk_get_left(const lsthunk_t *thunk);
+/**
+ * Get the parameter of a lambda thunk
+ * @param thunk The thunk
+ * @return The parameter
+ */
+lsapi_get lsapi_pure lstpat_t *lsthunk_get_param(const lsthunk_t *thunk);
 
-lsthunk_t *lsthunk_get_right(const lsthunk_t *thunk);
+/**
+ * Get the body of a lambda thunk
+ * @param thunk The thunk
+ * @return The body
+ */
+lsapi_get lsapi_pure lsthunk_t *lsthunk_get_body(const lsthunk_t *thunk);
 
-lstpat_t *lsthunk_get_param(const lsthunk_t *thunk);
+/**
+ * Get the bind of a bind reference thunk
+ * @param thunk The thunk
+ * @return The bind
+ */
+lsapi_get lsapi_pure lstbind_t *lsthunk_get_bind(const lsthunk_t *thunk);
 
-lsthunk_t *lsthunk_get_body(const lsthunk_t *thunk);
+/**
+ * Get the lambda of a parameter reference thunk
+ * @param thunk The thunk
+ * @return The bind
+ */
+lsapi_get lsapi_pure lsthunk_t *lsthunk_get_lambda(const lsthunk_t *thunk);
 
-lstref_target_t *lsthunk_get_ref_target(const lsthunk_t *thunk);
+/**
+ * Get the reference of a parameter reference thunk
+ * @param thunk The thunk
+ * @return The reference
+ */
+lsapi_get lsapi_pure const lsref_t *lsthunk_get_ref(const lsthunk_t *thunk);
+
+/**
+ * Get the bound data of a bind reference thunk
+ * @param thunk The thunk
+ * @return The bound
+ */
+lsapi_get lsapi_pure lsthunk_t *lsthunk_get_bound(const lsthunk_t *thunk);
+
+/**
+ * Get the name of a builtin thunk
+ * @param thunk The thunk
+ * @return The bound
+ */
+lsapi_get lsapi_pure const lsstr_t *
+lsthunk_get_builtin_name(const lsthunk_t *thunk);
+
+/**
+ * Get the arity of a builtin thunk
+ * @param thunk The thunk
+ * @return The bound
+ */
+lsapi_get lsapi_pure lssize_t lsthunk_get_builtin_arity(const lsthunk_t *thunk);
+
+/**
+ * Get the function of a builtin thunk
+ * @param thunk The thunk
+ * @return The bound
+ */
+lsapi_get lsapi_pure lstbuiltin_func_t
+lsthunk_get_builtin_func(const lsthunk_t *thunk);
+
+/**
+ * Get the data of a builtin thunk
+ * @param thunk The thunk
+ * @return The bound
+ */
+lsapi_get lsapi_pure void *lsthunk_get_builtin_data(const lsthunk_t *thunk);
 
 /**
  * Associate a thunk with an algebraic pattern
@@ -240,7 +384,8 @@ lstref_target_t *lsthunk_get_ref_target(const lsthunk_t *thunk);
  * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_alge(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
+lsmres_t lsthunk_match_palge(lsthunk_t *thunk, const lstpat_t *tpat,
+                             lstenv_t *tenv);
 
 /**
  * Associate a thunk with an as pattern
@@ -249,7 +394,8 @@ lsmres_t lsthunk_match_alge(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
  * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pas(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
+lsmres_t lsthunk_match_pas(lsthunk_t *thunk, const lstpat_t *tpat,
+                           lstenv_t *tenv);
 
 /**
  * Associate a thunk with a reference pattern
@@ -258,7 +404,8 @@ lsmres_t lsthunk_match_pas(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
  * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_ref(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
+lsmres_t lsthunk_match_pref(lsthunk_t *thunk, const lstpat_t *tpat,
+                            lstenv_t *tenv);
 
 /**
  * Associate a thunk with a pattern
@@ -267,14 +414,47 @@ lsmres_t lsthunk_match_ref(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
  * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat, lstenv_t *tenv);
+lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lstpat_t *tpat,
+                           lstenv_t *tenv);
+
+/**
+ * Beta reduction for thunk and make a copy of thunk and replace the thunk with
+ * the new thunk
+ * @param thunk The thunk
+ * @param tenv The environment
+ */
+lsapi_beta lsthunk_t *lsthunk_beta(lsthunk_t *thunk, lstenv_t *tenv);
+
+/**
+ * Beta reduction for algebraic thunk
+ * @param thunk The thunk
+ * @param tenv The environment
+ * @return The new thunk
+ */
+lsapi_beta lsthunk_t *lsthunk_beta_alge(lsthunk_t *thunk, lstenv_t *tenv);
+
+/**
+ * Beta reduction for application thunk
+ * @param thunk The thunk
+ * @param tenv The environment
+ * @return The new thunk
+ */
+lsapi_beta lsthunk_t *lsthunk_beta_appl(lsthunk_t *thunk, lstenv_t *tenv);
+
+/**
+ * Beta reduction for lambda thunk
+ * @param thunk The thunk
+ * @param tenv The environment
+ * @return The new thunk
+ */
+lsapi_beta lsthunk_t *lsthunk_beta_lambda(lsthunk_t *thunk, lstenv_t *tenv);
 
 /**
  * Evaluate a thunk to WHNF (Weak Head Normal Form)
  * @param thunk The thunk
  * @return The new thunk evaluate to WHNF
  */
-lsthunk_t *lsthunk_eval0(lsthunk_t *thunk);
+lsthunk_t *lsthunk_eval(lsthunk_t *thunk);
 
 /**
  * Apply a thunk to a list of arguments
@@ -283,7 +463,8 @@ lsthunk_t *lsthunk_eval0(lsthunk_t *thunk);
  * @param args The arguments
  * @return The result of the application
  */
-lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
+lsthunk_t *lsthunk_eval_thunk(lsthunk_t *func, lssize_t argc,
+                              lsthunk_t *const *args);
 
 /**
  * Evaluate an algebratic thunk to WHNF (Weak Head Normal Form)
@@ -304,6 +485,16 @@ lsthunk_t *lsthunk_eval_alge(lsthunk_t *thunk, lssize_t argc,
  */
 lsthunk_t *lsthunk_eval_appl(lsthunk_t *thunk, lssize_t argc,
                              lsthunk_t *const *args);
+
+/**
+ * Evaluate a bind reference thunk to WHNF (Weak Head Normal Form)
+ * @param thunk The thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new thunk evaluate to WHNF
+ */
+lsthunk_t *lsthunk_eval_choice(lsthunk_t *thunk, lssize_t argc,
+                               lsthunk_t *const *args);
 
 /**
  * Evaluate a lambda thunk to WHNF (Weak Head Normal Form)

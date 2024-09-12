@@ -15,4 +15,5 @@ lazyscript_LDADD = \
 lazyscript_SOURCES = \
     lazyscript.c \
     lazyscript.h \
+    lsassert.h \
     lstypes.h

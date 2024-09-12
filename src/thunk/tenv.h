@@ -1,8 +1,16 @@
 #pragma once
 
 typedef struct lstenv lstenv_t;
+typedef struct lstref_target lstref_target_t;
+typedef struct lstref_target_origin lstref_target_origin_t;
+typedef enum lstrtype {
+  LSTRTYPE_BIND,
+  LSTRTYPE_PARAM,
+  LSTRTYPE_THUNK
+} lstrtype_t;
 
 #include "common/str.h"
+#include "thunk/eenv.h"
 #include "thunk/thunk.h"
 
 /**
@@ -92,3 +100,7 @@ void lstenv_print(FILE *fp, const lstenv_t *tenv);
  */
 void lstenv_put_builtin(lstenv_t *tenv, const lsstr_t *name, lssize_t arity,
                         lstbuiltin_func_t func, void *data);
+
+
+lstrtype_t lstref_target_get_type(lstref_target_t *target);
+lsthunk_t *lstref_target_get_thunk(lstref_target_t *target);

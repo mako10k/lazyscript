@@ -36,3 +36,8 @@ typedef unsigned int lssize_t;
 
 #define lssizeof(tname, fname)                                                 \
   (offsetof(tname, fname) + sizeof(((tname *)0)->fname))
+
+typedef enum lsbool {
+  LSFALSE = 0,
+  LSTRUE = 1,
+} lsbool_t;

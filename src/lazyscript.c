@@ -69,7 +69,7 @@ static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
                                   void *data) {
   assert(argc == 1);
   assert(args != NULL);
-  lsthunk_t *thunk_str = lsthunk_eval0(args[0]);
+  lsthunk_t *thunk_str = lsthunk_get_whnf(args[0]);
   if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
     thunk_str = lsbuiltin_to_string(1, args, data);
   const lsstr_t *str = lsthunk_get_str(thunk_str);
@@ -88,7 +88,7 @@ static lsthunk_t *lsbuiltin_seq(lssize_t argc, lsthunk_t *const *args,
   assert(args != NULL);
   lsthunk_t *fst = args[0];
   lsthunk_t *snd = args[1];
-  lsthunk_t *fst_evaled = lsthunk_eval0(fst);
+  lsthunk_t *fst_evaled = lsthunk_get_whnf(fst);
   if (fst_evaled == NULL)
     return NULL;
   switch ((lsseq_type_t)(intptr_t)data) {
@@ -107,8 +107,8 @@ static lsthunk_t *lsbuiltin_add(lssize_t argc, lsthunk_t *const *args,
                                 void *data) {
   assert(argc == 2);
   assert(args != NULL);
-  lsthunk_t *lhs = lsthunk_eval0(args[0]);
-  lsthunk_t *rhs = lsthunk_eval0(args[1]);
+  lsthunk_t *lhs = lsthunk_get_whnf(args[0]);
+  lsthunk_t *rhs = lsthunk_get_whnf(args[1]);
   if (lhs == NULL || rhs == NULL)
     return NULL;
   if (lsthunk_get_type(lhs) != LSTTYPE_INT ||
@@ -123,8 +123,8 @@ static lsthunk_t *lsbuiltin_sub(lssize_t argc, lsthunk_t *const *args,
                                 void *data) {
   assert(argc == 2);
   assert(args != NULL);
-  lsthunk_t *lhs = lsthunk_eval0(args[0]);
-  lsthunk_t *rhs = lsthunk_eval0(args[1]);
+  lsthunk_t *lhs = lsthunk_get_whnf(args[0]);
+  lsthunk_t *rhs = lsthunk_get_whnf(args[1]);
   if (lhs == NULL || rhs == NULL)
     return NULL;
   if (lsthunk_get_type(lhs) != LSTTYPE_INT ||
