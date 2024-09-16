@@ -6,6 +6,4 @@ liblsthunk_la_SOURCES = \
     tenv.c \
     tenv.h \
     thunk.c \
-    thunk.h \
-    tpat.c \
-    tpat.h
+    thunk.h

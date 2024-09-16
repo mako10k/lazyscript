@@ -413,6 +413,8 @@ static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
   lsthunk_t *arg;
   lsthunk_t *const *args1 = (lsthunk_t *const *)lsa_shift(
       argc, (const void *const *)args, (const void **)&arg);
+  param = lstpat_clone(param);
+  body = lsthunk_clone(body);
   lsmres_t mres = lsthunk_match_pat(arg, param);
   if (mres != LSMATCH_SUCCESS)
     return NULL;

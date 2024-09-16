@@ -29,7 +29,6 @@ typedef lsthunk_t *(*lstbuiltin_func_t)(lssize_t, lsthunk_t *const *, void *);
 #include "pat/pas.h"
 #include "pat/pat.h"
 #include "thunk/tenv.h"
-#include "thunk/tpat.h"
 
 typedef enum lsttype {
   LSTTYPE_ALGE,
@@ -180,7 +179,7 @@ lsthunk_t *lsthunk_get_left(const lsthunk_t *thunk);
 
 lsthunk_t *lsthunk_get_right(const lsthunk_t *thunk);
 
-lstpat_t *lsthunk_get_param(const lsthunk_t *thunk);
+lspat_t *lsthunk_get_param(const lsthunk_t *thunk);
 
 lsthunk_t *lsthunk_get_body(const lsthunk_t *thunk);
 
@@ -189,34 +188,42 @@ lstref_target_t *lsthunk_get_ref_target(const lsthunk_t *thunk);
 /**
  * Associate a thunk with an algebraic pattern
  * @param thunk The thunk
- * @param tpat The algebraic pattern
+ * @param pat The algebraic pattern
+ * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_alge(lsthunk_t *thunk, lstpat_t *tpat);
+lsmres_t lsthunk_match_alge(lsthunk_t *thunk, const lspat_t *pat,
+                            lstenv_t *tenv);
 
 /**
  * Associate a thunk with an as pattern
  * @param thunk The thunk
- * @param tpat The as pattern
+ * @param pat The as pattern
+ * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pas(lsthunk_t *thunk, lstpat_t *tpat);
+lsmres_t lsthunk_match_pas(lsthunk_t *thunk, const lspat_t *pat,
+                           lstenv_t *tenv);
 
 /**
  * Associate a thunk with a reference pattern
  * @param thunk The thunk
- * @param tpat The reference pattern
+ * @param pat The reference pattern
+ * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_ref(lsthunk_t *thunk, lstpat_t *tpat);
+lsmres_t lsthunk_match_ref(lsthunk_t *thunk, const lspat_t *pat,
+                           lstenv_t *tenv);
 
 /**
  * Associate a thunk with a pattern
  * @param thunk The thunk
- * @param tpat The pattern
+ * @param pat The pattern
+ * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat);
+lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lspat_t *pat,
+                           lstenv_t *tenv);
 
 /**
  * Evaluate a thunk to WHNF (Weak Head Normal Form)
@@ -235,7 +242,7 @@ lsthunk_t *lsthunk_eval0(lsthunk_t *thunk);
 lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
 
 lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
-                                   lstpat_t *tpat);
+                                   lspat_t *pat);
 
 lstref_target_origin_t *lstref_target_origin_new_builtin(const lsstr_t *name,
                                                          lssize_t arity,
