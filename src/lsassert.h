@@ -13,6 +13,13 @@
 
 #define lsassert_talge(thunk) lsassert(lsthunk_get_type(thunk) == LSTTYPE_ALGE)
 #define lsassert_tappl(thunk) lsassert(lsthunk_get_type(thunk) == LSTTYPE_APPL)
+#define lsassert_tbeta(thunk) lsassert(lsthunk_get_type(thunk) == LSTTYPE_BETA)
+#define lsassert_tbindref(thunk)                                               \
+  lsassert(lsthunk_get_type(thunk) == LSTTYPE_BINDREF)
+#define lsassert_tbuiltin(thunk)                                               \
+  lsassert(lsthunk_get_type(thunk) == LSTTYPE_BUILTIN)
+#define lsassert_tchoice(thunk)                                                \
+  lsassert(lsthunk_get_type(thunk) == LSTTYPE_CHOICE)
 #define lsassert_tstr(thunk) lsassert(lsthunk_get_type(thunk) == LSTTYPE_STR)
 #define lsassert_tcons(thunk) lsassert(lsthunk_is_cons(thunk))
 #define lsassert_tlambda(thunk)                                                \
@@ -22,6 +29,10 @@
 #define lsassert_tcons(thunk) lsassert(lsthunk_is_cons(thunk))
 #define lsassert_tbindref(thunk)                                               \
   lsassert(lsthunk_get_type(thunk) == LSTTYPE_BINDREF)
+#define lsassert_tparamref(thunk)                                              \
+  lsassert(lsthunk_get_type(thunk) == LSTTYPE_PARAMREF)
+#define lsassert_tthunkref(thunk)                                              \
+  lsassert(lsthunk_get_type(thunk) == LSTTYPE_THUNKREF)
 
 #define lsassert_tpalge(tpat) lsassert(lstpat_get_type(tpat) == LSPTYPE_ALGE)
 #define lsassert_tpas(tpat) lsassert(lstpat_get_type(tpat) == LSPTYPE_AS)

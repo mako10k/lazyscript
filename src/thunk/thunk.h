@@ -3,13 +3,14 @@
 typedef struct lsthunk lsthunk_t;
 typedef struct lstalge lstalge_t;
 typedef struct lstappl lstappl_t;
-typedef struct lstchoice lstchoice_t;
+typedef struct lstbeta lstbeta_t;
 typedef struct lstbind lstbind_t;
-typedef struct lstlambda lstlambda_t;
 typedef struct lstbindref lstbindref_t;
+typedef struct lstbuiltin lstbuiltin_t;
+typedef struct lstchoice lstchoice_t;
+typedef struct lstlambda lstlambda_t;
 typedef struct lstparamref lstparamref_t;
 typedef struct lstthunkref lstthunkref_t;
-typedef struct lstbuiltin lstbuiltin_t;
 
 #include "lstypes.h"
 
@@ -29,6 +30,7 @@ typedef lsthunk_t *(*lstbuiltin_func_t)(lssize_t, lsthunk_t *const *, void *);
 typedef enum lsttype {
   LSTTYPE_ALGE,
   LSTTYPE_APPL,
+  LSTTYPE_BETA,
   LSTTYPE_BINDREF,
   LSTTYPE_BUILTIN,
   LSTTYPE_CHOICE,
@@ -40,6 +42,7 @@ typedef enum lsttype {
 } lsttype_t;
 
 #define lsapi_beta lsapi_nn12 lsapi_wur
+#define lsapi_new_thunk_beta lsapi_nn12 lsapi_wur
 #define lsapi_new_thunk_alge lsapi_nn1 lsapi_wur
 #define lsapi_new_thunk_appl lsapi_nn1 lsapi_wur
 #define lsapi_new_thunk_bindref lsapi_nn12 lsapi_wur
@@ -50,6 +53,15 @@ typedef enum lsttype {
 #define lsapi_new_thunk_paramref lsapi_nn1 lsapi_wur
 #define lsapi_new_thunk_str lsapi_wur
 #define lsapi_new_thunk_thunkref lsapi_wur
+
+/**
+ * Create a new thunk for beta reduction (but deferred)
+ * @param env The environment
+ * @param thunk The thunk
+ * @return The new thunk
+ */
+lsapi_new_thunk_beta lsthunk_t *lsthunk_new_beta(const lstenv_t *env,
+                                                 const lsthunk_t *thunk);
 
 /**
  * Create a new thunk for an algebraic data type
@@ -348,6 +360,20 @@ lsapi_get lsapi_pure const lsref_t *lsthunk_get_ref(const lsthunk_t *thunk);
 lsapi_get lsapi_pure lsthunk_t *lsthunk_get_bound(const lsthunk_t *thunk);
 
 /**
+ * Get the environment of the beta thunk
+ * @param thunk The thunk
+ * @return The environment
+ */
+lsapi_get lsapi_pure lstenv_t *lsthunk_get_env(const lsthunk_t *thunk);
+
+/**
+ * Get the thunk of the beta thunk
+ * @param thunk The thunk
+ * @return The thunk
+ */
+lsapi_get lsapi_pure lsthunk_t *lsthunk_get_thunk(const lsthunk_t *thunk);
+
+/**
  * Get the name of a builtin thunk
  * @param thunk The thunk
  * @return The bound
@@ -487,6 +513,16 @@ lsthunk_t *lsthunk_eval_appl(lsthunk_t *thunk, lssize_t argc,
                              lsthunk_t *const *args);
 
 /**
+ * Evaluate a beta thunk to WHNF (Weak Head Normal Form)
+ * @param thunk The thunk
+ * @param argc The number of arguments
+ * @param args The arguments
+ * @return The new thunk evaluate to WHNF
+ */
+lsthunk_t *lsthunk_eval_beta(lsthunk_t *thunk, lssize_t argc,
+                             lsthunk_t *const *args);
+
+/**
  * Evaluate a bind reference thunk to WHNF (Weak Head Normal Form)
  * @param thunk The thunk
  * @param argc The number of arguments
@@ -524,21 +560,6 @@ lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
  */
 lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
                             lsthunk_t *const *args);
-
-/**
- * Evaluate a choice thunk to WHNF (Weak Head Normal Form)
- * @param thunk The thunk
- * @param argc The number of arguments
- * @param args The arguments
- * @return The new thunk evaluate to WHNF
- */
-lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
-                                   lstpat_t *tpat);
-
-lstref_target_origin_t *lstref_target_origin_new_builtin(const lsstr_t *name,
-                                                         lssize_t arity,
-                                                         lstbuiltin_func_t func,
-                                                         void *data);
 
 lsthunk_t *lsprog_eval(const lsprog_t *prog, lstenv_t *tenv);
 
