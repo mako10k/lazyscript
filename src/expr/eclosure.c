@@ -15,14 +15,14 @@ const lseclosure_t *lseclosure_new(const lsexpr_t *expr, size_t bindc,
   assert(bindc == 0 || binds != NULL);
   lseclosure_t *eclosure =
       lsmalloc(sizeof(lseclosure_t) + bindc * sizeof(lsbind_t *));
-#ifdef DEBUG
+#if defined(DEBUG) && defined(DEBUG_VERBOSE)
   lsprintf(stderr, 0, "D: lseclosure_new: closure=%p, expr=%p, bindc=%zu\n",
            eclosure, expr, bindc);
 #endif
   eclosure->lec_expr = expr;
   eclosure->lec_bindc = bindc;
   for (lssize_t i = 0; i < bindc; i++) {
-#ifdef DEBUG
+#if defined(DEBUG) && defined(DEBUG_VERBOSE)
     lsprintf(stderr, 0, "D: lseclosure_new: binds[%zd]=%p\n", i, binds[i]);
 #endif
     eclosure->lec_binds[i] = binds[i];

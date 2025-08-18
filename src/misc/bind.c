@@ -12,7 +12,7 @@ const lsbind_t *lsbind_new(const lspat_t *lhs, const lsexpr_t *rhs) {
   lsbind_t *bind = lsmalloc(sizeof(lsbind_t));
   bind->lbe_lhs = lhs;
   bind->lbe_rhs = rhs;
-#ifdef DEBUG
+#if defined(DEBUG) && defined(DEBUG_VERBOSE)
   lsprintf(stderr, 0, "D: lsbind_new: ");
   lsbind_print(stderr, 0, 0, bind);
   lsprintf(stderr, 0, "\n");
