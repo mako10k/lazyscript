@@ -23,6 +23,25 @@ sudo make install   # 任意
 ./src/lazyscript -e "..."
 ```
 
+### 主なCLIオプションと環境変数
+
+- 実行/デバッグ系:
+  - `-e, --eval <prog>`: 1行プログラムを評価
+  - `-i, --dump-coreir`: パース後の Core IR を表示
+  - `-c, --eval-coreir`: Core IR 評価器で実行（スモーク）
+  - `-s, --strict-effects`: 効果の順序付け規律を検証（`chain/seq` 必須）
+  - `-t, --typecheck`: Core IR の最小タイプチェック（OK / E: type error を出力）
+- プラグイン/糖衣:
+  - `-p, --prelude-so <path>`: prelude プラグイン .so を指定（未指定時は組み込み）
+  - `-n, --sugar-namespace <ns>`: `~~sym` の展開先名前空間を指定（既定 `prelude`）
+- 環境変数:
+  - `LAZYSCRIPT_PRELUDE_SO`: `--prelude-so` と同義の上書き
+  - `LAZYSCRIPT_SUGAR_NS`: `--sugar-namespace` と同義の上書き
+
+詳細は以下も参照:
+- シンタックスシュガーと do 記法: `docs/05_syntax_sugar.md`
+- 最小タイプチェッカ: `docs/06_typecheck.md`
+
 ## コアビルトインとプレリュード
 
 lazyscript には以下の2層があります:

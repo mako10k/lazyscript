@@ -61,11 +61,11 @@ B
 - `(~~println "hi");` → `hi` と `()` を出力。
 - `(~~return 7);` → `7`。
 
-## 名前空間の切り替え（将来拡張）
-- `~~` が展開する先の名前空間（既定: `prelude`）は、ランタイム引数または環境変数で切替可能にする方針。
+## 名前空間の切り替え（実装済み）
+- `~~` の展開先名前空間（既定: `prelude`）は、CLI もしくは環境変数で切替可能です。
   - 例: `--sugar-namespace somens` または `LAZYSCRIPT_SUGAR_NS=somens`
-- 実装方法:
-  1. `lsscan_t` に `const char *ls_sugar_ns` を追加し、既定値を "prelude" に設定。
-  2. CLI から `--sugar-namespace` でセット。`lsparse_*` 呼び出し時に `lsscan` へ渡す。
-  3. `parser.y` の `LSTPRELUDESYM` 展開で `lsref_new(ls_sugar_ns, loc)` を参照。
-- 互換性: 未指定なら従来通り `prelude` を用いるため後方互換。
+- 実装メモ:
+  1. `lsscan_t` に `ls_sugar_ns` を追加し既定値を "prelude" に設定。
+  2. CLI `--sugar-namespace` / 環境変数 `LAZYSCRIPT_SUGAR_NS` で上書き。
+  3. `parser.y` の `LSTPRELUDESYM` 展開で `ls_sugar_ns` を参照。
+  
