@@ -85,3 +85,9 @@ void lscir_print(FILE *fp, int indent, const lscir_prog_t *cir);
 
 /* Validate effect/token discipline; returns error count (0 = OK). */
 int lscir_validate_effects(FILE *errfp, const lscir_prog_t *cir);
+
+/* Evaluate a Core IR program (minimal, for smoke tests). Returns 0 on success.
+ * Writes any effect output (e.g., println) to stdout, and prints the final value
+ * in a simple form compatible with existing tests (e.g., () for unit).
+ */
+int lscir_eval(FILE *outfp, const lscir_prog_t *cir);

@@ -544,3 +544,177 @@ int lscir_validate_effects(FILE *errfp, const lscir_prog_t *cir) {
   eff_scope_t sc = {0};
   return cir_validate_expr(errfp, cir->root, sc);
 }
+
+/* ---------- Minimal Core IR evaluator (smoke) ---------- */
+typedef enum {
+  RV_INT,
+  RV_STR,
+  RV_UNIT,
+  RV_TOKEN,
+  RV_LAM,
+  RV_SYMBOL,
+} rv_kind_t;
+
+typedef struct rv rv_t;
+
+typedef struct env_bind {
+  const char *name;
+  const rv_t *val;
+  struct env_bind *next;
+} env_bind_t;
+
+struct rv {
+  rv_kind_t kind;
+  union {
+    long long ival;
+    const char *sval;
+    struct {
+      const char *param;
+      const lscir_expr_t *body;
+      env_bind_t *env; // captured environment
+    } lam;
+    const char *sym;
+  };
+};
+
+static env_bind_t *env_push(env_bind_t *env, const char *name, const rv_t *v) {
+  env_bind_t *b = lsmalloc(sizeof(env_bind_t));
+  b->name = name; b->val = v; b->next = env; return b;
+}
+
+static const rv_t *env_lookup(env_bind_t *env, const char *name) {
+  for (env_bind_t *p = env; p; p = p->next) if (strcmp(p->name, name) == 0) return p->val;
+  return NULL;
+}
+
+static const rv_t *rv_int(long long x) { rv_t *v = lsmalloc(sizeof(rv_t)); v->kind = RV_INT; v->ival = x; return v; }
+static const rv_t *rv_str(const char *s) { rv_t *v = lsmalloc(sizeof(rv_t)); v->kind = RV_STR; v->sval = s; return v; }
+static const rv_t *rv_unit(void) { static rv_t u = { .kind = RV_UNIT }; return &u; }
+static const rv_t *rv_tok(void) { static rv_t t = { .kind = RV_TOKEN }; return &t; }
+static const rv_t *rv_sym(const char *s) { rv_t *v = lsmalloc(sizeof(rv_t)); v->kind = RV_SYMBOL; v->sym = s; return v; }
+static const rv_t *rv_lam(const char *p, const lscir_expr_t *b, env_bind_t *env) {
+  rv_t *v = lsmalloc(sizeof(rv_t)); v->kind = RV_LAM; v->lam.param = p; v->lam.body = b; v->lam.env = env; return v;
+}
+
+static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, env_bind_t *env);
+static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env);
+
+static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, env_bind_t *env) {
+  (void)outfp;
+  switch (v->kind) {
+  case LCIR_VAL_INT: return rv_int(v->ival);
+  case LCIR_VAL_STR: return rv_str(v->sval);
+  case LCIR_VAL_VAR: {
+    const rv_t *found = env_lookup(env, v->var);
+    if (found) return found;
+    // Treat unknown var as symbol (e.g., true/false, add/sub)
+    return rv_sym(v->var);
+  }
+  case LCIR_VAL_CONSTR: {
+    if (strcmp(v->constr.name, "()") == 0 && v->constr.argc == 0) return rv_unit();
+    // Fallback: represent as symbol name
+    return rv_sym(v->constr.name);
+  }
+  case LCIR_VAL_LAM:
+    return rv_lam(v->lam.param, v->lam.body, env);
+  }
+  return rv_unit();
+}
+
+static int truthy(const rv_t *v) {
+  if (!v) return 0;
+  switch (v->kind) {
+  case RV_INT: return v->ival != 0;
+  case RV_SYMBOL: return (strcmp(v->sym, "true") == 0) ? 1 : (strcmp(v->sym, "false") == 0 ? 0 : 1);
+  case RV_UNIT: return 0;
+  default: return 1;
+  }
+}
+
+static void print_value(FILE *outfp, const rv_t *v) {
+  switch (v->kind) {
+  case RV_UNIT: fprintf(outfp, "()\n"); return;
+  case RV_INT: fprintf(outfp, "%lld\n", v->ival); return;
+  case RV_STR: fprintf(outfp, "%s\n", v->sval); return;
+  case RV_SYMBOL: fprintf(outfp, "%s\n", v->sym); return;
+  case RV_LAM: fprintf(outfp, "<lam>\n"); return;
+  case RV_TOKEN: fprintf(outfp, "<token>\n"); return;
+  }
+}
+
+static const rv_t *apply_builtin_app(const char *name, int argc, const lscir_value_t *const *args, env_bind_t *env) {
+  if (strcmp(name, "add") == 0 || strcmp(name, "sub") == 0) {
+    if (argc != 2) return NULL;
+    const rv_t *a = eval_value(NULL, args[0], env);
+    const rv_t *b = eval_value(NULL, args[1], env);
+    if (!a || !b || a->kind != RV_INT || b->kind != RV_INT) return NULL;
+    long long res = (strcmp(name, "add") == 0) ? (a->ival + b->ival) : (a->ival - b->ival);
+    return rv_int(res);
+  }
+  return NULL;
+}
+
+static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env) {
+  if (!e) return rv_unit();
+  switch (e->kind) {
+  case LCIR_EXP_VAL:
+    return eval_value(outfp, e->v, env);
+  case LCIR_EXP_LET: {
+    const rv_t *bv = eval_expr(outfp, e->let1.bind, env);
+    env_bind_t *env2 = env_push(env, e->let1.var, bv);
+    return eval_expr(outfp, e->let1.body, env2);
+  }
+  case LCIR_EXP_APP: {
+    // Builtin var calls like add/sub
+    if (e->app.func->kind == LCIR_VAL_VAR) {
+      const rv_t *b = apply_builtin_app(e->app.func->var, e->app.argc, e->app.args, env);
+      if (b) return b;
+    }
+    // Lambda application (single arg)
+    if (e->app.func->kind == LCIR_VAL_LAM) {
+      if (e->app.argc != 1) return rv_unit();
+      const rv_t *av = eval_value(outfp, e->app.args[0], env);
+      const char *p = e->app.func->lam.param;
+      const lscir_expr_t *body = e->app.func->lam.body;
+      env_bind_t *cap = env; // treat as capturing current env (simplified)
+      env_bind_t *env2 = env_push(cap, p, av);
+      return eval_expr(outfp, body, env2);
+    }
+    return rv_unit();
+  }
+  case LCIR_EXP_IF: {
+    const rv_t *cv = eval_value(outfp, e->ife.cond, env);
+    if (truthy(cv)) return eval_expr(outfp, e->ife.then_e, env);
+    else return eval_expr(outfp, e->ife.else_e, env);
+  }
+  case LCIR_EXP_EFFAPP: {
+    // Token presence is assumed by validator; ignore here.
+    if (e->effapp.func->kind == LCIR_VAL_VAR && strcmp(e->effapp.func->var, "println") == 0) {
+      if (e->effapp.argc != 1) return rv_unit();
+      const rv_t *av = eval_value(outfp, e->effapp.args[0], env);
+      if (av->kind == RV_STR) fprintf(outfp, "%s\n", av->sval);
+      else if (av->kind == RV_INT) fprintf(outfp, "%lld\n", av->ival);
+      else if (av->kind == RV_SYMBOL) fprintf(outfp, "%s\n", av->sym);
+      return rv_unit();
+    }
+    if (e->effapp.func->kind == LCIR_VAL_VAR && strcmp(e->effapp.func->var, "exit") == 0) {
+      if (e->effapp.argc != 1) return rv_unit();
+      const rv_t *av = eval_value(outfp, e->effapp.args[0], env);
+      long long code = (av->kind == RV_INT) ? av->ival : 1;
+      exit(code == 0 ? 0 : 1);
+    }
+    return rv_unit();
+  }
+  case LCIR_EXP_TOKEN:
+    return rv_tok();
+  }
+  return rv_unit();
+}
+
+int lscir_eval(FILE *outfp, const lscir_prog_t *cir) {
+  if (!cir || !cir->root) return 0;
+  env_bind_t *env = NULL;
+  const rv_t *res = eval_expr(outfp, cir->root, env);
+  print_value(outfp, res);
+  return 0;
+}

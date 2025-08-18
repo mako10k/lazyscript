@@ -101,6 +101,20 @@ if [[ -x "$FMT_BIN" ]]; then
   fi
 fi
 
+# Optional: Core IR evaluator smoke tests (if available)
+if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
+  # Reuse existing tests that are evaluator-friendly
+  out="$("$BIN" --eval-coreir "$DIR/t05_let_without_keyword.ls" 2>&1)"
+  if [[ "$out" == "3"* ]]; then
+    echo "ok - coreir-eval t05_let_without_keyword"
+    ((pass++))
+  else
+    echo "not ok - coreir-eval t05_let_without_keyword"
+    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; echo "3"; echo "---";
+    ((fail++))
+  fi
+fi
+
 if [[ $fail -eq 0 ]]; then
   exit 0
 else
