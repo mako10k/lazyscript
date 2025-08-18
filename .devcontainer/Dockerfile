@@ -19,3 +19,8 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     clangd \
     gdb \
     && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+# Node.js (最新版) の導入
+RUN curl -fsSL https://deb.nodesource.com/setup_current.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g npm

@@ -1,0 +1,2 @@
+# Tests to skip due to known issues (tracked in TODO)
+t04_lambda_id

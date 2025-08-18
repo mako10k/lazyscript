@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Robust test runner: do not use `set -e` to avoid unexpected early exits during conditionals.
+# We handle exit codes manually and aggregate results.
+set -uo pipefail
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$DIR/.." && pwd)"
+BIN="$ROOT/src/lazyscript"
+FMT_BIN="$ROOT/src/lazyscript_format"
+
+if [[ ! -x "$BIN" ]]; then
+  echo "E: lazyscript binary not found: $BIN" >&2
+  exit 1
+fi
+
+pass=0; fail=0
+
+# Discover interpreter tests automatically: any test/*.ls that has a matching .out
+shopt -s nullglob
+cases=()
+for f in "$DIR"/*.ls; do
+  base="${f%.ls}"
+  if [[ -f "$base.out" ]]; then
+    cases+=("$(basename "$base")")
+  fi
+done
+shopt -u nullglob
+
+# Load skip list if present
+skip=()
+if [[ -f "$DIR/skip.list" ]]; then
+  while IFS= read -r s; do
+    [[ -z "$s" || "$s" =~ ^# ]] && continue
+    skip+=("$s")
+  done < "$DIR/skip.list"
+fi
+
+for name in "${cases[@]}"; do
+  [[ -z "$name" ]] && continue
+  src="$DIR/$name.ls"
+  exp="$DIR/$name.out"
+  # Skip known-bad tests
+  for s in "${skip[@]}"; do
+    if [[ "$name" == "$s" ]]; then
+      echo "skip - $name"
+      continue 2
+    fi
+  done
+  # Run program and capture all output (stdout+stderr)
+  out="$("$BIN" "$src" 2>&1)"
+  if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
+    echo "ok - $name"
+    ((pass++))
+  else
+    echo "not ok - $name"
+    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$exp"; echo "---";
+    ((fail++))
+  fi
+done
+
+# Optional: formatter smoke test if the binary exists and an expectation file is present
+if [[ -x "$FMT_BIN" ]]; then
+  fmt_src="$DIR/t04_lambda_id.ls"
+  fmt_exp="$DIR/t04_lambda_id.fmt.out"
+  if [[ -f "$fmt_src" && -f "$fmt_exp" ]]; then
+    fmt_out="$("$FMT_BIN" "$fmt_src" 2>&1)"
+    if diff -u <(printf "%s\n" "$fmt_out") "$fmt_exp" >/dev/null; then
+      echo "ok - format t04_lambda_id"
+      ((pass++))
+    else
+      echo "not ok - format t04_lambda_id"
+      echo "--- got"; printf "%s\n" "$fmt_out"; echo "--- exp"; cat "$fmt_exp"; echo "---";
+      ((fail++))
+    fi
+  fi
+fi
+
+if [[ $fail -eq 0 ]]; then
+  exit 0
+else
+  exit 1
+fi

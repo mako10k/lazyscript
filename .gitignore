@@ -49,3 +49,7 @@ null.d
 /conftest.err
 conftest.l
 
+/.vscode/
+/.github/
+
+

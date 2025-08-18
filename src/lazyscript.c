@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <dlfcn.h>
 
+static int g_debug = 0;
 static const lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   assert(in_str != NULL);
   yyscan_t yyscanner;
@@ -300,9 +301,9 @@ int main(int argc, char **argv) {
       snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
       const lsprog_t *prog = lsparse_string(name, optarg);
       if (prog != NULL) {
-#ifdef DEBUG
-        lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
-#endif
+        if (g_debug) {
+          lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+        }
         lstenv_t *tenv = lstenv_new(NULL);
         ls_register_core_builtins(tenv);
         if (!ls_try_load_prelude_plugin(tenv, prelude_so))
@@ -319,13 +320,14 @@ int main(int argc, char **argv) {
       prelude_so = optarg;
       break;
     case 'd':
+  g_debug = 1;
 #if DEBUG
-    {
-      extern int yydebug;
-      yydebug = 1;
-    }
+  {
+    extern int yydebug;
+    yydebug = 1;
+  }
 #endif
-    break;
+  break;
     case 'h':
       printf("Usage: %s [OPTION]... [FILE]...\n", argv[0]);
   printf("Options:\n");
@@ -349,9 +351,9 @@ int main(int argc, char **argv) {
       filename = "/dev/stdin";
     const lsprog_t *prog = lsparse_file(argv[i]);
     if (prog != NULL) {
-#ifdef DEBUG
-      lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
-#endif
+      if (g_debug) {
+        lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+      }
       lstenv_t *tenv = lstenv_new(NULL);
       ls_register_core_builtins(tenv);
       if (!ls_try_load_prelude_plugin(tenv, prelude_so))
