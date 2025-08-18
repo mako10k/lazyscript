@@ -82,3 +82,6 @@ const lscir_prog_t *lscir_lower_prog(const lsprog_t *prog);
 
 /* Print a Core IR program */
 void lscir_print(FILE *fp, int indent, const lscir_prog_t *cir);
+
+/* Validate effect/token discipline; returns error count (0 = OK). */
+int lscir_validate_effects(FILE *errfp, const lscir_prog_t *cir);

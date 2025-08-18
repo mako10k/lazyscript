@@ -57,6 +57,33 @@ for name in "${cases[@]}"; do
   fi
 done
 
+# Discover Core IR dump tests: any test/*.ls that has a matching .coreir.out
+shopt -s nullglob
+cir_cases=()
+for f in "$DIR"/*.ls; do
+  base="${f%.ls}"
+  if [[ -f "$base.coreir.out" ]]; then
+    cir_cases+=("$(basename "$base")")
+  fi
+done
+shopt -u nullglob
+
+for name in "${cir_cases[@]}"; do
+  [[ -z "$name" ]] && continue
+  src="$DIR/$name.ls"
+  exp="$DIR/$name.coreir.out"
+  # Run program with Core IR dump and capture all output
+  out="$("$BIN" --dump-coreir "$src" 2>&1)"
+  if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
+    echo "ok - coreir $name"
+    ((pass++))
+  else
+    echo "not ok - coreir $name"
+    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$exp"; echo "---";
+    ((fail++))
+  fi
+done
+
 # Optional: formatter smoke test if the binary exists and an expectation file is present
 if [[ -x "$FMT_BIN" ]]; then
   fmt_src="$DIR/t04_lambda_id.ls"

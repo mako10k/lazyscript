@@ -133,6 +133,18 @@ static const lscir_expr_t *mk_exp_let(const char *var, const lscir_expr_t *bind,
   lscir_expr_t *e = lsmalloc(sizeof(*e));
   e->kind = LCIR_EXP_LET; e->let1.var = var; e->let1.bind = bind; e->let1.body = body; return e;
 }
+static const lscir_expr_t *mk_exp_if(const lscir_value_t *cond, const lscir_expr_t *then_e, const lscir_expr_t *else_e) {
+  lscir_expr_t *e = lsmalloc(sizeof(*e));
+  e->kind = LCIR_EXP_IF; e->ife.cond = cond; e->ife.then_e = then_e; e->ife.else_e = else_e; return e;
+}
+static const lscir_expr_t *mk_exp_token(void) {
+  lscir_expr_t *e = lsmalloc(sizeof(*e));
+  e->kind = LCIR_EXP_TOKEN; return e;
+}
+static const lscir_expr_t *mk_exp_effapp(const lscir_value_t *f, const lscir_value_t *tok, int argc, const lscir_value_t *const *args) {
+  lscir_expr_t *e = lsmalloc(sizeof(*e));
+  e->kind = LCIR_EXP_EFFAPP; e->effapp.func = f; e->effapp.token = tok; e->effapp.argc = argc; e->effapp.args = args; return e;
+}
 
 /* ---------- Lowering (happy path) ---------- */
 static const char *extract_ref_name(const lsref_t *r) {
@@ -150,6 +162,7 @@ static const char *extract_pat_name(const lspat_t *p) {
   return buf ? buf : "_";
 }
 
+static const lscir_expr_t *lower_expr(const lsexpr_t *e);
 static const lscir_value_t *lower_value(const lsexpr_t *e);
 
 /* gensym utility */
@@ -197,16 +210,14 @@ static const lscir_value_t *lower_value(const lsexpr_t *e) {
     const lselambda_t *lam = lsexpr_get_lambda(e);
     const char *param = extract_pat_name(lselambda_get_param(lam));
     const lsexpr_t *body = lselambda_get_body(lam);
-    const lscir_value_t *bv = lower_value(body);
-    if (bv) return mk_val_lam(param, mk_exp_val(bv));
-    return NULL;
+  const lscir_expr_t *be = lower_expr(body);
+  if (be) return mk_val_lam(param, be);
+  return NULL;
   }
   default:
     return NULL;
   }
 }
-
-static const lscir_expr_t *lower_expr(const lsexpr_t *e);
 
 static const lscir_expr_t *lower_closure(const lseclosure_t *cl) {
   // Build let x1 = rhs1 in let x2 = rhs2 in ... body
@@ -215,8 +226,8 @@ static const lscir_expr_t *lower_closure(const lseclosure_t *cl) {
   if (!body) return NULL;
   lssize_t n = lseclosure_get_bindc(cl);
   const lsbind_t *const *bs = lseclosure_get_binds(cl);
-  for (lssize_t i = n - 1; i >= 0; i--) {
-    const lsbind_t *b = bs[i];
+  for (lssize_t i = n; i > 0; i--) {
+    const lsbind_t *b = bs[i - 1];
     const lspat_t *lhs = lsbind_get_lhs(b);
     if (!lhs || lspat_get_type(lhs) != LSPTYPE_REF) {
       // 未対応の複合パターン: 今はロールバック
@@ -239,6 +250,71 @@ static const lscir_expr_t *lower_expr(const lsexpr_t *e) {
     const lsexpr_t *func_e = lseappl_get_func(ap);
     int argc = (int)lseappl_get_argc(ap);
     const lsexpr_t *const *eargs = lseappl_get_args(ap);
+
+    // Special-case: ifthenelse cond then else  →  LCIR_EXP_IF
+    if (lsexpr_get_type(func_e) == LSETYPE_REF) {
+      const char *fname = extract_ref_name(lsexpr_get_ref(func_e));
+      if (fname && strcmp(fname, "ifthenelse") == 0 && argc == 3) {
+        const lsexpr_t *cond_e = eargs[0];
+        const lsexpr_t *then_ast = eargs[1];
+        const lsexpr_t *else_ast = eargs[2];
+        const lscir_value_t *cv = lower_value(cond_e);
+        const char *cn = NULL;
+        if (!cv) { cn = cir_gensym("c$"); cv = mk_val_var(cn); }
+        const lscir_expr_t *core = mk_exp_if(cv, lower_expr(then_ast), lower_expr(else_ast));
+        if (cn) core = mk_exp_let(cn, lower_expr(cond_e), core);
+        return core;
+      }
+    }
+
+    // Special-case: (~prelude sym) args...  → EffApp(sym, token, args...)
+    if (lsexpr_get_type(func_e) == LSETYPE_APPL) {
+      const lseappl_t *ap2 = lsexpr_get_appl(func_e);
+      const lsexpr_t *f2 = lseappl_get_func(ap2);
+      if (lsexpr_get_type(f2) == LSETYPE_REF && strcmp(extract_ref_name(lsexpr_get_ref(f2)), "prelude") == 0) {
+        if ((int)lseappl_get_argc(ap2) == 1) {
+          const lsexpr_t *a0 = lseappl_get_args(ap2)[0];
+          const char *sym = NULL;
+          if (lsexpr_get_type(a0) == LSETYPE_REF) {
+            sym = extract_ref_name(lsexpr_get_ref(a0));
+          } else if (lsexpr_get_type(a0) == LSETYPE_ALGE) {
+            const lsealge_t *al = lsexpr_get_alge(a0);
+            if (lsealge_get_argc(al) == 0) sym = lsstr_get_buf(lsealge_get_constr(al));
+          }
+          if (sym) {
+            // 暫定: println/exit のみ効果扱い
+            if (sym && (strcmp(sym, "println") == 0 || strcmp(sym, "exit") == 0)) {
+              // 値化した引数を作る（ANF）
+              const lscir_value_t **vals = NULL;
+              const char **lnames = NULL; const lsexpr_t **lexprs = NULL; int letc = 0;
+              if (argc > 0) vals = lsmalloc(sizeof(const lscir_value_t*) * argc);
+              for (int i = 0; i < argc; i++) {
+                const lscir_value_t *vi = lower_value(eargs[i]);
+                if (vi) { vals[i] = vi; }
+                else {
+                  const char *tn = cir_gensym("a$");
+                  vals[i] = mk_val_var(tn);
+                  const char **nn = lsmalloc(sizeof(const char*) * (letc + 1));
+                  const lsexpr_t **ee = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
+                  for (int k = 0; k < letc; k++) { nn[k] = lnames[k]; ee[k] = lexprs[k]; }
+                  nn[letc] = tn; ee[letc] = eargs[i]; letc++; lnames = nn; lexprs = ee;
+                }
+              }
+              const lscir_value_t *fv = mk_val_var(sym);
+              // token を導入
+              const char *tokn = cir_gensym("E$");
+              const lscir_value_t *tokv = mk_val_var(tokn);
+              const lscir_expr_t *core = mk_exp_effapp(fv, tokv, argc, vals);
+              // 引数の let を巻く
+              for (int i = letc - 1; i >= 0; i--) core = mk_exp_let(lnames[i], lower_expr(lexprs[i]), core);
+              // token let を先頭に
+              core = mk_exp_let(tokn, mk_exp_token(), core);
+              return core;
+            }
+          }
+        }
+      }
+    }
 
     // Collect value args, recording non-values to be let-bound later
     const lscir_value_t **vals = NULL;
@@ -284,6 +360,26 @@ static const lscir_expr_t *lower_expr(const lsexpr_t *e) {
     if (f_tmp != NULL) {
       core = mk_exp_let(f_tmp, lower_expr(func_e), core);
     }
+    return core;
+  }
+  case LSETYPE_CHOICE: {
+    // Lower e1 | e2  ≈  (app (var |) v1 v2) with ANF lets for non-values
+    const lsechoice_t *ch = lsexpr_get_choice(e);
+    const lsexpr_t *l = lsechoice_get_left(ch);
+    const lsexpr_t *r = lsechoice_get_right(ch);
+
+    const lscir_value_t *vl = lower_value(l);
+    const lscir_value_t *vr = lower_value(r);
+    const char *ln = NULL, *rn = NULL;
+    if (!vl) { ln = cir_gensym("c$"); vl = mk_val_var(ln); }
+    if (!vr) { rn = cir_gensym("c$"); vr = mk_val_var(rn); }
+
+  const lscir_value_t *f = mk_val_var("|");
+  const lscir_value_t **args_arr = lsmalloc(sizeof(const lscir_value_t*) * 2);
+  args_arr[0] = vl; args_arr[1] = vr;
+  const lscir_expr_t *core = mk_exp_app(f, 2, args_arr);
+    if (rn) core = mk_exp_let(rn, lower_expr(r), core);
+    if (ln) core = mk_exp_let(ln, lower_expr(l), core);
     return core;
   }
   case LSETYPE_CLOSURE: {
@@ -343,6 +439,23 @@ static void cir_print_expr(FILE *ofp, int ind, const lscir_expr_t *e2) {
     fputc(' ', ofp);
     cir_print_expr(ofp, 0, e2->let1.body);
     fputc(')', ofp); return;
+  case LCIR_EXP_IF:
+    lsprintf(ofp, ind, "(if ");
+    cir_print_val(ofp, 0, e2->ife.cond);
+    fputc(' ', ofp);
+    cir_print_expr(ofp, 0, e2->ife.then_e);
+    fputc(' ', ofp);
+    cir_print_expr(ofp, 0, e2->ife.else_e);
+    fputc(')', ofp); return;
+  case LCIR_EXP_EFFAPP:
+    lsprintf(ofp, ind, "(effapp ");
+    cir_print_val(ofp, 0, e2->effapp.func);
+    fputc(' ', ofp);
+    cir_print_val(ofp, 0, e2->effapp.token);
+    for (int i = 0; i < e2->effapp.argc; i++) { fputc(' ', ofp); cir_print_val(ofp, 0, e2->effapp.args[i]); }
+    fputc(')', ofp); return;
+  case LCIR_EXP_TOKEN:
+    lsprintf(ofp, ind, "(token)"); return;
   default:
     fprintf(ofp, "<unimpl>"); return;
   }
@@ -360,4 +473,74 @@ void lscir_print(FILE *fp, int indent, const lscir_prog_t *cir) {
   } else {
     fprintf(fp, "<null>\n");
   }
+}
+
+/* ---------- Effects validator ---------- */
+typedef struct eff_scope {
+  int has_token; // 0/1: token が導入済みか
+} eff_scope_t;
+
+static int cir_validate_expr(FILE *efp, const lscir_expr_t *e, eff_scope_t sc);
+
+static int cir_validate_val(FILE *efp, const lscir_value_t *v, eff_scope_t sc) {
+  (void)efp; (void)sc;
+  // Lam の中は別作用域で検査（token は引き継がない前提）
+  if (v && v->kind == LCIR_VAL_LAM) {
+    eff_scope_t inner = {0};
+    return cir_validate_expr(efp, v->lam.body, inner);
+  }
+  return 0;
+}
+
+static int cir_validate_expr(FILE *efp, const lscir_expr_t *e, eff_scope_t sc) {
+  if (!e) return 0;
+  switch (e->kind) {
+  case LCIR_EXP_VAL:
+    return cir_validate_val(efp, e->v, sc);
+  case LCIR_EXP_LET: {
+    // bind は現スコープ、body は bind の後のスコープ
+    int errs = cir_validate_expr(efp, e->let1.bind, sc);
+    eff_scope_t sc2 = sc;
+    if (e->let1.bind && e->let1.bind->kind == LCIR_EXP_TOKEN)
+      sc2.has_token = 1;
+    errs += cir_validate_expr(efp, e->let1.body, sc2);
+    return errs;
+  }
+  case LCIR_EXP_APP: {
+    int errs = 0;
+    errs += cir_validate_val(efp, e->app.func, sc);
+    for (int i = 0; i < e->app.argc; i++) errs += cir_validate_val(efp, e->app.args[i], sc);
+    return errs;
+  }
+  case LCIR_EXP_IF: {
+    int errs = 0;
+    errs += cir_validate_val(efp, e->ife.cond, sc);
+    errs += cir_validate_expr(efp, e->ife.then_e, sc);
+    errs += cir_validate_expr(efp, e->ife.else_e, sc);
+    return errs;
+  }
+  case LCIR_EXP_EFFAPP: {
+    int errs = 0;
+    if (!sc.has_token) {
+      fprintf(efp, "E: EffApp requires in-scope token (introduce via (token) let).\n");
+      errs++;
+    }
+    errs += cir_validate_val(efp, e->effapp.func, sc);
+    if (e->effapp.token->kind != LCIR_VAL_VAR) {
+      fprintf(efp, "E: EffApp token must be a variable.\n");
+      errs++;
+    }
+    for (int i = 0; i < e->effapp.argc; i++) errs += cir_validate_val(efp, e->effapp.args[i], sc);
+    return errs;
+  }
+  case LCIR_EXP_TOKEN:
+    return 0; // 導入点そのもの
+  }
+  return 0;
+}
+
+int lscir_validate_effects(FILE *errfp, const lscir_prog_t *cir) {
+  if (!cir || !cir->root) return 0;
+  eff_scope_t sc = {0};
+  return cir_validate_expr(errfp, cir->root, sc);
 }

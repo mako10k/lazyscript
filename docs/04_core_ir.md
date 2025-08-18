@@ -54,6 +54,14 @@
 - `seq a b` は E を導入し `a` の効果を先に発火、その後 `b` を評価（`EffApp` のトークンを直列化）。
 - `--strict-effects` では、`EffApp` が Token スコープ外に出ないことを IR で検査します。
 
+4) 条件分岐（ifthenelse → If）
+- フロントエンドでは `ifthenelse cond thenB elseB` のような通常関数として現れます。
+- 変換では特別扱いし、次の形に落とします（cond は ANF 化して値に）：
+  - `If ⟦cond⟧ then ⟦thenB⟧ else ⟦elseB⟧`
+- `then/else` はそれぞれ式（必要なら Let を含む）として再帰的に変換します。
+
+補足: `--strict-effects` を付けて `--dump-coreir` した場合も、IR 上の効果規律検査が走り、`EffApp` が `Token` の in-scope でない箇所にあるとエラーを出力します（実行時も同様）。
+
 実装上の要点
 - ANF では「関数の実引数」は必ず値（Var/Int/Str/Constr/Lam）になるよう `let` を導出します。
 - 参照名はフロントエンドの `~x` と IR の `Var x` を対応付けます。

@@ -330,10 +330,25 @@ int main(int argc, char **argv) {
         if (dump_coreir) {
           const lscir_prog_t *cir = lscir_lower_prog(prog);
           lscir_print(stdout, 0, cir);
+          if (g_effects_strict) {
+            int errs = lscir_validate_effects(stderr, cir);
+            if (errs > 0) {
+              fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
+              exit(1);
+            }
+          }
           break;
         }
         if (g_debug) {
           lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+        }
+        if (g_effects_strict) {
+          const lscir_prog_t *cir = lscir_lower_prog(prog);
+          int errs = lscir_validate_effects(stderr, cir);
+          if (errs > 0) {
+            fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
+            exit(1);
+          }
         }
         lstenv_t *tenv = lstenv_new(NULL);
         ls_register_core_builtins(tenv);
@@ -393,10 +408,27 @@ int main(int argc, char **argv) {
       if (dump_coreir) {
         const lscir_prog_t *cir = lscir_lower_prog(prog);
         lscir_print(stdout, 0, cir);
+        if (g_effects_strict) {
+          int errs = lscir_validate_effects(stderr, cir);
+          if (errs > 0) {
+            fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
+            // Continue to next file after reporting error
+            continue;
+          }
+        }
         continue;
       }
       if (g_debug) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+      }
+      if (g_effects_strict) {
+        const lscir_prog_t *cir = lscir_lower_prog(prog);
+        int errs = lscir_validate_effects(stderr, cir);
+        if (errs > 0) {
+          fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
+          // Skip execution on validation errors
+          continue;
+        }
       }
       lstenv_t *tenv = lstenv_new(NULL);
       ls_register_core_builtins(tenv);
