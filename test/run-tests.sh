@@ -124,6 +124,17 @@ if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
     echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$DIR/t08_coreir_chain.out"; echo "---";
     ((fail++))
   fi
+
+  # return should just pass through the value
+  out="$("$BIN" --eval-coreir "$DIR/t09_coreir_return.ls" 2>&1)"
+  if diff -u <(printf "%s\n" "$out") "$DIR/t09_coreir_return.out" >/dev/null; then
+    echo "ok - coreir-eval t09_coreir_return"
+    ((pass++))
+  else
+    echo "not ok - coreir-eval t09_coreir_return"
+    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$DIR/t09_coreir_return.out"; echo "---";
+    ((fail++))
+  fi
 fi
 
 if [[ $fail -eq 0 ]]; then
