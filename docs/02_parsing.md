@@ -33,6 +33,10 @@
 - ラムダ: `elambda`
 - ブロック: `'{' expr '}'` → 式そのまま
 
+補足（シンタックスシュガー）:
+- `~~sym` は `(~<ns> sym)` に展開する（既定 ns は `prelude`）。
+- 名前空間は CLI `--sugar-namespace <ns>` または環境変数 `LAZYSCRIPT_SUGAR_NS` で上書き可能。
+
 ### タプル・リスト
 - `etuple`:
   - `()` → `","` コンストラクタ(0)

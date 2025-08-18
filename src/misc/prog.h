@@ -16,3 +16,6 @@ lsscan_t *lsscan_new(const char *filename);
 const lsprog_t *lsscan_get_prog(const lsscan_t *scanner);
 void lsscan_set_prog(lsscan_t *scanner, const lsprog_t *prog);
 const char *lsscan_get_filename(const lsscan_t *scanner);
+// Sugar namespace for ~~sym desugaring (default: "prelude")
+void lsscan_set_sugar_ns(lsscan_t *scanner, const char *ns);
+const char *lsscan_get_sugar_ns(const lsscan_t *scanner);

@@ -21,6 +21,7 @@ static int g_effects_depth = 0;  // nesting counter for allowed effects
 static inline void ls_effects_begin(void) { if (g_effects_strict) g_effects_depth++; }
 static inline void ls_effects_end(void) { if (g_effects_strict && g_effects_depth > 0) g_effects_depth--; }
 static inline int ls_effects_allowed(void) { return !g_effects_strict || g_effects_depth > 0; }
+static const char *g_sugar_ns = NULL; // NULL => default (prelude)
 const lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   assert(in_str != NULL);
   yyscan_t yyscanner;
@@ -28,6 +29,9 @@ const lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   lsscan_t *lsscan = lsscan_new(filename);
   yyset_in(in_str, yyscanner);
   yyset_extra(lsscan, yyscanner);
+  // Apply sugar namespace if configured
+  if (g_sugar_ns == NULL) g_sugar_ns = getenv("LAZYSCRIPT_SUGAR_NS");
+  if (g_sugar_ns && g_sugar_ns[0]) lsscan_set_sugar_ns(lsscan, g_sugar_ns);
   int ret = yyparse(yyscanner);
   const lsprog_t *prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
   yylex_destroy(yyscanner);
@@ -312,6 +316,7 @@ int main(int argc, char **argv) {
   struct option longopts[] = {
       {"eval", required_argument, NULL, 'e'},
       {"prelude-so", required_argument, NULL, 'p'},
+    {"sugar-namespace", required_argument, NULL, 'n'},
     {"strict-effects", no_argument, NULL, 's'},
       {"dump-coreir", no_argument, NULL, 'i'},
       {"eval-coreir", no_argument, NULL, 'c'},
@@ -321,7 +326,7 @@ int main(int argc, char **argv) {
       {NULL, 0, NULL, 0},
   };
   int opt;
-  while ((opt = getopt_long(argc, argv, "e:p:sicdhv", longopts, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "e:p:n:sicdhv", longopts, NULL)) != -1) {
     switch (opt) {
     case 'e': {
       static int eval_count = 0;
@@ -376,6 +381,9 @@ int main(int argc, char **argv) {
     case 'p':
       prelude_so = optarg;
       break;
+    case 'n':
+      g_sugar_ns = optarg;
+      break;
     case 's':
       g_effects_strict = 1;
       break;
@@ -400,12 +408,14 @@ int main(int argc, char **argv) {
       printf("  -d, --debug     print debug information\n");
   printf("  -e, --eval      evaluate a one-line program string\n");
   printf("  -p, --prelude-so <path>  load prelude plugin .so (override)\n");
+  printf("  -n, --sugar-namespace <ns>  set namespace for ~~sym sugar (default: prelude)\n");
   printf("  -s, --strict-effects  enforce effect discipline (seq/chain required)\n");
   printf("  -i, --dump-coreir  print Core IR after parsing (debug)\n");
   printf("  -c, --eval-coreir  run via Core IR evaluator (smoke)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
   printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
+      printf("  LAZYSCRIPT_SUGAR_NS     namespace used for ~~sym sugar (if -n not set)\n");
       exit(0);
     case 'v':
       printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);

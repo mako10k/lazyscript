@@ -179,11 +179,12 @@ efact:
       LSTINT { $$ = lsexpr_new_int($1); }
     | LSTSTR { $$ = lsexpr_new_str($1); }
     | LSTPRELUDESYM {
-        // desugar: ~~sym  ==>  (~prelude sym)
-        const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr("prelude"), @$));
+        // desugar: ~~sym  ==>  (~<ns> sym), where ns = lsscan_get_sugar_ns(yyextra)
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$));
         const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
         const lsexpr_t *args[] = { sym };
-        $$ = lsexpr_new_appl(lseappl_new(prelude, 1, args));
+        $$ = lsexpr_new_appl(lseappl_new(nsref, 1, args));
       }
     | etuple {
         lssize_t argc = lsealge_get_argc($1);

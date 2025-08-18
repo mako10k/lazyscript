@@ -10,6 +10,7 @@ struct lsprog {
 struct lsscan {
   const lsprog_t *ls_prog;
   const char *ls_filename;
+  const char *ls_sugar_ns;
 };
 
 const lsprog_t *lsprog_new(const lsexpr_t *expr) {
@@ -35,6 +36,7 @@ lsscan_t *lsscan_new(const char *filename) {
   lsscan_t *scanner = lsmalloc(sizeof(lsscan_t));
   scanner->ls_prog = NULL;
   scanner->ls_filename = filename;
+  scanner->ls_sugar_ns = "prelude";
   return scanner;
 }
 
@@ -48,4 +50,12 @@ void lsscan_set_prog(lsscan_t *scanner, const lsprog_t *prog) {
 
 const char *lsscan_get_filename(const lsscan_t *scanner) {
   return scanner->ls_filename;
+}
+
+void lsscan_set_sugar_ns(lsscan_t *scanner, const char *ns) {
+  scanner->ls_sugar_ns = (ns && ns[0]) ? ns : "prelude";
+}
+
+const char *lsscan_get_sugar_ns(const lsscan_t *scanner) {
+  return scanner->ls_sugar_ns ? scanner->ls_sugar_ns : "prelude";
 }
