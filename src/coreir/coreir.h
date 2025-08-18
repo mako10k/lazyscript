@@ -33,11 +33,11 @@ struct lscir_value {
 	union {
 		long long ival;
 		const char *sval;
-		struct {
-			const char *name;
-			lscir_value_t const **args;
-			int argc;
-		} constr;
+			struct {
+				const char *name;
+				const lscir_value_t *const *args;
+				int argc;
+			} constr;
 		const char *var; // 変数名（デバッグ用）
 		struct {
 			const char *param; // 単一引数（暫定）
