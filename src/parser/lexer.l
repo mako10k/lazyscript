@@ -3,6 +3,11 @@
 #include "parser/parser.h"
 #include "common/loc.h"
 #include "common/io.h"
+#include "common/malloc.h"
+/* Flex 生成コード内の malloc/realloc/free を GC ラッパに切り替える */
+#define malloc  lsmalloc
+#define realloc lsrealloc
+#define free    lsfree
 #define YY_USER_ACTION lsloc_update(yylloc, yytext, yyleng);
 %}
 %option noyywrap

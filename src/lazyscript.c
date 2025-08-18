@@ -1,6 +1,7 @@
 #include "lazyscript.h"
 #include "common/str.h"
 #include "misc/prog.h"
+#include "expr/ealge.h"
 #include "parser/parser.h"
 #include "thunk/thunk.h"
 #include <string.h>
@@ -10,6 +11,7 @@
 #include <gc.h>
 #include <getopt.h>
 #include <stdarg.h>
+#include <dlfcn.h>
 
 static const lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   assert(in_str != NULL);
@@ -57,11 +59,10 @@ static lsthunk_t *lsbuiltin_to_string(lssize_t argc, lsthunk_t *const *args,
   assert(args != NULL);
   size_t len = 0;
   char *buf = NULL;
-  FILE *fp = open_memstream(&buf, &len);
+  FILE *fp = lsopen_memstream_gc(&buf, &len);
   lsthunk_dprint(fp, LSPREC_LOWEST, 0, args[0]);
   fclose(fp);
   const lsstr_t *str = lsstr_new(buf, len);
-  free(buf);
   return lsthunk_new_str(str);
 }
 
@@ -75,6 +76,104 @@ static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
   const lsstr_t *str = lsthunk_get_str(thunk_str);
   lsstr_print_bare(stdout, LSPREC_LOWEST, 0, str);
   return args[0];
+}
+
+// --- Prelude helpers/builtins ---
+static lsthunk_t *ls_make_unit(void) {
+  // Build algebraic constructor () with 0 args
+  const lsealge_t *eunit = lsealge_new(lsstr_cstr("()"), 0, NULL);
+  return lsthunk_new_ealge(eunit, NULL);
+}
+
+static lsthunk_t *lsbuiltin_prelude_exit(lssize_t argc, lsthunk_t *const *args,
+                                         void *data) {
+  (void)data;
+  assert(argc == 1);
+  assert(args != NULL);
+  lsthunk_t *val = lsthunk_eval0(args[0]);
+  if (val == NULL)
+    return NULL;
+  if (lsthunk_get_type(val) != LSTTYPE_INT) {
+    lsprintf(stderr, 0, "E: exit: invalid type\n");
+    return NULL;
+  }
+  // We only distinguish zero/non-zero to avoid needing a raw int getter.
+  int is_zero = lsint_eq(lsthunk_get_int(val), lsint_new(0));
+  exit(is_zero ? 0 : 1);
+}
+
+static lsthunk_t *lsbuiltin_prelude_println(lssize_t argc,
+                                            lsthunk_t *const *args,
+                                            void *data) {
+  (void)data;
+  assert(argc == 1);
+  assert(args != NULL);
+  lsthunk_t *thunk_str = lsthunk_eval0(args[0]);
+  if (thunk_str == NULL)
+    return NULL;
+  if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
+    thunk_str = lsbuiltin_to_string(1, args, NULL);
+  const lsstr_t *str = lsthunk_get_str(thunk_str);
+  lsstr_print_bare(stdout, LSPREC_LOWEST, 0, str);
+  lsprintf(stdout, 0, "\n");
+  return ls_make_unit();
+}
+
+static lsthunk_t *lsbuiltin_prelude_chain(lssize_t argc,
+                                          lsthunk_t *const *args,
+                                          void *data) {
+  (void)data;
+  assert(argc == 2);
+  assert(args != NULL);
+  // Evaluate the first action for effects
+  lsthunk_t *action = lsthunk_eval0(args[0]);
+  if (action == NULL)
+    return NULL;
+  // Apply the continuation to unit
+  lsthunk_t *unit = ls_make_unit();
+  lsthunk_t *cont = args[1];
+  return lsthunk_eval(cont, 1, &unit);
+}
+
+static lsthunk_t *lsbuiltin_prelude_return(lssize_t argc,
+                                           lsthunk_t *const *args,
+                                           void *data) {
+  (void)data;
+  assert(argc == 1);
+  assert(args != NULL);
+  return args[0];
+}
+
+static lsthunk_t *lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t *const *args,
+                                    void *data) {
+  (void)data;
+  assert(argc == 1);
+  assert(args != NULL);
+  lsthunk_t *key = lsthunk_eval0(args[0]);
+  if (key == NULL)
+    return NULL;
+  if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
+    lsprintf(stderr, 0,
+             "E: prelude: expected a bare symbol (e.g., exit/println/chain/return)\n");
+    return NULL;
+  }
+  const lsstr_t *name = lsthunk_get_constr(key);
+  if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1,
+                               lsbuiltin_prelude_exit, NULL);
+  if (lsstrcmp(name, lsstr_cstr("println")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.println"), 1,
+                               lsbuiltin_prelude_println, NULL);
+  if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2,
+                               lsbuiltin_prelude_chain, NULL);
+  if (lsstrcmp(name, lsstr_cstr("return")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1,
+                               lsbuiltin_prelude_return, NULL);
+  lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
+  lsprintf(stderr, 0, "\n");
+  return NULL;
 }
 
 typedef enum lsseq_type {
@@ -135,7 +234,7 @@ static lsthunk_t *lsbuiltin_sub(lssize_t argc, lsthunk_t *const *args,
   return lsthunk_new_int(lsint_sub(lsthunk_get_int(lhs), lsthunk_get_int(rhs)));
 }
 
-static void lsbuiltin_prelude(lstenv_t *tenv) {
+static void ls_register_core_builtins(lstenv_t *tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("dump"), 1, lsbuiltin_dump, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("to_str"), 1, lsbuiltin_to_string, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
@@ -147,16 +246,53 @@ static void lsbuiltin_prelude(lstenv_t *tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("sub"), 2, lsbuiltin_sub, NULL);
 }
 
+static void ls_register_builtin_prelude(lstenv_t *tenv) {
+  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, NULL);
+}
+
+typedef int (*ls_prelude_register_fn)(lstenv_t *);
+
+static int ls_try_load_prelude_plugin(lstenv_t *tenv, const char *path) {
+  const char *chosen = path;
+  if (chosen == NULL)
+    chosen = getenv("LAZYSCRIPT_PRELUDE_SO");
+  if (chosen == NULL || chosen[0] == '\0')
+    return 0;
+  void *handle = dlopen(chosen, RTLD_NOW | RTLD_LOCAL);
+  if (!handle) {
+    lsprintf(stderr, 0, "W: dlopen failed: %s\n", dlerror());
+    return 0;
+  }
+  dlerror();
+  ls_prelude_register_fn reg = (ls_prelude_register_fn)dlsym(handle, "ls_prelude_register");
+  const char *err = dlerror();
+  if (err != NULL || reg == NULL) {
+    lsprintf(stderr, 0, "W: dlsym(ls_prelude_register) failed: %s\n", err ? err : "(null)");
+    dlclose(handle);
+    return 0;
+  }
+  int rc = reg(tenv);
+  if (rc != 0) {
+    lsprintf(stderr, 0, "W: prelude plugin returned error: %d\n", rc);
+    // keep handle but report error; fall back
+    return 0;
+  }
+  // Keep handle open for the lifetime of process
+  return 1;
+}
+
 int main(int argc, char **argv) {
+  const char *prelude_so = NULL;
   struct option longopts[] = {
       {"eval", required_argument, NULL, 'e'},
+      {"prelude-so", required_argument, NULL, 'p'},
       {"debug", no_argument, NULL, 'd'},
       {"help", no_argument, NULL, 'h'},
       {"version", no_argument, NULL, 'v'},
       {NULL, 0, NULL, 0},
   };
   int opt;
-  while ((opt = getopt_long(argc, argv, "e:dhv", longopts, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "e:p:dhv", longopts, NULL)) != -1) {
     switch (opt) {
     case 'e': {
       static int eval_count = 0;
@@ -168,7 +304,9 @@ int main(int argc, char **argv) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
 #endif
         lstenv_t *tenv = lstenv_new(NULL);
-        lsbuiltin_prelude(tenv);
+        ls_register_core_builtins(tenv);
+        if (!ls_try_load_prelude_plugin(tenv, prelude_so))
+          ls_register_builtin_prelude(tenv);
         lsthunk_t *ret = lsprog_eval(prog, tenv);
         if (ret != NULL) {
           lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
@@ -177,6 +315,9 @@ int main(int argc, char **argv) {
       }
       break;
     }
+    case 'p':
+      prelude_so = optarg;
+      break;
     case 'd':
 #if DEBUG
     {
@@ -187,10 +328,13 @@ int main(int argc, char **argv) {
     break;
     case 'h':
       printf("Usage: %s [OPTION]... [FILE]...\n", argv[0]);
-      printf("Options:\n");
+  printf("Options:\n");
       printf("  -d, --debug     print debug information\n");
+  printf("  -e, --eval      evaluate a one-line program string\n");
+  printf("  -p, --prelude-so <path>  load prelude plugin .so (override)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
+  printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
       exit(0);
     case 'v':
       printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -209,7 +353,9 @@ int main(int argc, char **argv) {
       lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
 #endif
       lstenv_t *tenv = lstenv_new(NULL);
-      lsbuiltin_prelude(tenv);
+      ls_register_core_builtins(tenv);
+      if (!ls_try_load_prelude_plugin(tenv, prelude_so))
+        ls_register_builtin_prelude(tenv);
       lsthunk_t *ret = lsprog_eval(prog, tenv);
       if (ret != NULL) {
         lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);

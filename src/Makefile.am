@@ -1,4 +1,4 @@
-SUBDIRS = common expr misc parser pat thunk
+SUBDIRS = common expr misc parser pat thunk plugins
 
 bin_PROGRAMS = lazyscript
 
@@ -11,6 +11,9 @@ lazyscript_LDADD = \
     expr/liblsexpr.la \
     common/liblscommon.la \
     $(GC_LIBS)
+
+# Export program symbols so dlopen()'d plugins can resolve symbols from the main binary
+lazyscript_LDFLAGS = -export-dynamic
 
 lazyscript_SOURCES = \
     lazyscript.c \

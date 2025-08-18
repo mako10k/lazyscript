@@ -28,6 +28,7 @@ typedef lsthunk_t *(*lstbuiltin_func_t)(lssize_t, lsthunk_t *const *, void *);
 #include "pat/palge.h"
 #include "pat/pas.h"
 #include "pat/pat.h"
+#include "thunk/tpat.h"
 #include "thunk/tenv.h"
 
 typedef enum lsttype {
@@ -179,7 +180,7 @@ lsthunk_t *lsthunk_get_left(const lsthunk_t *thunk);
 
 lsthunk_t *lsthunk_get_right(const lsthunk_t *thunk);
 
-lspat_t *lsthunk_get_param(const lsthunk_t *thunk);
+lstpat_t *lsthunk_get_param(const lsthunk_t *thunk);
 
 lsthunk_t *lsthunk_get_body(const lsthunk_t *thunk);
 
@@ -192,8 +193,7 @@ lstref_target_t *lsthunk_get_ref_target(const lsthunk_t *thunk);
  * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_alge(lsthunk_t *thunk, const lspat_t *pat,
-                            lstenv_t *tenv);
+lsmres_t lsthunk_match_alge(lsthunk_t *thunk, lstpat_t *tpat);
 
 /**
  * Associate a thunk with an as pattern
@@ -202,8 +202,7 @@ lsmres_t lsthunk_match_alge(lsthunk_t *thunk, const lspat_t *pat,
  * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pas(lsthunk_t *thunk, const lspat_t *pat,
-                           lstenv_t *tenv);
+lsmres_t lsthunk_match_pas(lsthunk_t *thunk, lstpat_t *tpat);
 
 /**
  * Associate a thunk with a reference pattern
@@ -212,8 +211,7 @@ lsmres_t lsthunk_match_pas(lsthunk_t *thunk, const lspat_t *pat,
  * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_ref(lsthunk_t *thunk, const lspat_t *pat,
-                           lstenv_t *tenv);
+lsmres_t lsthunk_match_ref(lsthunk_t *thunk, lstpat_t *tpat);
 
 /**
  * Associate a thunk with a pattern
@@ -222,8 +220,7 @@ lsmres_t lsthunk_match_ref(lsthunk_t *thunk, const lspat_t *pat,
  * @param tenv The environment
  * @return result
  */
-lsmres_t lsthunk_match_pat(lsthunk_t *thunk, const lspat_t *pat,
-                           lstenv_t *tenv);
+lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat);
 
 /**
  * Evaluate a thunk to WHNF (Weak Head Normal Form)
@@ -242,7 +239,7 @@ lsthunk_t *lsthunk_eval0(lsthunk_t *thunk);
 lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
 
 lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
-                                   lspat_t *pat);
+                                   lstpat_t *pat);
 
 lstref_target_origin_t *lstref_target_origin_new_builtin(const lsstr_t *name,
                                                          lssize_t arity,
@@ -254,3 +251,7 @@ lsthunk_t *lsprog_eval(const lsprog_t *prog, lstenv_t *tenv);
 void lsthunk_print(FILE *fp, lsprec_t prec, int indent, lsthunk_t *thunk);
 
 void lsthunk_dprint(FILE *fp, lsprec_t prec, int indent, lsthunk_t *thunk);
+
+// For now, cloning a thunk returns the same pointer (immutable semantics).
+// If thunk mutability is introduced, replace with a deep copy.
+lsthunk_t *lsthunk_clone(lsthunk_t *thunk);

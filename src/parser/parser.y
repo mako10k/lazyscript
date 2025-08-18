@@ -1,6 +1,14 @@
 %code top {
 #include <stdio.h>
 #include "lazyscript.h"
+#include "common/malloc.h"
+/* Bison のスタック確保に GC を使う */
+#ifndef YYMALLOC
+#define YYMALLOC lsmalloc
+#endif
+#ifndef YYFREE
+#define YYFREE lsfree
+#endif
 }
 
 %code requires {

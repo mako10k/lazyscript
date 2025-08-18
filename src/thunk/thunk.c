@@ -864,3 +864,9 @@ void lsthunk_dprint(FILE *fp, lsprec_t prec, int indent, lsthunk_t *thunk) {
   lsthunk_colle_t *colle = lsthunk_colle_new(thunk, NULL, &id, 0, 1);
   lsthunk_print_internal(fp, prec, indent, thunk, 0, colle, LSPM_ASIS, 0);
 }
+
+lsthunk_t *lsthunk_clone(lsthunk_t *thunk) {
+  // Thunks are treated as immutable graph nodes managed by GC.
+  // Returning the same pointer is sufficient for now.
+  return thunk;
+}

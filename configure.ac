@@ -52,7 +52,8 @@ AC_CONFIG_FILES([Makefile
                  src/misc/Makefile
                  src/parser/Makefile
                  src/pat/Makefile
-                 src/thunk/Makefile])
+                 src/thunk/Makefile
+                 src/plugins/Makefile])
 
 AC_ARG_ENABLE([debug],
   AS_HELP_STRING([--enable-debug], [Enable debugging]),
