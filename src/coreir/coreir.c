@@ -920,7 +920,10 @@ int lscir_typecheck(FILE *outfp, const lscir_prog_t *cir) {
   if (!cir || !cir->root) { fprintf(outfp, "OK\n"); return 0; }
   const ty_t *t = NULL; int err = type_expr(cir->root, &t);
   // Perform a lightweight Kind check (Pure vs IO). Informational, no output yet.
-  (void) expr_has_io(cir->root);
+  if (expr_has_io(cir->root)) {
+    // Warn to stderr only; do not affect success status or stdout contract.
+    fprintf(stderr, "W: kind: effectful constructs (IO) detected; avoid using effects in pure contexts.\n");
+  }
   if (err) { fprintf(outfp, "E: type error\n"); return 1; }
   fprintf(outfp, "OK\n");
   return 0;
