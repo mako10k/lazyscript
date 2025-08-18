@@ -897,9 +897,30 @@ static int type_expr(const lscir_expr_t *e, const ty_t **out) {
   return 1;
 }
 
+// -------------------- Minimal Kind check (Pure vs IO) --------------------
+// We approximate Kind with a simple flag: Pure (*) vs IO (effectful computation).
+// Rules (conservative):
+//  - VAL, APP are Pure (values/functions in Core IR are side-effect free)
+//  - LET/IF are IO if any sub-expression is IO
+//  - EFFAPP and TOKEN are IO
+static int expr_has_io(const lscir_expr_t *e) {
+  if (!e) return 0;
+  switch (e->kind) {
+    case LCIR_EXP_VAL: return 0;
+    case LCIR_EXP_APP: return 0;
+    case LCIR_EXP_LET: return expr_has_io(e->let1.bind) || expr_has_io(e->let1.body);
+    case LCIR_EXP_IF:  return expr_has_io(e->ife.then_e) || expr_has_io(e->ife.else_e);
+    case LCIR_EXP_EFFAPP: return 1;
+    case LCIR_EXP_TOKEN:  return 1;
+  }
+  return 0;
+}
+
 int lscir_typecheck(FILE *outfp, const lscir_prog_t *cir) {
   if (!cir || !cir->root) { fprintf(outfp, "OK\n"); return 0; }
   const ty_t *t = NULL; int err = type_expr(cir->root, &t);
+  // Perform a lightweight Kind check (Pure vs IO). Informational, no output yet.
+  (void) expr_has_io(cir->root);
   if (err) { fprintf(outfp, "E: type error\n"); return 1; }
   fprintf(outfp, "OK\n");
   return 0;
