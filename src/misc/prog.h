@@ -4,6 +4,7 @@ typedef struct lsprog lsprog_t;
 typedef struct lsscan lsscan_t;
 
 #include "expr/expr.h"
+#include "common/loc.h"
 
 const lsprog_t *lsprog_new(const lsexpr_t *expr);
 void lsprog_print(FILE *fp, int prec, int indent, const lsprog_t *prog);

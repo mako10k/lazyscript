@@ -154,6 +154,27 @@ lsthunk_t *lstpat_get_refbound(const lstpat_t *pat) {
   return pat->r.bound;
 }
 
+static void lstpat_clear_binds_internal(lstpat_t *pat) {
+  switch (pat->ltp_type) {
+  case LSPTYPE_ALGE:
+    for (lssize_t i = 0; i < pat->alge.argc; i++)
+      lstpat_clear_binds_internal(pat->alge.args[i]);
+    break;
+  case LSPTYPE_AS:
+    lstpat_clear_binds_internal(pat->as.ref);
+    lstpat_clear_binds_internal(pat->as.aspattern);
+    break;
+  case LSPTYPE_INT:
+  case LSPTYPE_STR:
+    break;
+  case LSPTYPE_REF:
+    pat->r.bound = NULL;
+    break;
+  }
+}
+
+void lstpat_clear_binds(lstpat_t *pat) { lstpat_clear_binds_internal(pat); }
+
 static lstpat_t *lstpat_clone_internal(const lstpat_t *pat) {
   switch (pat->ltp_type) {
   case LSPTYPE_ALGE: {

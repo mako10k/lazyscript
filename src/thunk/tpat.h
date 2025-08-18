@@ -49,3 +49,6 @@ lsthunk_t *lstpat_get_refbound(const lstpat_t *pat);
 // Utilities
 lstpat_t *lstpat_clone(const lstpat_t *pat);
 void lstpat_print(FILE *fp, lsprec_t prec, int indent, const lstpat_t *pat);
+
+// Clear all REF bindings inside the pattern (for lambda reuse)
+void lstpat_clear_binds(lstpat_t *pat);

@@ -173,7 +173,9 @@ lsstr_ht_put_raw_resizable(lsstr_ht_t *str_ht, const char *buf, lssize_t len) {
   return *lsstr_ht_put_raw(str_ht, buf, len);
 }
 
-__attribute__((constructor)) static void lsstr_init(void) {
+static void lsstr_ensure_init(void) {
+  if (g_str_ht.lsth_ents != NULL)
+    return;
   g_str_ht.lsth_ents = lsmalloc_atomic(sizeof(const lsstr_t *) * 16);
   g_str_ht.lsth_cap = 16;
   g_str_ht.lsth_size = 0;
@@ -183,6 +185,7 @@ __attribute__((constructor)) static void lsstr_init(void) {
 
 const lsstr_t *lsstr_new(const char *buf, lssize_t len) {
   assert(buf != NULL);
+  lsstr_ensure_init();
   const lsstr_t *str = lsstr_ht_put_raw_resizable(&g_str_ht, buf, len);
   return str;
 }

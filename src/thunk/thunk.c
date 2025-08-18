@@ -413,12 +413,18 @@ static lsthunk_t *lsthunk_eval_lambda(lsthunk_t *thunk, lssize_t argc,
   lsthunk_t *arg;
   lsthunk_t *const *args1 = (lsthunk_t *const *)lsa_shift(
       argc, (const void *const *)args, (const void **)&arg);
-  param = lstpat_clone(param);
+  // Bind directly on the lambda's original parameter pattern so that
+  // references inside body (which point to the same pattern objects via env)
+  // observe the binding. We'll clear bindings after evaluation to keep
+  // the lambda reusable.
   body = lsthunk_clone(body);
   lsmres_t mres = lsthunk_match_pat(arg, param);
   if (mres != LSMATCH_SUCCESS)
     return NULL;
-  return lsthunk_eval(body, argc - 1, args1);
+  lsthunk_t *ret = lsthunk_eval(body, argc - 1, args1);
+  // Clear parameter bindings for reuse
+  lstpat_clear_binds(param);
+  return ret;
 }
 
 static lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
@@ -473,12 +479,12 @@ static lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
     return lsthunk_eval(refbound, argc, args);
   }
   case LSTRTYPE_LAMBDA: {
-    lsmres_t mres = lsthunk_match_pat(origin->lrto_lambda.ltl_body,
-                                      origin->lrto_lambda.ltl_param);
-    if (mres != LSMATCH_SUCCESS)
-      return NULL;
+    // Parameter refs should have been bound during lambda application.
     refbound = lstpat_get_refbound(pat_ref);
-    assert(refbound != NULL);
+    if (refbound == NULL) {
+      lsprintf(stderr, 0, "E: unbound lambda parameter reference\n");
+      return NULL;
+    }
     return lsthunk_eval(refbound, argc, args);
   }
   case LSTRTYPE_BUILTIN:
