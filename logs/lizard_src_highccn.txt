@@ -1,0 +1,33 @@
+NLOC    Avg.NLOC  AvgCCN  Avg.token  function_cnt    file
+    236      10.5     2.7       72.8        20     src/thunk/tpat.c
+    787      15.8     4.0      116.7        45     src/thunk/thunk.c
+    108      12.4     3.5      103.1         8     src/expr/ealge.c
+     91      11.9     3.0       94.4         7     src/plugins/prelude_plugin.c
+    117      11.7     3.3       96.3         9     src/pat/palge.c
+    383      15.7     5.0      105.6        23     src/common/str.c
+     49      14.7     2.7      111.0         3     src/common/loc.c
+     95      16.4     4.6      120.2         5     src/common/io.c
+    127      15.9     3.3      121.4         7     src/common/hash.c
+     37      15.5     3.0       98.5         2     src/lazyscript_format.c
+    501      20.8     5.1      140.5        23     src/lazyscript.c
+      38     12    289      4      40 lstpat_print@221-260@src/thunk/tpat.c
+      58     17    398      5      58 lsthunk_colle_new@640-697@src/thunk/thunk.c
+     160     48   1191      8     162 lsthunk_print_internal@699-860@src/thunk/thunk.c
+      55     16    446      4      56 lsealge_print@63-118@src/expr/ealge.c
+      55     16    453      4      56 lspalge_print@66-121@src/pat/palge.c
+      24     17    215      3      26 lsstr_parse_hex@239-264@src/common/str.c
+      50     25    200      3      50 lsstr_parse_esc@280-329@src/common/str.c
+      51     15    298      4      51 lsstr_print@360-410@src/common/str.c
+      26     12    236      6      26 lsa_splicev@109-134@src/common/array.c
+      65     44   1564      1      66 lower_expr@99-164@src/coreir/coreir_clean.c
+       4     12    174      3       4 cir_val_repr@203-206@src/coreir/coreir_clean.c
+      10     14    401      3      10 cir_validate_expr@212-221@src/coreir/coreir_clean.c
+      21     23    493      3      21 eval_value@262-282@src/coreir/coreir_clean.c
+      24     40    743      2      24 print_value@286-309@src/coreir/coreir_clean.c
+      23     61   1364      5      24 apply_natfun@311-334@src/coreir/coreir_clean.c
+      13     21    519      3      13 eval_expr@340-352@src/coreir/coreir_clean.c
+       9     14    211      2       9 expr_has_effects@360-368@src/coreir/coreir_clean.c
+       9     12    137      1       9 natfun_arity@371-379@src/coreir/coreir_clean.c
+      27     13    186      1      29 expr_check_arity@381-409@src/coreir/coreir_clean.c
+     204     48   1218      2     206 main@332-537@src/lazyscript.c
+      4583      10.0     3.5       92.0      361           20      0.06    0.26
