@@ -113,6 +113,17 @@ if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
     echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; echo "3"; echo "---";
     ((fail++))
   fi
+
+  # Token-gated effect via chain: should print and return unit under evaluator
+  out="$("$BIN" --eval-coreir "$DIR/t08_coreir_chain.ls" 2>&1)"
+  if diff -u <(printf "%s\n" "$out") "$DIR/t08_coreir_chain.out" >/dev/null; then
+    echo "ok - coreir-eval t08_coreir_chain"
+    ((pass++))
+  else
+    echo "not ok - coreir-eval t08_coreir_chain"
+    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$DIR/t08_coreir_chain.out"; echo "---";
+    ((fail++))
+  fi
 fi
 
 if [[ $fail -eq 0 ]]; then

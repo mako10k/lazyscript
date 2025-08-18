@@ -579,6 +579,11 @@ typedef struct env_bind {
   struct env_bind *next;
 } env_bind_t;
 
+typedef struct eval_ctx {
+  env_bind_t *env;
+  int has_token; // simplistic token presence flag
+} eval_ctx_t;
+
 struct rv {
   rv_kind_t kind;
   union {
@@ -621,31 +626,33 @@ static const rv_t *rv_natfun(const char *name, int arity, int capc, const rv_t *
   rv_t *v = lsmalloc(sizeof(rv_t)); v->kind = RV_NATFUN; v->nf.name = name; v->nf.arity = arity; v->nf.capc = capc; v->nf.caps = caps; return v;
 }
 
-static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, env_bind_t *env);
-static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env);
+static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, eval_ctx_t *ctx);
+static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, eval_ctx_t *ctx);
 
-static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, env_bind_t *env) {
+static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, eval_ctx_t *ctx) {
   (void)outfp;
   switch (v->kind) {
   case LCIR_VAL_INT: return rv_int(v->ival);
   case LCIR_VAL_STR: return rv_str(v->sval);
   case LCIR_VAL_VAR: {
-  const rv_t *found = env_lookup(env, v->var);
+  const rv_t *found = env_lookup(ctx ? ctx->env : NULL, v->var);
   if (found) return found;
   // Builtin natfuns (curried)
   if (strcmp(v->var, "add") == 0) return rv_natfun("add", 2, 0, NULL);
   if (strcmp(v->var, "sub") == 0) return rv_natfun("sub", 2, 0, NULL);
+  if (strcmp(v->var, "chain") == 0) return rv_natfun("chain", 2, 0, NULL);
+  if (strcmp(v->var, "return") == 0) return rv_natfun("return", 1, 0, NULL);
   // Treat others as symbols (e.g., true/false)
   return rv_sym(v->var);
   }
   case LCIR_VAL_CONSTR: {
-    if (strcmp(v->constr.name, "()") == 0 && v->constr.argc == 0) return rv_unit();
+  if (strcmp(v->constr.name, "()") == 0 && v->constr.argc == 0) return rv_unit();
     // Fallback: represent as symbol name
     return rv_sym(v->constr.name);
   }
   case LCIR_VAL_LAM:
-    // Capture current env to form a closure
-    return rv_lam(v->lam.param, v->lam.body, env);
+  // Capture current env to form a closure
+  return rv_lam(v->lam.param, v->lam.body, ctx ? ctx->env : NULL);
   }
   return rv_unit();
 }
@@ -672,7 +679,7 @@ static void print_value(FILE *outfp, const rv_t *v) {
   }
 }
 
-static const rv_t *natfun_apply_one(FILE *outfp, const rv_t *nf, const rv_t *arg) {
+static const rv_t *apply_natfun_one(FILE *outfp, const rv_t *nf, const rv_t *arg, eval_ctx_t *ctx) {
   if (!nf || nf->kind != RV_NATFUN) return NULL;
   const char *name = nf->nf.name; int ar = nf->nf.arity; int cap = nf->nf.capc;
   // If not enough args yet, return a new curried function with appended capture
@@ -691,6 +698,7 @@ static const rv_t *natfun_apply_one(FILE *outfp, const rv_t *nf, const rv_t *arg
     return rv_int(res);
   }
   if (strcmp(name, "println") == 0) {
+    if (!ctx || !ctx->has_token) { fprintf(outfp, "E: println requires token (seq/chain).\n"); return rv_unit(); }
     // println x  ==> print then unit
     if (arg->kind == RV_STR) fprintf(outfp, "%s\n", arg->sval);
     else if (arg->kind == RV_INT) fprintf(outfp, "%lld\n", arg->ival);
@@ -698,6 +706,7 @@ static const rv_t *natfun_apply_one(FILE *outfp, const rv_t *nf, const rv_t *arg
     return rv_unit();
   }
   if (strcmp(name, "exit") == 0) {
+    if (!ctx || !ctx->has_token) { fprintf(outfp, "E: exit requires token (seq/chain).\n"); return rv_unit(); }
     long long code = (arg->kind == RV_INT) ? arg->ival : 1;
     exit(code == 0 ? 0 : 1);
   }
@@ -706,32 +715,38 @@ static const rv_t *natfun_apply_one(FILE *outfp, const rv_t *nf, const rv_t *arg
     return arg;
   }
   if (strcmp(name, "chain") == 0) {
-    // chain a f  ==> f ()
-    // (a は既に評価済み値として cap[0] にある想定。効果は let で順序づけ済み)
+    // chain a f  ==> enable token; f ()
+    int prev = ctx ? ctx->has_token : 0;
+    if (ctx) ctx->has_token = 1;
     const rv_t *f = arg;
     if (f && f->kind == RV_LAM) {
       env_bind_t *env2 = env_push(f->lam.env, f->lam.param, rv_unit());
-      return eval_expr(outfp, f->lam.body, env2);
+      eval_ctx_t sub = { .env = env2, .has_token = ctx ? ctx->has_token : 0 };
+      const rv_t *ret = eval_expr(outfp, f->lam.body, &sub);
+      if (ctx) ctx->has_token = prev;
+      return ret;
     }
+    if (ctx) ctx->has_token = prev;
     return f ? f : rv_unit();
   }
   return rv_unit();
 }
 
-static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env) {
+static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, eval_ctx_t *ctx) {
   if (!e) return rv_unit();
   switch (e->kind) {
   case LCIR_EXP_VAL:
-    return eval_value(outfp, e->v, env);
+  return eval_value(outfp, e->v, ctx);
   case LCIR_EXP_LET: {
-    const rv_t *bv = eval_expr(outfp, e->let1.bind, env);
-    env_bind_t *env2 = env_push(env, e->let1.var, bv);
-    return eval_expr(outfp, e->let1.body, env2);
+  const rv_t *bv = eval_expr(outfp, e->let1.bind, ctx);
+  env_bind_t *env2 = env_push(ctx ? ctx->env : NULL, e->let1.var, bv);
+  eval_ctx_t sub = { .env = env2, .has_token = ctx ? ctx->has_token : 0 };
+  return eval_expr(outfp, e->let1.body, &sub);
   }
   case LCIR_EXP_APP: {
     // Prelude dispatcher: (app (var prelude) <sym>)  ==> natfun(sym)
     if (e->app.func->kind == LCIR_VAL_VAR && strcmp(e->app.func->var, "prelude") == 0 && e->app.argc == 1) {
-      const rv_t *sv = eval_value(outfp, e->app.args[0], env);
+  const rv_t *sv = eval_value(outfp, e->app.args[0], ctx);
       if (sv && sv->kind == RV_SYMBOL) {
         const char *s = sv->sym;
         if (strcmp(s, "println") == 0) return rv_natfun("println", 1, 0, NULL);
@@ -742,23 +757,24 @@ static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env
       return rv_unit();
     }
     // Evaluate function value first
-    const rv_t *rf = eval_value(outfp, e->app.func, env);
+  const rv_t *rf = eval_value(outfp, e->app.func, ctx);
     // Curry: apply each argument from left to right
     for (int i = 0; i < e->app.argc; i++) {
-      const rv_t *av = eval_value(outfp, e->app.args[i], env);
+  const rv_t *av = eval_value(outfp, e->app.args[i], ctx);
       if (!rf) return rv_unit();
       if (rf->kind == RV_LAM) {
         env_bind_t *env2 = env_push(rf->lam.env, rf->lam.param, av);
-        rf = eval_expr(outfp, rf->lam.body, env2);
+  eval_ctx_t sub2 = { .env = env2, .has_token = ctx ? ctx->has_token : 0 };
+  rf = eval_expr(outfp, rf->lam.body, &sub2);
         continue;
       }
       if (rf->kind == RV_NATFUN) {
-        rf = natfun_apply_one(outfp, rf, av);
+        rf = apply_natfun_one(outfp, rf, av, ctx);
         continue;
       }
       // Applying a plain symbol? Try lifting builtins to natfun
       if (rf->kind == RV_SYMBOL && (strcmp(rf->sym, "add") == 0 || strcmp(rf->sym, "sub") == 0)) {
-        rf = natfun_apply_one(outfp, rv_natfun(rf->sym, 2, 0, NULL), av);
+        rf = apply_natfun_one(outfp, rv_natfun(rf->sym, 2, 0, NULL), av, ctx);
         continue;
       }
       // Not applicable
@@ -767,38 +783,40 @@ static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env
     return rf ? rf : rv_unit();
   }
   case LCIR_EXP_IF: {
-    const rv_t *cv = eval_value(outfp, e->ife.cond, env);
-    if (truthy(cv)) return eval_expr(outfp, e->ife.then_e, env);
-    else return eval_expr(outfp, e->ife.else_e, env);
+  const rv_t *cv = eval_value(outfp, e->ife.cond, ctx);
+  if (truthy(cv)) return eval_expr(outfp, e->ife.then_e, ctx);
+  else return eval_expr(outfp, e->ife.else_e, ctx);
   }
   case LCIR_EXP_EFFAPP: {
     // Token presence is assumed by validator; ignore here.
     if (e->effapp.func->kind == LCIR_VAL_VAR && strcmp(e->effapp.func->var, "println") == 0) {
+      if (!ctx || !ctx->has_token) { fprintf(outfp, "E: println requires token (seq/chain).\n"); return rv_unit(); }
       if (e->effapp.argc != 1) return rv_unit();
-      const rv_t *av = eval_value(outfp, e->effapp.args[0], env);
+  const rv_t *av = eval_value(outfp, e->effapp.args[0], ctx);
       if (av->kind == RV_STR) fprintf(outfp, "%s\n", av->sval);
       else if (av->kind == RV_INT) fprintf(outfp, "%lld\n", av->ival);
       else if (av->kind == RV_SYMBOL) fprintf(outfp, "%s\n", av->sym);
       return rv_unit();
     }
     if (e->effapp.func->kind == LCIR_VAL_VAR && strcmp(e->effapp.func->var, "exit") == 0) {
+      if (!ctx || !ctx->has_token) { fprintf(outfp, "E: exit requires token (seq/chain).\n"); return rv_unit(); }
       if (e->effapp.argc != 1) return rv_unit();
-      const rv_t *av = eval_value(outfp, e->effapp.args[0], env);
+  const rv_t *av = eval_value(outfp, e->effapp.args[0], ctx);
       long long code = (av->kind == RV_INT) ? av->ival : 1;
       exit(code == 0 ? 0 : 1);
     }
     return rv_unit();
   }
   case LCIR_EXP_TOKEN:
-    return rv_tok();
+    if (ctx) ctx->has_token = 1; return rv_tok();
   }
   return rv_unit();
 }
 
 int lscir_eval(FILE *outfp, const lscir_prog_t *cir) {
   if (!cir || !cir->root) return 0;
-  env_bind_t *env = NULL;
-  const rv_t *res = eval_expr(outfp, cir->root, env);
+  eval_ctx_t ctx = { .env = NULL, .has_token = 0 };
+  const rv_t *res = eval_expr(outfp, cir->root, &ctx);
   print_value(outfp, res);
   return 0;
 }
