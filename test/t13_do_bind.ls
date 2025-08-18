@@ -1,1 +1,1 @@
-{ x <- add 1 2; ~~println ~x };
+{ x <- ~add 1 2; ~~println ~x };
