@@ -41,6 +41,7 @@ sudo make install   # 任意
 詳細は以下も参照:
 - シンタックスシュガーと do 記法: `docs/05_syntax_sugar.md`
 - 最小タイプチェッカ: `docs/06_typecheck.md`
+- 型/値コンストラクタの分離とIO規律（設計メモ）: `docs/07_effect_types.md`
 
 ## コアビルトインとプレリュード
 

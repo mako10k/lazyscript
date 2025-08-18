@@ -916,13 +916,50 @@ static int expr_has_io(const lscir_expr_t *e) {
   return 0;
 }
 
+static void kind_report_expr(FILE *errfp, const lscir_expr_t *e, int as_error) {
+  if (!e) return;
+  switch (e->kind) {
+    case LCIR_EXP_EFFAPP: {
+      char fbuf[64];
+      cir_val_repr(fbuf, sizeof(fbuf), e->effapp.func);
+      fprintf(errfp, "%c: kind: IO effapp at %s\n", as_error ? 'E' : 'W', fbuf);
+      return;
+    }
+    case LCIR_EXP_TOKEN: {
+      fprintf(errfp, "%c: kind: IO token creation\n", as_error ? 'E' : 'W');
+      return;
+    }
+    case LCIR_EXP_LET:
+      kind_report_expr(errfp, e->let1.bind, as_error);
+      kind_report_expr(errfp, e->let1.body, as_error);
+      return;
+    case LCIR_EXP_IF:
+      kind_report_expr(errfp, e->ife.then_e, as_error);
+      kind_report_expr(errfp, e->ife.else_e, as_error);
+      return;
+    default:
+      return;
+  }
+}
+
+static int g_kind_warn = 1;  // default: warn
+static int g_kind_error = 0; // default: not error
+
+void lscir_typecheck_set_kind_warn(int warn_enabled) { g_kind_warn = warn_enabled ? 1 : 0; }
+void lscir_typecheck_set_kind_error(int error_enabled) { g_kind_error = error_enabled ? 1 : 0; }
+
 int lscir_typecheck(FILE *outfp, const lscir_prog_t *cir) {
   if (!cir || !cir->root) { fprintf(outfp, "OK\n"); return 0; }
   const ty_t *t = NULL; int err = type_expr(cir->root, &t);
-  // Perform a lightweight Kind check (Pure vs IO). Informational, no output yet.
-  if (expr_has_io(cir->root)) {
-    // Warn to stderr only; do not affect success status or stdout contract.
-    fprintf(stderr, "W: kind: effectful constructs (IO) detected; avoid using effects in pure contexts.\n");
+  // Lightweight Kind check (Pure vs IO). Warn by default; can be silenced or escalated to error.
+  int has_io = expr_has_io(cir->root);
+  if (has_io) {
+    if (g_kind_error) {
+      kind_report_expr(stderr, cir->root, /*as_error=*/1);
+      return 1;
+    } else if (g_kind_warn) {
+      kind_report_expr(stderr, cir->root, /*as_error=*/0);
+    }
   }
   if (err) { fprintf(outfp, "E: type error\n"); return 1; }
   fprintf(outfp, "OK\n");

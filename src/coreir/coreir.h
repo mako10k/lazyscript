@@ -96,3 +96,11 @@ int lscir_eval(FILE *outfp, const lscir_prog_t *cir);
  * Returns 0 on success, non-zero on type error.
  */
 int lscir_typecheck(FILE *outfp, const lscir_prog_t *cir);
+
+/* Configure Kind check behavior for lscir_typecheck (process-global, minimal).
+ * warn_enabled: non-zero to emit warnings to stderr when IO (effects) are detected.
+ * error_enabled: non-zero to treat IO detection as an error (non-zero exit),
+ *                printing error details to stderr. When enabled, warning is suppressed.
+ */
+void lscir_typecheck_set_kind_warn(int warn_enabled);
+void lscir_typecheck_set_kind_error(int error_enabled);
