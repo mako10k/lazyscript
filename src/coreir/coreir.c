@@ -482,6 +482,19 @@ typedef struct eff_scope {
 
 static int cir_validate_expr(FILE *efp, const lscir_expr_t *e, eff_scope_t sc);
 
+static void cir_val_repr(char *buf, size_t n, const lscir_value_t *v) {
+  if (!buf || n == 0) return;
+  if (!v) { snprintf(buf, n, "<null>"); return; }
+  switch (v->kind) {
+  case LCIR_VAL_INT: snprintf(buf, n, "int %lld", v->ival); return;
+  case LCIR_VAL_STR: snprintf(buf, n, "str ..."); return;
+  case LCIR_VAL_VAR: snprintf(buf, n, "var %s", v->var ? v->var : "?"); return;
+  case LCIR_VAL_CONSTR: snprintf(buf, n, "%s(...)", v->constr.name ? v->constr.name : "<constr>"); return;
+  case LCIR_VAL_LAM: snprintf(buf, n, "lam %s", v->lam.param ? v->lam.param : "_"); return;
+  }
+  snprintf(buf, n, "<val>");
+}
+
 static int cir_validate_val(FILE *efp, const lscir_value_t *v, eff_scope_t sc) {
   (void)efp; (void)sc;
   // Lam の中は別作用域で検査（token は引き継がない前提）
@@ -522,12 +535,14 @@ static int cir_validate_expr(FILE *efp, const lscir_expr_t *e, eff_scope_t sc) {
   case LCIR_EXP_EFFAPP: {
     int errs = 0;
     if (!sc.has_token) {
-      fprintf(efp, "E: EffApp requires in-scope token (introduce via (token) let).\n");
+  char fbuf[64]; cir_val_repr(fbuf, sizeof(fbuf), e->effapp.func);
+  fprintf(efp, "E: EffApp(%s): requires in-scope token (introduce via (token) let).\n", fbuf);
       errs++;
     }
     errs += cir_validate_val(efp, e->effapp.func, sc);
     if (e->effapp.token->kind != LCIR_VAL_VAR) {
-      fprintf(efp, "E: EffApp token must be a variable.\n");
+  char tbuf[64]; cir_val_repr(tbuf, sizeof(tbuf), e->effapp.token);
+  fprintf(efp, "E: EffApp token must be a variable, got: %s.\n", tbuf);
       errs++;
     }
     for (int i = 0; i < e->effapp.argc; i++) errs += cir_validate_val(efp, e->effapp.args[i], sc);
@@ -657,7 +672,7 @@ static void print_value(FILE *outfp, const rv_t *v) {
   }
 }
 
-static const rv_t *natfun_apply_one(const rv_t *nf, const rv_t *arg) {
+static const rv_t *natfun_apply_one(FILE *outfp, const rv_t *nf, const rv_t *arg) {
   if (!nf || nf->kind != RV_NATFUN) return NULL;
   const char *name = nf->nf.name; int ar = nf->nf.arity; int cap = nf->nf.capc;
   // If not enough args yet, return a new curried function with appended capture
@@ -675,6 +690,31 @@ static const rv_t *natfun_apply_one(const rv_t *nf, const rv_t *arg) {
     long long res = (strcmp(name, "add") == 0) ? (a->ival + b->ival) : (a->ival - b->ival);
     return rv_int(res);
   }
+  if (strcmp(name, "println") == 0) {
+    // println x  ==> print then unit
+    if (arg->kind == RV_STR) fprintf(outfp, "%s\n", arg->sval);
+    else if (arg->kind == RV_INT) fprintf(outfp, "%lld\n", arg->ival);
+    else if (arg->kind == RV_SYMBOL) fprintf(outfp, "%s\n", arg->sym);
+    return rv_unit();
+  }
+  if (strcmp(name, "exit") == 0) {
+    long long code = (arg->kind == RV_INT) ? arg->ival : 1;
+    exit(code == 0 ? 0 : 1);
+  }
+  if (strcmp(name, "return") == 0) {
+    // return x ==> x
+    return arg;
+  }
+  if (strcmp(name, "chain") == 0) {
+    // chain a f  ==> f ()
+    // (a は既に評価済み値として cap[0] にある想定。効果は let で順序づけ済み)
+    const rv_t *f = arg;
+    if (f && f->kind == RV_LAM) {
+      env_bind_t *env2 = env_push(f->lam.env, f->lam.param, rv_unit());
+      return eval_expr(outfp, f->lam.body, env2);
+    }
+    return f ? f : rv_unit();
+  }
   return rv_unit();
 }
 
@@ -689,6 +729,18 @@ static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env
     return eval_expr(outfp, e->let1.body, env2);
   }
   case LCIR_EXP_APP: {
+    // Prelude dispatcher: (app (var prelude) <sym>)  ==> natfun(sym)
+    if (e->app.func->kind == LCIR_VAL_VAR && strcmp(e->app.func->var, "prelude") == 0 && e->app.argc == 1) {
+      const rv_t *sv = eval_value(outfp, e->app.args[0], env);
+      if (sv && sv->kind == RV_SYMBOL) {
+        const char *s = sv->sym;
+        if (strcmp(s, "println") == 0) return rv_natfun("println", 1, 0, NULL);
+        if (strcmp(s, "exit") == 0)    return rv_natfun("exit", 1, 0, NULL);
+        if (strcmp(s, "chain") == 0)   return rv_natfun("chain", 2, 0, NULL);
+        if (strcmp(s, "return") == 0)  return rv_natfun("return", 1, 0, NULL);
+      }
+      return rv_unit();
+    }
     // Evaluate function value first
     const rv_t *rf = eval_value(outfp, e->app.func, env);
     // Curry: apply each argument from left to right
@@ -701,12 +753,12 @@ static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env
         continue;
       }
       if (rf->kind == RV_NATFUN) {
-        rf = natfun_apply_one(rf, av);
+        rf = natfun_apply_one(outfp, rf, av);
         continue;
       }
       // Applying a plain symbol? Try lifting builtins to natfun
       if (rf->kind == RV_SYMBOL && (strcmp(rf->sym, "add") == 0 || strcmp(rf->sym, "sub") == 0)) {
-        rf = natfun_apply_one(rv_natfun(rf->sym, 2, 0, NULL), av);
+        rf = natfun_apply_one(outfp, rv_natfun(rf->sym, 2, 0, NULL), av);
         continue;
       }
       // Not applicable
