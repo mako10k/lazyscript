@@ -31,6 +31,8 @@ sudo make install   # 任意
   - `-c, --eval-coreir`: Core IR 評価器で実行（スモーク）
   - `-s, --strict-effects`: 効果の順序付け規律を検証（`chain/seq` 必須）
   - `-t, --typecheck`: Core IR の最小タイプチェック（OK / E: type error を出力）
+  - `--no-kind-warn`: 効果（IO種別）の警告を抑制（既定は警告を stderr に出力）
+  - `--kind-error`: 効果（IO種別）をエラーとして扱う（stderr にエラーを出力し非ゼロ終了）
 - プラグイン/糖衣:
   - `-p, --prelude-so <path>`: prelude プラグイン .so を指定（未指定時は組み込み）
   - `-n, --sugar-namespace <ns>`: `~~sym` の展開先名前空間を指定（既定 `prelude`）
