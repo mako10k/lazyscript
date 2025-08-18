@@ -170,6 +170,23 @@ static lsthunk_t *lsbuiltin_prelude_return(lssize_t argc,
   return args[0];
 }
 
+static lsthunk_t *lsbuiltin_prelude_bind(lssize_t argc,
+                                         lsthunk_t *const *args,
+                                         void *data) {
+  (void)data;
+  assert(argc == 2);
+  assert(args != NULL);
+  // Evaluate the first computation to get its value (with effects enabled)
+  ls_effects_begin();
+  lsthunk_t *val = lsthunk_eval0(args[0]);
+  ls_effects_end();
+  if (val == NULL)
+    return NULL;
+  // Apply the continuation to the value
+  lsthunk_t *cont = args[1];
+  return lsthunk_eval(cont, 1, &val);
+}
+
 static lsthunk_t *lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t *const *args,
                                     void *data) {
   (void)data;
@@ -193,6 +210,9 @@ static lsthunk_t *lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t *const *ar
   if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2,
                                lsbuiltin_prelude_chain, NULL);
+  if (lsstrcmp(name, lsstr_cstr("bind")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.bind"), 2,
+                               lsbuiltin_prelude_bind, NULL);
   if (lsstrcmp(name, lsstr_cstr("return")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1,
                                lsbuiltin_prelude_return, NULL);

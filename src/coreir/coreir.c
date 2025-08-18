@@ -714,6 +714,23 @@ static const rv_t *apply_natfun_one(FILE *outfp, const rv_t *nf, const rv_t *arg
     // return x ==> x
     return arg;
   }
+  if (strcmp(name, "bind") == 0) {
+    // bind a f  ==> enable token; f a
+    int prev = ctx ? ctx->has_token : 0;
+    if (ctx) ctx->has_token = 1;
+    const rv_t *f = arg;
+    if (f && f->kind == RV_LAM) {
+      // First captured arg holds the value from previous stage
+      const rv_t *a = (nf->nf.capc >= 1 && nf->nf.caps) ? nf->nf.caps[0] : rv_unit();
+      env_bind_t *env2 = env_push(f->lam.env, f->lam.param, a);
+      eval_ctx_t sub = { .env = env2, .has_token = ctx ? ctx->has_token : 0 };
+      const rv_t *ret = eval_expr(outfp, f->lam.body, &sub);
+      if (ctx) ctx->has_token = prev;
+      return ret;
+    }
+    if (ctx) ctx->has_token = prev;
+    return f ? f : rv_unit();
+  }
   if (strcmp(name, "chain") == 0) {
     // chain a f  ==> enable token; f ()
     int prev = ctx ? ctx->has_token : 0;
@@ -752,6 +769,7 @@ static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, eval_ctx_t *ctx
         if (strcmp(s, "println") == 0) return rv_natfun("println", 1, 0, NULL);
         if (strcmp(s, "exit") == 0)    return rv_natfun("exit", 1, 0, NULL);
         if (strcmp(s, "chain") == 0)   return rv_natfun("chain", 2, 0, NULL);
+  if (strcmp(s, "bind") == 0)    return rv_natfun("bind", 2, 0, NULL);
         if (strcmp(s, "return") == 0)  return rv_natfun("return", 1, 0, NULL);
       }
       return rv_unit();

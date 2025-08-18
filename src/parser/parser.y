@@ -87,7 +87,8 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %expect 36
 
 %nterm <prog> prog
-%nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact
+%nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
+%nterm <array> dostmt
 %nterm <elambda> elambda
 %nterm <array> earray parray
 %nterm <ealge> ealge elist econs etuple
@@ -105,6 +106,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %token <strval> LSTPRELUDESYM
 %token <strval> LSTSTR
 %token LSTARROW
+%token LSTLEFTARROW
 %right '|'
 %right ':'
 
@@ -195,7 +197,77 @@ efact:
     | closure { $$ = lsexpr_new_closure($1); }
     | '~' LSTSYMBOL { $$ = lsexpr_new_ref(lsref_new($2, @$)); }
     | elambda { $$ = lsexpr_new_lambda($1); }
-    | '{' expr '}' { $$ = $2; }
+    | '{' dostmts '}' { $$ = $2; }
+    ;
+
+// do-block style sugar inside braces
+// Encoding for intermediate stmt node (dostmt: <array>):
+//   - Plain statement: [ expr ]
+//   - Bind statement:  [ refexpr, expr ]  where refexpr is (~ x)
+
+dostmts:
+      dostmt {
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$));
+        const lsexpr_t *ret_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("return"), 0, NULL));
+        const lsexpr_t *ret = lsexpr_new_appl(lseappl_new(nsref, 1, &ret_sym));
+        lssize_t sz = lsarray_get_size($1);
+        if (sz == 1) {
+          const lsexpr_t *e = (const lsexpr_t *)lsarray_get($1)[0];
+          const lsexpr_t *args[] = { e };
+          $$ = lsexpr_new_appl(lseappl_new(ret, 1, args));
+        } else {
+          // tail bind: desugar to bind A (x -> return ())
+          const lsexpr_t *xexpr = (const lsexpr_t *)lsarray_get($1)[0];
+          const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[1];
+          const lsexpr_t *bind_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("bind"), 0, NULL));
+          const lsexpr_t *bind = lsexpr_new_appl(lseappl_new(nsref, 1, &bind_sym));
+          const lsref_t *x = lsexpr_get_ref(xexpr);
+          const lspat_t *pat = lspat_new_ref(x);
+          const lsexpr_t *unit = lsexpr_new_alge(lsealge_new(lsstr_cstr(","), 0, NULL));
+          const lsexpr_t *ret_arg[] = { unit };
+          const lsexpr_t *ret_unit = lsexpr_new_appl(lseappl_new(ret, 1, ret_arg));
+          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(pat, ret_unit));
+          const lsexpr_t *args2[] = { ae, lam };
+          $$ = lsexpr_new_appl(lseappl_new(bind, 2, args2));
+        }
+      }
+    | dostmt ';' dostmts {
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$));
+        lssize_t sz = lsarray_get_size($1);
+        if (sz == 1) {
+          // chain A (_ -> rest)
+          const lsexpr_t *chain_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("chain"), 0, NULL));
+          const lsexpr_t *chain = lsexpr_new_appl(lseappl_new(nsref, 1, &chain_sym));
+          const lspat_t *argpat = lspat_new_ref(lsref_new(lsstr_cstr("_"), @$));
+          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(argpat, $3));
+          const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[0];
+          const lsexpr_t *args2[] = { ae, lam };
+          $$ = lsexpr_new_appl(lseappl_new(chain, 2, args2));
+        } else {
+          // bind A (x -> rest)
+          const lsexpr_t *bind_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("bind"), 0, NULL));
+          const lsexpr_t *bind = lsexpr_new_appl(lseappl_new(nsref, 1, &bind_sym));
+          const lsexpr_t *xexpr = (const lsexpr_t *)lsarray_get($1)[0];
+          const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[1];
+          const lsref_t *x = lsexpr_get_ref(xexpr);
+          const lspat_t *pat = lspat_new_ref(x);
+          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(pat, $3));
+          const lsexpr_t *args2[] = { ae, lam };
+          $$ = lsexpr_new_appl(lseappl_new(bind, 2, args2));
+        }
+      }
+    ;
+
+dostmt:
+      expr { $$ = lsarray_new(1, $1); }
+  | pref LSTLEFTARROW expr { const lsexpr_t *re = lsexpr_new_ref($1); $$ = lsarray_new(2, re, $3); }
+    | LSTSYMBOL LSTLEFTARROW expr {
+        const lsref_t *r = lsref_new($1, @1);
+        const lsexpr_t *re = lsexpr_new_ref(r);
+        $$ = lsarray_new(2, re, $3);
+      }
     ;
 
 closure:

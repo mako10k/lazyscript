@@ -32,6 +32,7 @@
 [~]{2}[a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext + 2); return LSTPRELUDESYM; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext); return LSTSYMBOL; }
 \"([^\\\"]|\\.)*\" { yylval->strval = lsstr_parse(yytext, yyleng); return LSTSTR; }
+"<-"       { return LSTLEFTARROW; }
 "->"       { return LSTARROW; }
 . { return yytext[0]; }
 %%
