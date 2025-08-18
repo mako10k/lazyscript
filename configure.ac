@@ -52,6 +52,7 @@ AC_CONFIG_FILES([Makefile
                  src/misc/Makefile
                  src/parser/Makefile
                  src/pat/Makefile
+                 src/coreir/Makefile
                  src/thunk/Makefile
                  src/plugins/Makefile])
 

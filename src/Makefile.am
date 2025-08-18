@@ -1,4 +1,4 @@
-SUBDIRS = common expr misc parser pat thunk plugins
+SUBDIRS = common expr misc parser pat thunk coreir plugins
 
 bin_PROGRAMS = lazyscript lazyscript_format
 
@@ -8,6 +8,7 @@ lazy_script_common_libs = \
     thunk/liblsthunk.la \
     pat/liblspat.la \
     expr/liblsexpr.la \
+    coreir/liblscoreir.la \
     common/liblscommon.la \
     $(GC_LIBS)
 

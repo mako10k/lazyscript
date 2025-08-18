@@ -12,9 +12,16 @@
 #include <getopt.h>
 #include <stdarg.h>
 #include <dlfcn.h>
+#include "coreir/coreir.h"
 
 static int g_debug = 0;
-static const lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
+static int g_effects_strict = 0; // when true, guard side effects
+static int g_effects_depth = 0;  // nesting counter for allowed effects
+
+static inline void ls_effects_begin(void) { if (g_effects_strict) g_effects_depth++; }
+static inline void ls_effects_end(void) { if (g_effects_strict && g_effects_depth > 0) g_effects_depth--; }
+static inline int ls_effects_allowed(void) { return !g_effects_strict || g_effects_depth > 0; }
+const lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   assert(in_str != NULL);
   yyscan_t yyscanner;
   yylex_init(&yyscanner);
@@ -71,6 +78,10 @@ static lsthunk_t *lsbuiltin_print(lssize_t argc, lsthunk_t *const *args,
                                   void *data) {
   assert(argc == 1);
   assert(args != NULL);
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: print: effect used in pure context (enable seq/chain or run with effects)\n");
+    return NULL;
+  }
   lsthunk_t *thunk_str = lsthunk_eval0(args[0]);
   if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
     thunk_str = lsbuiltin_to_string(1, args, data);
@@ -91,6 +102,10 @@ static lsthunk_t *lsbuiltin_prelude_exit(lssize_t argc, lsthunk_t *const *args,
   (void)data;
   assert(argc == 1);
   assert(args != NULL);
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: exit: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
   lsthunk_t *val = lsthunk_eval0(args[0]);
   if (val == NULL)
     return NULL;
@@ -109,6 +124,10 @@ static lsthunk_t *lsbuiltin_prelude_println(lssize_t argc,
   (void)data;
   assert(argc == 1);
   assert(args != NULL);
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: println: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
   lsthunk_t *thunk_str = lsthunk_eval0(args[0]);
   if (thunk_str == NULL)
     return NULL;
@@ -127,7 +146,9 @@ static lsthunk_t *lsbuiltin_prelude_chain(lssize_t argc,
   assert(argc == 2);
   assert(args != NULL);
   // Evaluate the first action for effects
+  ls_effects_begin();
   lsthunk_t *action = lsthunk_eval0(args[0]);
+  ls_effects_end();
   if (action == NULL)
     return NULL;
   // Apply the continuation to unit
@@ -188,7 +209,9 @@ static lsthunk_t *lsbuiltin_seq(lssize_t argc, lsthunk_t *const *args,
   assert(args != NULL);
   lsthunk_t *fst = args[0];
   lsthunk_t *snd = args[1];
+  ls_effects_begin();
   lsthunk_t *fst_evaled = lsthunk_eval0(fst);
+  ls_effects_end();
   if (fst_evaled == NULL)
     return NULL;
   switch ((lsseq_type_t)(intptr_t)data) {
@@ -284,16 +307,19 @@ static int ls_try_load_prelude_plugin(lstenv_t *tenv, const char *path) {
 
 int main(int argc, char **argv) {
   const char *prelude_so = NULL;
+  int dump_coreir = 0;
   struct option longopts[] = {
       {"eval", required_argument, NULL, 'e'},
       {"prelude-so", required_argument, NULL, 'p'},
+    {"strict-effects", no_argument, NULL, 's'},
+      {"dump-coreir", no_argument, NULL, 'i'},
       {"debug", no_argument, NULL, 'd'},
       {"help", no_argument, NULL, 'h'},
       {"version", no_argument, NULL, 'v'},
       {NULL, 0, NULL, 0},
   };
   int opt;
-  while ((opt = getopt_long(argc, argv, "e:p:dhv", longopts, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "e:p:sidhv", longopts, NULL)) != -1) {
     switch (opt) {
     case 'e': {
       static int eval_count = 0;
@@ -301,6 +327,11 @@ int main(int argc, char **argv) {
       snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
       const lsprog_t *prog = lsparse_string(name, optarg);
       if (prog != NULL) {
+        if (dump_coreir) {
+          const lscir_prog_t *cir = lscir_lower_prog(prog);
+          lscir_print(stdout, 0, cir);
+          break;
+        }
         if (g_debug) {
           lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
         }
@@ -319,6 +350,12 @@ int main(int argc, char **argv) {
     case 'p':
       prelude_so = optarg;
       break;
+    case 's':
+      g_effects_strict = 1;
+      break;
+    case 'i':
+      dump_coreir = 1;
+      break;
     case 'd':
   g_debug = 1;
 #if DEBUG
@@ -334,6 +371,8 @@ int main(int argc, char **argv) {
       printf("  -d, --debug     print debug information\n");
   printf("  -e, --eval      evaluate a one-line program string\n");
   printf("  -p, --prelude-so <path>  load prelude plugin .so (override)\n");
+  printf("  -s, --strict-effects  enforce effect discipline (seq/chain required)\n");
+  printf("  -i, --dump-coreir  print Core IR after parsing (debug)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
   printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
@@ -351,6 +390,11 @@ int main(int argc, char **argv) {
       filename = "/dev/stdin";
     const lsprog_t *prog = lsparse_file(argv[i]);
     if (prog != NULL) {
+      if (dump_coreir) {
+        const lscir_prog_t *cir = lscir_lower_prog(prog);
+        lscir_print(stdout, 0, cir);
+        continue;
+      }
       if (g_debug) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
       }
