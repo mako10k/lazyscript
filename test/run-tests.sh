@@ -137,6 +137,35 @@ if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
   fi
 fi
 
+# Optional: Core IR typechecker tests (if available)
+if "$BIN" --help 2>&1 | grep -q -- "--typecheck"; then
+  # Discover any test/*.ls that has a matching .type.out
+  shopt -s nullglob
+  type_cases=()
+  for f in "$DIR"/*.ls; do
+    base="${f%.ls}"
+    if [[ -f "$base.type.out" ]]; then
+      type_cases+=("$(basename "$base")")
+    fi
+  done
+  shopt -u nullglob
+
+  for name in "${type_cases[@]}"; do
+    [[ -z "$name" ]] && continue
+    src="$DIR/$name.ls"
+    exp="$DIR/$name.type.out"
+    out="$("$BIN" --typecheck "$src" 2>&1)"
+    if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
+      echo "ok - typecheck $name"
+      ((pass++))
+    else
+      echo "not ok - typecheck $name"
+      echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$exp"; echo "---";
+      ((fail++))
+    fi
+  done
+fi
+
 if [[ $fail -eq 0 ]]; then
   exit 0
 else

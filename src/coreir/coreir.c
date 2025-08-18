@@ -838,3 +838,69 @@ int lscir_eval(FILE *outfp, const lscir_prog_t *cir) {
   print_value(outfp, res);
   return 0;
 }
+
+// -------------------- Minimal type checker (very rough) --------------------
+typedef enum { TY_INT, TY_STR, TY_UNIT, TY_FUN, TY_SYM } ty_tag_t;
+typedef struct ty ty_t;
+struct ty { ty_tag_t tag; int arity; const ty_t *ret; };
+
+static const ty_t TYI = { .tag = TY_INT };
+static const ty_t TYS = { .tag = TY_STR };
+static const ty_t TYU = { .tag = TY_UNIT };
+
+static const ty_t *mk_fun(int ar, const ty_t *ret) {
+  ty_t *t = lsmalloc(sizeof(ty_t)); t->tag = TY_FUN; t->arity = ar; t->ret = ret; return t;
+}
+
+static int type_expr(const lscir_expr_t *e, const ty_t **out) {
+  if (!e) { *out = &TYU; return 0; }
+  switch (e->kind) {
+  case LCIR_EXP_VAL: {
+    const lscir_value_t *v = e->v;
+    switch (v->kind) {
+      case LCIR_VAL_INT: *out = &TYI; return 0;
+      case LCIR_VAL_STR: *out = &TYS; return 0;
+      case LCIR_VAL_CONSTR: {
+        // () → unit, true/false → sym, otherwise constructor as sym
+        if (v->constr.name && strcmp(v->constr.name, ",") == 0 && v->constr.argc == 0) { *out = &TYU; return 0; }
+        *out = &TYU; return 0;
+      }
+      case LCIR_VAL_VAR: {
+        // Known vars: add/sub -> fun 2 -> int, chain -> fun 2 -> unit, return -> fun 1 -> a, println/exit by EffApp only
+        if (strcmp(v->var, "add") == 0 || strcmp(v->var, "sub") == 0) { *out = mk_fun(2, &TYI); return 0; }
+        if (strcmp(v->var, "chain") == 0) { *out = mk_fun(2, &TYU); return 0; }
+        if (strcmp(v->var, "return") == 0) { *out = mk_fun(1, &TYU); return 0; }
+        *out = &TYU; return 0;
+      }
+      case LCIR_VAL_LAM: *out = mk_fun(1, &TYU); return 0;
+    }
+  }
+  case LCIR_EXP_LET: {
+    // Type both sides; ignore env for minimal version
+    const ty_t *t1, *t2; int e1 = type_expr(e->let1.bind, &t1); int e2 = type_expr(e->let1.body, &t2);
+    if (e1 || e2) return 1; *out = t2; return 0;
+  }
+  case LCIR_EXP_APP: {
+    const ty_t *tf; if (type_expr((const lscir_expr_t*) &(lscir_expr_t){ .kind=LCIR_EXP_VAL, .v=e->app.func }, &tf)) return 1;
+    // Check arity downward
+    if (!tf || tf->tag != TY_FUN) { *out = &TYU; return 0; }
+    if (e->app.argc > tf->arity) { return 1; }
+    int rem = tf->arity - e->app.argc; *out = rem == 0 ? tf->ret : mk_fun(rem, tf->ret); return 0;
+  }
+  case LCIR_EXP_IF: {
+    const ty_t *t1, *t2, *t3; if (type_expr((const lscir_expr_t*) &(lscir_expr_t){ .kind=LCIR_EXP_VAL, .v=e->ife.cond }, &t1)) return 1;
+    if (type_expr(e->ife.then_e, &t2) || type_expr(e->ife.else_e, &t3)) return 1; *out = t2; return 0;
+  }
+  case LCIR_EXP_EFFAPP: { *out = &TYU; return 0; }
+  case LCIR_EXP_TOKEN: { *out = &TYU; return 0; }
+  }
+  return 1;
+}
+
+int lscir_typecheck(FILE *outfp, const lscir_prog_t *cir) {
+  if (!cir || !cir->root) { fprintf(outfp, "OK\n"); return 0; }
+  const ty_t *t = NULL; int err = type_expr(cir->root, &t);
+  if (err) { fprintf(outfp, "E: type error\n"); return 1; }
+  fprintf(outfp, "OK\n");
+  return 0;
+}

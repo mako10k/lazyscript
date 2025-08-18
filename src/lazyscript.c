@@ -333,20 +333,22 @@ int main(int argc, char **argv) {
   const char *prelude_so = NULL;
   int dump_coreir = 0;
   int eval_coreir = 0;
+  int typecheck_coreir = 0;
   struct option longopts[] = {
       {"eval", required_argument, NULL, 'e'},
       {"prelude-so", required_argument, NULL, 'p'},
     {"sugar-namespace", required_argument, NULL, 'n'},
     {"strict-effects", no_argument, NULL, 's'},
-      {"dump-coreir", no_argument, NULL, 'i'},
+    {"dump-coreir", no_argument, NULL, 'i'},
       {"eval-coreir", no_argument, NULL, 'c'},
+    {"typecheck", no_argument, NULL, 't'},
       {"debug", no_argument, NULL, 'd'},
       {"help", no_argument, NULL, 'h'},
       {"version", no_argument, NULL, 'v'},
       {NULL, 0, NULL, 0},
   };
   int opt;
-  while ((opt = getopt_long(argc, argv, "e:p:n:sicdhv", longopts, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "e:p:n:sictdhv", longopts, NULL)) != -1) {
     switch (opt) {
     case 'e': {
       static int eval_count = 0;
@@ -368,6 +370,14 @@ int main(int argc, char **argv) {
         }
         if (g_debug) {
           lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+        }
+        if (typecheck_coreir) {
+          const lscir_prog_t *cir = lscir_lower_prog(prog);
+          if (g_effects_strict) {
+            int errs = lscir_validate_effects(stderr, cir);
+            if (errs > 0) { fprintf(stderr, "E: strict-effects: %d error(s)\n", errs); exit(1); }
+          }
+          return lscir_typecheck(stdout, cir);
         }
         if (eval_coreir) {
           const lscir_prog_t *cir = lscir_lower_prog(prog);
@@ -413,6 +423,9 @@ int main(int argc, char **argv) {
     case 'c':
       eval_coreir = 1;
       break;
+    case 't':
+      typecheck_coreir = 1;
+      break;
     case 'd':
   g_debug = 1;
 #if DEBUG
@@ -432,6 +445,7 @@ int main(int argc, char **argv) {
   printf("  -s, --strict-effects  enforce effect discipline (seq/chain required)\n");
   printf("  -i, --dump-coreir  print Core IR after parsing (debug)\n");
   printf("  -c, --eval-coreir  run via Core IR evaluator (smoke)\n");
+  printf("  -t, --typecheck    run minimal Core IR typechecker and print OK/error\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
   printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
@@ -465,6 +479,15 @@ int main(int argc, char **argv) {
       }
       if (g_debug) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+      }
+      if (typecheck_coreir) {
+        const lscir_prog_t *cir = lscir_lower_prog(prog);
+        if (g_effects_strict) {
+          int errs = lscir_validate_effects(stderr, cir);
+          if (errs > 0) { fprintf(stderr, "E: strict-effects: %d error(s)\n", errs); continue; }
+        }
+        lscir_typecheck(stdout, cir);
+        continue;
       }
       if (eval_coreir) {
         const lscir_prog_t *cir = lscir_lower_prog(prog);

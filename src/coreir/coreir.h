@@ -91,3 +91,8 @@ int lscir_validate_effects(FILE *errfp, const lscir_prog_t *cir);
  * in a simple form compatible with existing tests (e.g., () for unit).
  */
 int lscir_eval(FILE *outfp, const lscir_prog_t *cir);
+
+/* Minimal typecheck for Core IR: prints a one-line result to outfp.
+ * Returns 0 on success, non-zero on type error.
+ */
+int lscir_typecheck(FILE *outfp, const lscir_prog_t *cir);
