@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 32
+%expect 36
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact
@@ -102,6 +102,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 
 %token <intval> LSTINT
 %token <strval> LSTSYMBOL
+%token <strval> LSTPRELUDESYM
 %token <strval> LSTSTR
 %token LSTARROW
 %right '|'
@@ -177,6 +178,13 @@ expr5:
 efact:
       LSTINT { $$ = lsexpr_new_int($1); }
     | LSTSTR { $$ = lsexpr_new_str($1); }
+    | LSTPRELUDESYM {
+        // desugar: ~~sym  ==>  (~prelude sym)
+        const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr("prelude"), @$));
+        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+        const lsexpr_t *args[] = { sym };
+        $$ = lsexpr_new_appl(lseappl_new(prelude, 1, args));
+      }
     | etuple {
         lssize_t argc = lsealge_get_argc($1);
         const lsexpr_t *const *args = lsealge_get_args($1);
