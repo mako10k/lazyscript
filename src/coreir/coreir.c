@@ -553,6 +553,7 @@ typedef enum {
   RV_TOKEN,
   RV_LAM,
   RV_SYMBOL,
+  RV_NATFUN,
 } rv_kind_t;
 
 typedef struct rv rv_t;
@@ -574,6 +575,12 @@ struct rv {
       env_bind_t *env; // captured environment
     } lam;
     const char *sym;
+    struct {
+      const char *name;
+      int arity;
+      int capc; // captured count
+      const rv_t *const *caps; // captured args
+    } nf;
   };
 };
 
@@ -595,6 +602,9 @@ static const rv_t *rv_sym(const char *s) { rv_t *v = lsmalloc(sizeof(rv_t)); v->
 static const rv_t *rv_lam(const char *p, const lscir_expr_t *b, env_bind_t *env) {
   rv_t *v = lsmalloc(sizeof(rv_t)); v->kind = RV_LAM; v->lam.param = p; v->lam.body = b; v->lam.env = env; return v;
 }
+static const rv_t *rv_natfun(const char *name, int arity, int capc, const rv_t *const *caps) {
+  rv_t *v = lsmalloc(sizeof(rv_t)); v->kind = RV_NATFUN; v->nf.name = name; v->nf.arity = arity; v->nf.capc = capc; v->nf.caps = caps; return v;
+}
 
 static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, env_bind_t *env);
 static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env);
@@ -605,10 +615,13 @@ static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, env_bind_t *e
   case LCIR_VAL_INT: return rv_int(v->ival);
   case LCIR_VAL_STR: return rv_str(v->sval);
   case LCIR_VAL_VAR: {
-    const rv_t *found = env_lookup(env, v->var);
-    if (found) return found;
-    // Treat unknown var as symbol (e.g., true/false, add/sub)
-    return rv_sym(v->var);
+  const rv_t *found = env_lookup(env, v->var);
+  if (found) return found;
+  // Builtin natfuns (curried)
+  if (strcmp(v->var, "add") == 0) return rv_natfun("add", 2, 0, NULL);
+  if (strcmp(v->var, "sub") == 0) return rv_natfun("sub", 2, 0, NULL);
+  // Treat others as symbols (e.g., true/false)
+  return rv_sym(v->var);
   }
   case LCIR_VAL_CONSTR: {
     if (strcmp(v->constr.name, "()") == 0 && v->constr.argc == 0) return rv_unit();
@@ -616,6 +629,7 @@ static const rv_t *eval_value(FILE *outfp, const lscir_value_t *v, env_bind_t *e
     return rv_sym(v->constr.name);
   }
   case LCIR_VAL_LAM:
+    // Capture current env to form a closure
     return rv_lam(v->lam.param, v->lam.body, env);
   }
   return rv_unit();
@@ -639,19 +653,29 @@ static void print_value(FILE *outfp, const rv_t *v) {
   case RV_SYMBOL: fprintf(outfp, "%s\n", v->sym); return;
   case RV_LAM: fprintf(outfp, "<lam>\n"); return;
   case RV_TOKEN: fprintf(outfp, "<token>\n"); return;
+  case RV_NATFUN: fprintf(outfp, "<fun %s/%d:%d>\n", v->nf.name, v->nf.arity, v->nf.capc); return;
   }
 }
 
-static const rv_t *apply_builtin_app(const char *name, int argc, const lscir_value_t *const *args, env_bind_t *env) {
+static const rv_t *natfun_apply_one(const rv_t *nf, const rv_t *arg) {
+  if (!nf || nf->kind != RV_NATFUN) return NULL;
+  const char *name = nf->nf.name; int ar = nf->nf.arity; int cap = nf->nf.capc;
+  // If not enough args yet, return a new curried function with appended capture
+  if (cap + 1 < ar) {
+    const rv_t **caps2 = lsmalloc(sizeof(rv_t*) * (cap + 1));
+    for (int i = 0; i < cap; i++) caps2[i] = nf->nf.caps ? nf->nf.caps[i] : NULL;
+    caps2[cap] = arg;
+    return rv_natfun(name, ar, cap + 1, caps2);
+  }
+  // Reaching full arity now
   if (strcmp(name, "add") == 0 || strcmp(name, "sub") == 0) {
-    if (argc != 2) return NULL;
-    const rv_t *a = eval_value(NULL, args[0], env);
-    const rv_t *b = eval_value(NULL, args[1], env);
-    if (!a || !b || a->kind != RV_INT || b->kind != RV_INT) return NULL;
+    const rv_t *a = (cap >= 1 && nf->nf.caps) ? nf->nf.caps[0] : NULL;
+    const rv_t *b = arg;
+    if (!a || !b || a->kind != RV_INT || b->kind != RV_INT) return rv_unit();
     long long res = (strcmp(name, "add") == 0) ? (a->ival + b->ival) : (a->ival - b->ival);
     return rv_int(res);
   }
-  return NULL;
+  return rv_unit();
 }
 
 static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env) {
@@ -665,22 +689,30 @@ static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, env_bind_t *env
     return eval_expr(outfp, e->let1.body, env2);
   }
   case LCIR_EXP_APP: {
-    // Builtin var calls like add/sub
-    if (e->app.func->kind == LCIR_VAL_VAR) {
-      const rv_t *b = apply_builtin_app(e->app.func->var, e->app.argc, e->app.args, env);
-      if (b) return b;
+    // Evaluate function value first
+    const rv_t *rf = eval_value(outfp, e->app.func, env);
+    // Curry: apply each argument from left to right
+    for (int i = 0; i < e->app.argc; i++) {
+      const rv_t *av = eval_value(outfp, e->app.args[i], env);
+      if (!rf) return rv_unit();
+      if (rf->kind == RV_LAM) {
+        env_bind_t *env2 = env_push(rf->lam.env, rf->lam.param, av);
+        rf = eval_expr(outfp, rf->lam.body, env2);
+        continue;
+      }
+      if (rf->kind == RV_NATFUN) {
+        rf = natfun_apply_one(rf, av);
+        continue;
+      }
+      // Applying a plain symbol? Try lifting builtins to natfun
+      if (rf->kind == RV_SYMBOL && (strcmp(rf->sym, "add") == 0 || strcmp(rf->sym, "sub") == 0)) {
+        rf = natfun_apply_one(rv_natfun(rf->sym, 2, 0, NULL), av);
+        continue;
+      }
+      // Not applicable
+      return rv_unit();
     }
-    // Lambda application (single arg)
-    if (e->app.func->kind == LCIR_VAL_LAM) {
-      if (e->app.argc != 1) return rv_unit();
-      const rv_t *av = eval_value(outfp, e->app.args[0], env);
-      const char *p = e->app.func->lam.param;
-      const lscir_expr_t *body = e->app.func->lam.body;
-      env_bind_t *cap = env; // treat as capturing current env (simplified)
-      env_bind_t *env2 = env_push(cap, p, av);
-      return eval_expr(outfp, body, env2);
-    }
-    return rv_unit();
+    return rf ? rf : rv_unit();
   }
   case LCIR_EXP_IF: {
     const rv_t *cv = eval_value(outfp, e->ife.cond, env);
