@@ -1,5 +1,6 @@
 // Clean implementation starts here
 #include <stdlib.h>
+#include <string.h>
 
 #include "coreir/coreir.h"
 #include "common/malloc.h"
@@ -128,6 +129,10 @@ static const lscir_expr_t *mk_exp_app(const lscir_value_t *f, int argc, const ls
   lscir_expr_t *e = lsmalloc(sizeof(*e));
   e->kind = LCIR_EXP_APP; e->app.func = f; e->app.argc = argc; e->app.args = args; return e;
 }
+static const lscir_expr_t *mk_exp_let(const char *var, const lscir_expr_t *bind, const lscir_expr_t *body) {
+  lscir_expr_t *e = lsmalloc(sizeof(*e));
+  e->kind = LCIR_EXP_LET; e->let1.var = var; e->let1.bind = bind; e->let1.body = body; return e;
+}
 
 /* ---------- Lowering (happy path) ---------- */
 static const char *extract_ref_name(const lsref_t *r) {
@@ -146,6 +151,16 @@ static const char *extract_pat_name(const lspat_t *p) {
 }
 
 static const lscir_value_t *lower_value(const lsexpr_t *e);
+
+/* gensym utility */
+static const char *cir_gensym(const char *pfx) {
+  static int s_gsym = 0;
+  char buf[64];
+  int n = snprintf(buf, sizeof(buf), "%s%d", pfx, ++s_gsym);
+  char *s = lsmalloc((size_t)n + 1);
+  memcpy(s, buf, (size_t)n + 1);
+  return s;
+}
 
 static const lscir_value_t *lower_alge_value(const lsealge_t *ea) {
   const lsstr_t *c = lsealge_get_constr(ea);
@@ -191,26 +206,89 @@ static const lscir_value_t *lower_value(const lsexpr_t *e) {
   }
 }
 
+static const lscir_expr_t *lower_expr(const lsexpr_t *e);
+
+static const lscir_expr_t *lower_closure(const lseclosure_t *cl) {
+  // Build let x1 = rhs1 in let x2 = rhs2 in ... body
+  const lsexpr_t *body_ast = lseclosure_get_expr(cl);
+  const lscir_expr_t *body = lower_expr(body_ast);
+  if (!body) return NULL;
+  lssize_t n = lseclosure_get_bindc(cl);
+  const lsbind_t *const *bs = lseclosure_get_binds(cl);
+  for (lssize_t i = n - 1; i >= 0; i--) {
+    const lsbind_t *b = bs[i];
+    const lspat_t *lhs = lsbind_get_lhs(b);
+    if (!lhs || lspat_get_type(lhs) != LSPTYPE_REF) {
+      // 未対応の複合パターン: 今はロールバック
+      return NULL;
+    }
+    const char *vname = lsstr_get_buf(lsref_get_name(lspat_get_ref(lhs)));
+    const lsexpr_t *rhs_ast = lsbind_get_rhs(b);
+    const lscir_expr_t *rhs = lower_expr(rhs_ast);
+    if (!rhs) return NULL;
+    body = mk_exp_let(vname, rhs, body);
+  }
+  return body;
+}
+
 static const lscir_expr_t *lower_expr(const lsexpr_t *e) {
   if (!e) return NULL;
   switch (lsexpr_get_type(e)) {
   case LSETYPE_APPL: {
     const lseappl_t *ap = lsexpr_get_appl(e);
-    const lscir_value_t *f = lower_value(lseappl_get_func(ap));
-    if (!f) return NULL;
+    const lsexpr_t *func_e = lseappl_get_func(ap);
     int argc = (int)lseappl_get_argc(ap);
     const lsexpr_t *const *eargs = lseappl_get_args(ap);
-    const lscir_value_t **args = NULL;
+
+    // Collect value args, recording non-values to be let-bound later
+    const lscir_value_t **vals = NULL;
+    const char **let_names = NULL;
+    const lsexpr_t **let_exprs = NULL;
+    int letc = 0;
     if (argc > 0) {
-      const lscir_value_t **tmp = lsmalloc(sizeof(const lscir_value_t*) * argc);
-      for (int i = 0; i < argc; i++) {
-        const lscir_value_t *vi = lower_value(eargs[i]);
-        if (!vi) return NULL;
-        ((const lscir_value_t**)tmp)[i] = vi;
-      }
-      args = tmp;
+      vals = lsmalloc(sizeof(const lscir_value_t*) * argc);
     }
-    return mk_exp_app(f, argc, args);
+    for (int i = 0; i < argc; i++) {
+      const lscir_value_t *vi = lower_value(eargs[i]);
+      if (vi) {
+        vals[i] = vi;
+      } else {
+        // non-value: create temp var and record let binding
+  const char *tmpv = cir_gensym("a$");
+        vals[i] = mk_val_var(tmpv);
+        // grow arrays
+        const char **nn = lsmalloc(sizeof(const char*) * (letc + 1));
+        const lsexpr_t **ee = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
+        for (int k = 0; k < letc; k++) { nn[k] = let_names[k]; ee[k] = let_exprs[k]; }
+        nn[letc] = tmpv; ee[letc] = eargs[i]; letc++;
+        let_names = nn; let_exprs = ee;
+      }
+    }
+
+    // Function value or let-binding if non-value
+    const lscir_value_t *fv = lower_value(func_e);
+    const char *f_tmp = NULL;
+    if (!fv) {
+      f_tmp = cir_gensym("f$");
+      fv = mk_val_var(f_tmp);
+    }
+
+    // Build core app
+    const lscir_expr_t *core = mk_exp_app(fv, argc, vals);
+
+    // Wrap lets for args in reverse order
+    for (int i = letc - 1; i >= 0; i--) {
+      core = mk_exp_let(let_names[i], lower_expr(let_exprs[i]), core);
+    }
+    // Wrap let for function if needed
+    if (f_tmp != NULL) {
+      core = mk_exp_let(f_tmp, lower_expr(func_e), core);
+    }
+    return core;
+  }
+  case LSETYPE_CLOSURE: {
+    const lseclosure_t *cl = lsexpr_get_closure(e);
+    return lower_closure(cl);
   }
   default: {
     const lscir_value_t *v = lower_value(e);
@@ -258,6 +336,12 @@ static void cir_print_expr(FILE *ofp, int ind, const lscir_expr_t *e2) {
     lsprintf(ofp, ind, "(app ");
     cir_print_val(ofp, 0, e2->app.func);
     for (int i = 0; i < e2->app.argc; i++) { fputc(' ', ofp); cir_print_val(ofp, 0, e2->app.args[i]); }
+    fputc(')', ofp); return;
+  case LCIR_EXP_LET:
+    lsprintf(ofp, ind, "(let %s ", e2->let1.var);
+    cir_print_expr(ofp, 0, e2->let1.bind);
+    fputc(' ', ofp);
+    cir_print_expr(ofp, 0, e2->let1.body);
     fputc(')', ofp); return;
   default:
     fprintf(ofp, "<unimpl>"); return;
