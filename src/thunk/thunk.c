@@ -95,14 +95,23 @@ lsthunk_t *lsthunk_new_ealge(const lsealge_t *ealge, lstenv_t *tenv) {
 lsthunk_t *lsthunk_new_eappl(const lseappl_t *eappl, lstenv_t *tenv) {
   lssize_t eargc = lseappl_get_argc(eappl);
   const lsexpr_t *const *eargs = lseappl_get_args(eappl);
+  lsthunk_t *func = lsthunk_new_expr(lseappl_get_func(eappl), tenv);
+  if (func == NULL)
+    return NULL;
+  lsthunk_t *args_buf[eargc];
+  for (lssize_t i = 0; i < eargc; i++) {
+    args_buf[i] = lsthunk_new_expr(eargs[i], tenv);
+    if (args_buf[i] == NULL)
+      return NULL;
+  }
   lsthunk_t *thunk =
       lsmalloc(lssizeof(lsthunk_t, lt_appl) + eargc * sizeof(lsthunk_t *));
   thunk->lt_type = LSTTYPE_APPL;
   thunk->lt_whnf = NULL;
-  thunk->lt_appl.lta_func = lsthunk_new_expr(lseappl_get_func(eappl), tenv);
+  thunk->lt_appl.lta_func = func;
   thunk->lt_appl.lta_argc = eargc;
   for (lssize_t i = 0; i < eargc; i++)
-    thunk->lt_appl.lta_args[i] = lsthunk_new_expr(eargs[i], tenv);
+    thunk->lt_appl.lta_args[i] = args_buf[i];
   return thunk;
 }
 
@@ -535,6 +544,10 @@ static lsthunk_t *lsthunk_eval_choice(lsthunk_t *thunk, lssize_t argc,
   right->lt_type = LSTTYPE_APPL;
   right->lt_whnf = NULL;
   right->lt_appl.lta_func = thunk->lt_choice.ltc_right;
+  if (right->lt_appl.lta_func == NULL) {
+    // Propagate evaluation failure
+    return NULL;
+  }
   right->lt_appl.lta_argc = argc;
   for (lssize_t i = 0; i < argc; i++)
     right->lt_appl.lta_args[i] = args[i];

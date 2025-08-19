@@ -39,6 +39,7 @@ static int ls_or_mark_present_s;
 static int ls_or_mark_used_s;
 static lsthunk_t *const ls_or_mark_present = (lsthunk_t *)&ls_or_mark_present_s;
 static lsthunk_t *const ls_or_mark_used = (lsthunk_t *)&ls_or_mark_used_s;
+static int ls_or_newvar_seen = 0;
 
 // Forward decls for internal helpers
 static void lstpat_mark_refs_present(lstpat_t *pat);
@@ -138,7 +139,13 @@ lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv,
     lstpat_mark_refs_present(l);
 
   // Walk right AST to ensure it introduces no new names and marks all as used
-  lspat_walk_mark_right(pright, tenv);
+    ls_or_newvar_seen = 0;
+    lspat_walk_mark_right(pright, tenv);
+    if (ls_or_newvar_seen) {
+      // clear marks before returning
+      lstpat_mark_clear(l);
+      return NULL;
+    }
 
     // If any left-mark is still present, right missed usage
     if (lstpat_any_mark_present(l)) {
@@ -437,8 +444,9 @@ static void lstpat_mark_ref_used_by_name(const lsstr_t *name, lstenv_t *tenv) {
     // new var introduced on right: error is reported by reuse-only builder later
     lstenv_incr_nerrors(tenv);
     lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
-    lsstr_print(stderr, LSPREC_LOWEST, 0, name);
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
     lsprintf(stderr, 0, "' (not allowed)\n");
+  ls_or_newvar_seen = 1;
     return;
   }
   lstpat_t *pref = lstref_target_get_pat(target);
@@ -515,7 +523,7 @@ static lstpat_t *lstpat_new_pat_reuse_only(const lspat_t *pat, lstenv_t *tenv,
     if (!existing) {
       if (tenv) lstenv_incr_nerrors(tenv);
       lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
-      lsstr_print(stderr, LSPREC_LOWEST, 0, lsref_get_name(r));
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(r));
       lsprintf(stderr, 0, "' (not allowed)\n");
       return NULL;
     }
@@ -546,7 +554,7 @@ static lstpat_t *lstpat_new_pat_reuse_only(const lspat_t *pat, lstenv_t *tenv,
     if (!existing) {
       if (tenv) lstenv_incr_nerrors(tenv);
       lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
-      lsstr_print(stderr, LSPREC_LOWEST, 0, lsref_get_name(r));
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(r));
       lsprintf(stderr, 0, "' (not allowed)\n");
       return NULL;
     }
