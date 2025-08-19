@@ -1,3 +1,4 @@
+AUTOMAKE_OPTIONS = subdir-objects
 SUBDIRS = common expr misc parser pat thunk coreir llvmir plugins
 
 bin_PROGRAMS = lazyscript lazyscript_format lsllvmir_dump
