@@ -8,6 +8,7 @@
 #include "common/hash.h"
 #include "builtins/ns.h"
 #include "runtime/builtin.h"
+#include "runtime/error.h"
 // forward for namespace value constructor (not used now)
 // lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data);
 
@@ -20,11 +21,10 @@ static lsthunk_t* lsbuiltin_prelude_exit(lssize_t argc, lsthunk_t* const* args, 
     lsprintf(stderr, 0, "E: exit: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
-  lsthunk_t* val = lsthunk_eval0(args[0]);
-  if (!val) return NULL;
+  lsthunk_t* val = ls_eval_arg(args[0], "exit: arg");
+  if (lsthunk_is_err(val)) return val;
   if (lsthunk_get_type(val) != LSTTYPE_INT) {
-    lsprintf(stderr, 0, "E: exit: invalid type\n");
-    return NULL;
+    return ls_make_err("exit: invalid type");
   }
   int is_zero = lsint_eq(lsthunk_get_int(val), lsint_new(0));
   exit(is_zero ? 0 : 1);
@@ -44,14 +44,8 @@ static lsthunk_t* lsbuiltin_prelude_println(lssize_t argc, lsthunk_t* const* arg
   #if LS_TRACE
   lsprintf(stderr, 0, "DBG println: begin\n");
   #endif
-  lsthunk_t* thunk_str = lsthunk_eval0(args[0]);
-  if (thunk_str == NULL)
-    { 
-      #if LS_TRACE
-      lsprintf(stderr, 0, "DBG println: arg eval -> NULL\n");
-      #endif
-      return NULL;
-    }
+  lsthunk_t* thunk_str = ls_eval_arg(args[0], "println: arg");
+  if (lsthunk_is_err(thunk_str)) return thunk_str;
   #if LS_TRACE
   {
     const char* vt = "?";
@@ -65,6 +59,7 @@ static lsthunk_t* lsbuiltin_prelude_println(lssize_t argc, lsthunk_t* const* arg
   #endif
   if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
     thunk_str = lsbuiltin_to_string(1, args, NULL);
+  if (lsthunk_is_err(thunk_str)) return thunk_str;
   #if LS_TRACE
   if (lsthunk_get_type(thunk_str) != LSTTYPE_STR) {
     lsprintf(stderr, 0, "DBG println: to_str did not return string\n");
@@ -84,12 +79,12 @@ static lsthunk_t* lsbuiltin_prelude_chain(lssize_t argc, lsthunk_t* const* args,
   lsprintf(stderr, 0, "DBG chain: begin\n");
   #endif
   ls_effects_begin();
-  lsthunk_t* action = lsthunk_eval0(args[0]);
+  lsthunk_t* action = ls_eval_arg(args[0], "chain: action");
   ls_effects_end();
   #if LS_TRACE
   lsprintf(stderr, 0, "DBG chain: after action eval -> %s\n", action ? "ok" : "NULL");
   #endif
-  if (!action) return NULL;
+  if (lsthunk_is_err(action)) return action;
   lsthunk_t* unit = ls_make_unit();
   lsthunk_t* cont = args[1];
   #if LS_TRACE
@@ -107,9 +102,9 @@ static lsthunk_t* lsbuiltin_prelude_bind(lssize_t argc, lsthunk_t* const* args, 
   (void)data; (void)argc;
   // Evaluate the first computation to get its value (with effects enabled)
   ls_effects_begin();
-  lsthunk_t* val = lsthunk_eval0(args[0]);
+  lsthunk_t* val = ls_eval_arg(args[0], "bind: value");
   ls_effects_end();
-  if (!val) return NULL;
+  if (lsthunk_is_err(val)) return val;
   // Apply the continuation to the value
   lsthunk_t* cont = args[1];
   return lsthunk_eval(cont, 1, &val);
@@ -126,14 +121,15 @@ static lsthunk_t* lsbuiltin_prelude_def(lssize_t argc, lsthunk_t* const* args, v
     lsprintf(stderr, 0, "E: def: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
-  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return NULL;
-  lsthunk_t* namev = lsthunk_eval0(args[0]); if (!namev) return NULL;
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return ls_make_err("def: no env");
+  lsthunk_t* namev = ls_eval_arg(args[0], "def: name");
+  if (lsthunk_is_err(namev)) return namev;
   if (lsthunk_get_type(namev) != LSTTYPE_ALGE || lsthunk_get_argc(namev) != 0) {
-    lsprintf(stderr, 0, "E: def: expected a bare symbol as first argument\n");
-    return NULL;
+    return ls_make_err("def: expected bare symbol");
   }
   const lsstr_t* name = lsthunk_get_constr(namev);
-  lsthunk_t* val = lsthunk_eval0(args[1]); if (!val) return NULL;
+  lsthunk_t* val = ls_eval_arg(args[1], "def: value");
+  if (lsthunk_is_err(val)) return val;
   lstenv_put_builtin(tenv, name, 0, lsbuiltin_getter0, val);
   return ls_make_unit();
 }
@@ -143,10 +139,10 @@ lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void
 static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   lstenv_t* tenv = (lstenv_t*)data;
   (void)argc;
-  lsthunk_t* key = lsthunk_eval0(args[0]); if (!key) return NULL;
+  lsthunk_t* key = ls_eval_arg(args[0], "prelude: key");
+  if (lsthunk_is_err(key)) return key;
   if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
-    lsprintf(stderr, 0, "E: prelude: expected a bare symbol (e.g., exit/println/chain/return)\n");
-    return NULL;
+    return ls_make_err("prelude: expected bare symbol");
   }
   const lsstr_t* name = lsthunk_get_constr(key);
   if (lsstrcmp(name, lsstr_cstr("exit")) == 0)

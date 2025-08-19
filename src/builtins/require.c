@@ -5,6 +5,7 @@
 #include "thunk/tenv.h"
 #include "common/str.h"
 #include "common/io.h"
+#include "runtime/error.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -43,18 +44,18 @@ lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void
     lsprintf(stderr, 0, "E: require: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
-  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return NULL;
-  lsthunk_t* pathv = lsthunk_eval0(args[0]); if (!pathv) return NULL;
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return ls_make_err("require: no env");
+  lsthunk_t* pathv = ls_eval_arg(args[0], "require: path");
+  if (lsthunk_is_err(pathv)) return pathv;
   if (lsthunk_get_type(pathv) != LSTTYPE_STR) {
-    lsprintf(stderr, 0, "E: require: expected string path\n");
-    return NULL;
+    return ls_make_err("require: expected string path");
   }
   size_t n=0; char* buf=NULL; FILE* fp=lsopen_memstream_gc(&buf,&n);
   lsstr_print_bare(fp, LSPREC_LOWEST, 0, lsthunk_get_str(pathv)); fclose(fp);
   const char* path = buf;
   if (ls_modules_is_loaded(path)) return ls_make_unit();
   const lsprog_t* prog = ls_require_resolve(path);
-  if (!prog) return NULL;
+  if (!prog) return ls_make_err("require: not found");
   if (ls_effects_get_strict()) ls_effects_begin();
   (void)lsprog_eval(prog, tenv);
   if (ls_effects_get_strict()) ls_effects_end();

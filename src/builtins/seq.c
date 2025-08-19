@@ -2,6 +2,7 @@
 #include "thunk/thunk.h"
 #include "common/str.h"
 #include "common/io.h"
+#include "runtime/error.h"
 #include <stdint.h>
 
 typedef enum lsseq_type { LSSEQ_SIMPLE, LSSEQ_CHAIN } lsseq_type_t;
@@ -11,10 +12,9 @@ lsthunk_t* lsbuiltin_seq(lssize_t argc, lsthunk_t* const* args, void* data) {
   lsthunk_t* fst = args[0];
   lsthunk_t* snd = args[1];
   ls_effects_begin();
-  lsthunk_t* fst_evaled = lsthunk_eval0(fst);
+  lsthunk_t* fst_evaled = ls_eval_arg(fst, "seq: first");
   ls_effects_end();
-  if (fst_evaled == NULL)
-    return NULL;
+  if (lsthunk_is_err(fst_evaled)) return fst_evaled;
   switch ((lsseq_type_t)(intptr_t)data) {
   case LSSEQ_SIMPLE:
     return snd;

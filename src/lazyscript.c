@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include "runtime/effects.h"
 #include "runtime/unit.h"
+#include "runtime/error.h"
 // builtins modules
 #include "builtins/prelude.h"
 #include "builtins/ns.h"
@@ -274,8 +275,14 @@ int main(int argc, char** argv) {
         g_run_main         = 0; // -e は従来通り：最終値を出力
         lsthunk_t* ret     = lsprog_eval(prog, tenv);
         if (ret != NULL) {
-          lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
-          lsprintf(stdout, 0, "\n");
+          if (lsthunk_is_err(ret)) {
+            lsprintf(stderr, 0, "E: ");
+            lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
+            lsprintf(stderr, 0, "\n");
+          } else {
+            lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
+            lsprintf(stdout, 0, "\n");
+          }
         }
         g_run_main = saved_run_main;
       }
@@ -419,8 +426,14 @@ int main(int argc, char** argv) {
       ls_maybe_eval_init(tenv);
       lsthunk_t* ret = lsprog_eval(prog, tenv);
       if (ret != NULL && !ls_maybe_run_entry(tenv)) {
-        lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
-        lsprintf(stdout, 0, "\n");
+        if (lsthunk_is_err(ret)) {
+          lsprintf(stderr, 0, "E: ");
+          lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
+          lsprintf(stderr, 0, "\n");
+        } else {
+          lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
+          lsprintf(stdout, 0, "\n");
+        }
       }
     }
   }
