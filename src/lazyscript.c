@@ -104,7 +104,10 @@ static lsthunk_t *lsbuiltin_to_string(lssize_t argc, lsthunk_t *const *args,
   size_t len = 0;
   char *buf = NULL;
   FILE *fp = lsopen_memstream_gc(&buf, &len);
-  lsthunk_dprint(fp, LSPREC_LOWEST, 0, args[0]);
+  // Evaluate to WHNF so values like ints/strings render as such
+  lsthunk_t *v = lsthunk_eval0(args[0]);
+  if (v == NULL) { fclose(fp); return NULL; }
+  lsthunk_dprint(fp, LSPREC_LOWEST, 0, v);
   fclose(fp);
   const lsstr_t *str = lsstr_new(buf, len);
   return lsthunk_new_str(str);

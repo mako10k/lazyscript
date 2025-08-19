@@ -425,8 +425,17 @@ static lsthunk_t *lsthunk_eval_builtin(lsthunk_t *thunk, lssize_t argc,
                                        lsthunk_t *const *args) {
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_BUILTIN);
-  if (argc == 0)
+  if (argc == 0) {
+    // For zero-arity builtins, invoke immediately to obtain the value.
+    if (thunk->lt_builtin->lti_arity == 0) {
+      lstbuiltin_func_t f0 = thunk->lt_builtin->lti_func;
+      void *d0 = thunk->lt_builtin->lti_data;
+      lsthunk_t *ret0 = f0(0, NULL, d0);
+      return ret0 ? lsthunk_eval0(ret0) : NULL;
+    }
+    // Otherwise, it's a function waiting for more args.
     return thunk;
+  }
   lssize_t arity = thunk->lt_builtin->lti_arity;
   lstbuiltin_func_t func = thunk->lt_builtin->lti_func;
   void *data = thunk->lt_builtin->lti_data;

@@ -95,3 +95,21 @@ LAZYSCRIPT_PRELUDE_SO=/path/to/liblazyscript_prelude.so ./src/lazyscript -e '...
 ## 開発メモ
 - プラグインからは `thunk/thunk.h`, `thunk/tenv.h`, `expr/ealge.h`, `common/str.h`, `common/io.h` を参照します。
 - ホストバイナリのシンボルを解決するため、`lazyscript` は `-export-dynamic` でリンクされています。
+
+## ランタイム拡張（自己ホストの土台）
+
+起動時に初期化スクリプトを読み込む/実行時にスクリプトをロードすることで、言語自身での拡張を可能にします。
+
+- `--init <file>` / `LAZYSCRIPT_INIT`
+  - 起動後、ユーザコードの前に LazyScript を 1 度評価します（thunk 実装経路）。
+  - `strict-effects` 有効時は副作用コンテキスト内で評価されます。
+
+- `~~require "path.ls"`
+  - 実行時に LS ファイルを読み込み・評価します。
+  - `LAZYSCRIPT_PATH`（コロン区切り）を検索し、同じパスは 1 回だけロードされます（簡易キャッシュ）。
+
+- `~~def Name value`
+  - 現在の環境に `Name` を束縛します（トップレベル相当）。以降 `~Name` で参照可能。
+  - 例: `{ ~~def foo 123; ~~println (~to_str ~foo) };  # => 123`
+
+メモ: 参照の解決は評価時にも行われるため、`def` や `require` で後から導入された名前も参照可能です。

@@ -12,6 +12,9 @@ if [[ ! -x "$BIN" ]]; then
   exit 1
 fi
 
+# Ensure runtime module search path defaults to the test directory unless overridden
+export LAZYSCRIPT_PATH="${LAZYSCRIPT_PATH:-$DIR}"
+
 pass=0; fail=0
 
 # Discover interpreter tests automatically: any test/*.ls that has a matching .out
