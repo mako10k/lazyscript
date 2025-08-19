@@ -748,6 +748,53 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
   else
     switch (thunk->lt_type) {
     case LSTTYPE_ALGE:
+      // Pretty-print proper lists (x : y : [] => [x, y])
+      if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
+          thunk->lt_alge.lta_argc == 2) {
+        // Collect elements
+        lssize_t      cap = 8, n = 0;
+        lsthunk_t**   elems = lsmalloc(sizeof(lsthunk_t*) * cap);
+        const lsthunk_t* cur = thunk;
+        while (cur->lt_type == LSTTYPE_ALGE &&
+               lsstrcmp(cur->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
+               cur->lt_alge.lta_argc == 2) {
+          if (n >= cap) {
+            cap *= 2;
+            lsthunk_t** tmp = lsmalloc(sizeof(lsthunk_t*) * cap);
+            for (lssize_t i = 0; i < n; i++) tmp[i] = elems[i];
+            elems = tmp;
+          }
+          elems[n++] = cur->lt_alge.lta_args[0];
+          cur        = cur->lt_alge.lta_args[1];
+        }
+        int is_nil = (cur->lt_type == LSTTYPE_ALGE &&
+                      lsstrcmp(cur->lt_alge.lta_constr, lsstr_cstr("[]")) == 0 &&
+                      cur->lt_alge.lta_argc == 0);
+        if (is_nil) {
+          // Render as [e0, e1, ...]
+          lsprintf(fp, 0, "[");
+          for (lssize_t i = 0; i < n; i++) {
+            if (i > 0) lsprintf(fp, 0, ", ");
+            lsthunk_t* e = elems[i];
+            // Print simple scalars bare; otherwise fallback to regular printing
+            if (e->lt_type == LSTTYPE_INT) {
+              lsint_print(fp, LSPREC_LOWEST, indent, e->lt_int);
+            } else if (e->lt_type == LSTTYPE_STR) {
+              // Bare string (no quotes) inside list pretty-print
+              lsstr_print_bare(fp, LSPREC_LOWEST, indent, e->lt_str);
+            } else if (e->lt_type == LSTTYPE_ALGE &&
+                       lsstrcmp(e->lt_alge.lta_constr, lsstr_cstr("()")) == 0 &&
+                       e->lt_alge.lta_argc == 0) {
+              lsprintf(fp, 0, "()");
+            } else {
+              lsthunk_print_internal(fp, LSPREC_LOWEST, indent, e, level + 1, colle, mode, 0);
+            }
+          }
+          lsprintf(fp, 0, "]");
+          return;
+        }
+        // else fallthrough to default ':' printing below
+      }
       if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr("[]")) == 0) {
         lsprintf(fp, 0, "[");
         for (lssize_t i = 0; i < thunk->lt_alge.lta_argc; i++) {

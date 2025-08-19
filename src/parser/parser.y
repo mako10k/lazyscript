@@ -299,9 +299,9 @@ elist:
         lssize_t argc = lsarray_get_size($2);
         const lsexpr_t *const *es = (const lsexpr_t *const *)lsarray_get($2);
         const lsealge_t *chain = lsealge_new(lsstr_cstr("[]"), 0, NULL);
-        for (lssize_t i = argc - 1; i >= 0; i--) {
+        for (lssize_t i = argc; i > 0; i--) {
           const lsexpr_t *args2[2];
-          args2[0] = es[i];
+          args2[0] = es[i - 1];
           args2[1] = lsexpr_new_alge(chain);
           chain    = lsealge_new(lsstr_cstr(":"), 2, args2);
         }
@@ -372,9 +372,9 @@ plist:
         lssize_t argc = lsarray_get_size($2);
         const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
         const lspalge_t *chain = lspalge_new(lsstr_cstr("[]"), 0, NULL);
-        for (lssize_t i = argc - 1; i >= 0; i--) {
+        for (lssize_t i = argc; i > 0; i--) {
           const lspat_t *args2[2];
-          args2[0] = ps[i];
+          args2[0] = ps[i - 1];
           args2[1] = lspat_new_alge(chain);
           chain    = lspalge_new(lsstr_cstr(":"), 2, args2);
         }
