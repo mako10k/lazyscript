@@ -201,7 +201,6 @@ efact:
     | '~' LSTSYMBOL { $$ = lsexpr_new_ref(lsref_new($2, @$)); }
     | elambda { $$ = lsexpr_new_lambda($1); }
   | '!' '{' dostmts '}' { $$ = $3; }
-  | '!' '{' dostmts ';' '}' { $$ = $3; }
     | '{' nsentries '}' {
         // Anonymous namespace literal sugar:
         // { a = e1; b = e2; }  =>
@@ -273,7 +272,17 @@ nsentry:
 //   - Bind statement:  [ refexpr, expr ]  where refexpr is (~ x)
 
 dostmts:
-      dostmt {
+      /* empty */ {
+        // Empty do-block yields unit: return ()
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$));
+        const lsexpr_t *ret_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("return"), 0, NULL));
+        const lsexpr_t *ret = lsexpr_new_appl(lseappl_new(nsref, 1, &ret_sym));
+        const lsexpr_t *unit = lsexpr_new_alge(lsealge_new(lsstr_cstr(","), 0, NULL));
+        const lsexpr_t *args[] = { unit };
+        $$ = lsexpr_new_appl(lseappl_new(ret, 1, args));
+      }
+    | dostmt {
         const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
         const lsexpr_t *nsref = lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$));
         const lsexpr_t *ret_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("return"), 0, NULL));
@@ -326,6 +335,8 @@ dostmts:
         }
       }
     ;
+
+
 
 dostmt:
       pref LSTLEFTARROW expr { const lsexpr_t *re = lsexpr_new_ref($1); $$ = lsarray_new(2, re, $3); }
