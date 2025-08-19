@@ -11,8 +11,11 @@
 #include <gc.h>
 #include <getopt.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <dlfcn.h>
 #include "coreir/coreir.h"
+#include "common/hash.h"
+#include <unistd.h>
 
 static int g_debug = 0;
 static int g_effects_strict = 0; // when true, guard side effects
@@ -22,6 +25,8 @@ static inline void ls_effects_begin(void) { if (g_effects_strict) g_effects_dept
 static inline void ls_effects_end(void) { if (g_effects_strict && g_effects_depth > 0) g_effects_depth--; }
 static inline int ls_effects_allowed(void) { return !g_effects_strict || g_effects_depth > 0; }
 static const char *g_sugar_ns = NULL; // NULL => default (prelude)
+static const char *g_init_file = NULL; // Optional init script (from --init or env)
+static lshash_t *g_require_loaded = NULL; // cache of loaded module paths
 const lsprog_t *lsparse_stream(const char *filename, FILE *in_str) {
   assert(in_str != NULL);
   yyscan_t yyscanner;
@@ -54,6 +59,33 @@ static const lsprog_t *lsparse_string(const char *filename, const char *str) {
   const lsprog_t *prog = lsparse_stream(filename, stream);
   fclose(stream);
   return prog;
+}
+
+// Nullable file parser: returns NULL if file open fails
+static const lsprog_t *lsparse_file_nullable(const char *filename) {
+  FILE *stream = fopen(filename, "r");
+  if (!stream) return NULL;
+  const lsprog_t *prog = lsparse_stream(filename, stream);
+  fclose(stream);
+  return prog;
+}
+
+// Load and evaluate an initialization script into the given environment (thunk path)
+static void ls_maybe_eval_init(lstenv_t *tenv) {
+  if (g_init_file == NULL || g_init_file[0] == '\0') {
+    const char *from_env = getenv("LAZYSCRIPT_INIT");
+    if (from_env && from_env[0]) g_init_file = from_env;
+  }
+  if (g_init_file && g_init_file[0]) {
+    const lsprog_t *iprog = lsparse_file(g_init_file);
+    if (iprog) {
+      // Effects in init are allowed if strict-effects is enabled (wrap with begin/end)
+      if (g_effects_strict) ls_effects_begin();
+      lsthunk_t *ret = lsprog_eval(iprog, tenv);
+      if (g_effects_strict) ls_effects_end();
+      (void)ret; // ignore value, init is for side effects / definitions
+    }
+  }
 }
 
 static lsthunk_t *lsbuiltin_dump(lssize_t argc, lsthunk_t *const *args,
@@ -170,6 +202,104 @@ static lsthunk_t *lsbuiltin_prelude_return(lssize_t argc,
   return args[0];
 }
 
+// prelude.require: load and evaluate a LazyScript file at runtime (side-effect)
+static lsthunk_t *lsbuiltin_prelude_require(lssize_t argc,
+                                            lsthunk_t *const *args,
+                                            void *data) {
+  assert(argc == 1);
+  assert(args != NULL);
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: require: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
+  lstenv_t *tenv = (lstenv_t *)data;
+  if (tenv == NULL) return NULL;
+  lsthunk_t *pathv = lsthunk_eval0(args[0]);
+  if (pathv == NULL) return NULL;
+  if (lsthunk_get_type(pathv) != LSTTYPE_STR) {
+    lsprintf(stderr, 0, "E: require: expected string path\n");
+    return NULL;
+  }
+  const lsstr_t *s = lsthunk_get_str(pathv);
+  size_t n = 0; char *buf = NULL; FILE *fp = lsopen_memstream_gc(&buf, &n);
+  lsstr_print_bare(fp, LSPREC_LOWEST, 0, s); fclose(fp);
+  const char *path = buf;
+  // Resolve path: absolute/relative or via LAZYSCRIPT_PATH
+  const char *resolved = NULL;
+  const lsprog_t *prog = NULL;
+  // try as-is
+  prog = lsparse_file_nullable(path);
+  if (prog) {
+    resolved = path;
+  } else {
+    const char *spath = getenv("LAZYSCRIPT_PATH");
+    if (spath && spath[0]) {
+      // copy spath to buffer to tokenize
+      char *buf = strdup(spath);
+      if (buf) {
+        for (char *tok = strtok(buf, ":"); tok != NULL; tok = strtok(NULL, ":")) {
+          size_t need = strlen(tok) + 1 + strlen(path) + 1;
+          char *cand = (char *)malloc(need);
+          if (!cand) break;
+          snprintf(cand, need, "%s/%s", tok, path);
+          prog = lsparse_file_nullable(cand);
+          if (prog) { resolved = cand; break; }
+          free(cand);
+        }
+        free(buf);
+      }
+    }
+  }
+  if (!prog) return NULL;
+  // module loaded cache
+  if (!g_require_loaded) g_require_loaded = lshash_new(16);
+  const lsstr_t *k = lsstr_cstr(resolved);
+  lshash_data_t oldv;
+  if (lshash_get(g_require_loaded, k, &oldv)) {
+    // already loaded; do nothing
+    return ls_make_unit();
+  }
+  (void)lshash_put(g_require_loaded, k, (const void *)1, &oldv);
+  if (g_effects_strict) ls_effects_begin();
+  lsthunk_t *ret = lsprog_eval(prog, tenv);
+  if (g_effects_strict) ls_effects_end();
+  (void)ret;
+  return ls_make_unit();
+}
+
+// 0-arity builtin getter for prelude.def: returns captured thunk value
+static lsthunk_t *lsbuiltin_getter0(lssize_t argc, lsthunk_t *const *args, void *data) {
+  (void)argc; (void)args;
+  return (lsthunk_t *)data;
+}
+
+// prelude.def: bind a value to a bare symbol in current environment
+static lsthunk_t *lsbuiltin_prelude_def(lssize_t argc,
+                                        lsthunk_t *const *args,
+                                        void *data) {
+  assert(argc == 2);
+  assert(args != NULL);
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: def: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
+  lstenv_t *tenv = (lstenv_t *)data;
+  if (tenv == NULL) return NULL;
+  lsthunk_t *namev = lsthunk_eval0(args[0]);
+  if (namev == NULL) return NULL;
+  if (lsthunk_get_type(namev) != LSTTYPE_ALGE || lsthunk_get_argc(namev) != 0) {
+    lsprintf(stderr, 0, "E: def: expected a bare symbol as first argument\n");
+    return NULL;
+  }
+  const lsstr_t *name = lsthunk_get_constr(namev);
+  // value: allow lazy or strict? evaluate now to stabilize
+  lsthunk_t *val = lsthunk_eval0(args[1]);
+  if (val == NULL) return NULL;
+  // Install as 0-arity builtin that returns captured value
+  lstenv_put_builtin(tenv, name, 0, lsbuiltin_getter0, val);
+  return ls_make_unit();
+}
+
 static lsthunk_t *lsbuiltin_prelude_bind(lssize_t argc,
                                          lsthunk_t *const *args,
                                          void *data) {
@@ -189,7 +319,8 @@ static lsthunk_t *lsbuiltin_prelude_bind(lssize_t argc,
 
 static lsthunk_t *lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t *const *args,
                                     void *data) {
-  (void)data;
+  // data is the current environment for dynamic loading (require)
+  lstenv_t *tenv = (lstenv_t *)data;
   assert(argc == 1);
   assert(args != NULL);
   lsthunk_t *key = lsthunk_eval0(args[0]);
@@ -207,6 +338,12 @@ static lsthunk_t *lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t *const *ar
   if (lsstrcmp(name, lsstr_cstr("println")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.println"), 1,
                                lsbuiltin_prelude_println, NULL);
+  if (lsstrcmp(name, lsstr_cstr("def")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2,
+                               lsbuiltin_prelude_def, tenv);
+  if (lsstrcmp(name, lsstr_cstr("require")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1,
+                               lsbuiltin_prelude_require, tenv);
   if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2,
                                lsbuiltin_prelude_chain, NULL);
@@ -295,7 +432,8 @@ static void ls_register_core_builtins(lstenv_t *tenv) {
 }
 
 static void ls_register_builtin_prelude(lstenv_t *tenv) {
-  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, NULL);
+  // Pass tenv via data to allow prelude.require to load into this environment
+  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, tenv);
 }
 
 typedef int (*ls_prelude_register_fn)(lstenv_t *);
@@ -346,6 +484,7 @@ int main(int argc, char **argv) {
     {"typecheck", no_argument, NULL, 't'},
       {"no-kind-warn", no_argument, NULL, 1000},
       {"kind-error", no_argument, NULL, 1001},
+  {"init", required_argument, NULL, 1002},
       {"debug", no_argument, NULL, 'd'},
       {"help", no_argument, NULL, 'h'},
       {"version", no_argument, NULL, 'v'},
@@ -438,6 +577,9 @@ int main(int argc, char **argv) {
     case 1001: // --kind-error
       kind_error = 1;
       break;
+    case 1002: // --init <file>
+      g_init_file = optarg;
+      break;
     case 'd':
   g_debug = 1;
 #if DEBUG
@@ -460,10 +602,12 @@ int main(int argc, char **argv) {
   printf("  -t, --typecheck    run minimal Core IR typechecker and print OK/error\n");
   printf("      --no-kind-warn  suppress kind (Pure/IO) warnings during --typecheck\n");
   printf("      --kind-error    treat kind (Pure/IO) issues as errors during --typecheck\n");
+  printf("      --init <file>   load and evaluate an init LazyScript before user code (thunk path)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
   printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
       printf("  LAZYSCRIPT_SUGAR_NS     namespace used for ~~sym sugar (if -n not set)\n");
+      printf("  LAZYSCRIPT_INIT         path to init LazyScript (used if --init not set)\n");
       exit(0);
     case 'v':
       printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -526,6 +670,10 @@ int main(int argc, char **argv) {
       ls_register_core_builtins(tenv);
       if (!ls_try_load_prelude_plugin(tenv, prelude_so))
         ls_register_builtin_prelude(tenv);
+  // Evaluate init script (if any) into the same environment
+  ls_maybe_eval_init(tenv);
+  // Evaluate init script (if any) into the same environment
+  ls_maybe_eval_init(tenv);
       lsthunk_t *ret = lsprog_eval(prog, tenv);
       if (ret != NULL) {
         lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);

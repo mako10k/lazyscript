@@ -53,6 +53,7 @@ struct lstref_target {
 struct lstref {
   const lsref_t *ltr_ref;
   lstref_target_t *ltr_target;
+  const lstenv_t *ltr_env;
 };
 
 struct lstbuiltin {
@@ -144,15 +145,8 @@ lsthunk_t *lsthunk_new_ref(const lsref_t *ref, lstenv_t *tenv) {
   thunk->lt_type = LSTTYPE_REF;
   thunk->lt_whnf = NULL;
   thunk->lt_ref.ltr_ref = ref;
-  thunk->lt_ref.ltr_target = target;
-  if (target == NULL) {
-    lsprintf(stderr, 0, "E: ");
-    lsloc_print(stderr, lsref_get_loc(ref));
-    lsprintf(stderr, 0, "undefined reference: ");
-    lsref_print(stderr, LSPREC_LOWEST, 0, ref);
-    lsprintf(stderr, 0, "\n");
-    lstenv_incr_nerrors(tenv);
-  }
+  thunk->lt_ref.ltr_target = target; // may be NULL; resolve lazily at eval
+  thunk->lt_ref.ltr_env = tenv;
   return thunk;
 }
 
@@ -460,7 +454,20 @@ static lsthunk_t *lsthunk_eval_ref(lsthunk_t *thunk, lssize_t argc,
   assert(thunk->lt_type == LSTTYPE_REF);
   assert(argc == 0 || args != NULL);
   lstref_target_t *target = thunk->lt_ref.ltr_target;
-  assert(target != NULL);
+  if (target == NULL) {
+    // try lazy lookup in environment captured at construction
+    target = lstenv_get(thunk->lt_ref.ltr_env, lsref_get_name(thunk->lt_ref.ltr_ref));
+    if (target == NULL) {
+      lsprintf(stderr, 0, "E: ");
+      lsloc_print(stderr, lsref_get_loc(thunk->lt_ref.ltr_ref));
+      lsprintf(stderr, 0, "undefined reference: ");
+      lsref_print(stderr, LSPREC_LOWEST, 0, thunk->lt_ref.ltr_ref);
+      lsprintf(stderr, 0, "\n");
+      // We don't have a tenv counter here; best-effort: skip increment
+      return NULL;
+    }
+    thunk->lt_ref.ltr_target = target; // cache
+  }
   lstref_target_origin_t *origin = target->lrt_origin;
   assert(origin != NULL);
   lstpat_t *pat_ref = target->lrt_pat;
