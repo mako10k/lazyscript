@@ -113,3 +113,19 @@ LAZYSCRIPT_PRELUDE_SO=/path/to/liblazyscript_prelude.so ./src/lazyscript -e '...
   - 例: `{ ~~def foo 123; ~~println (~to_str ~foo) };  # => 123`
 
 メモ: 参照の解決は評価時にも行われるため、`def` や `require` で後から導入された名前も参照可能です。
+
+## LLVM IR（スケルトン）
+
+Core IR から LLVM IR へのロワリング準備として、最小構成を追加しています。
+
+- 共有C-ABI呼び出し規約: `src/coreir/cir_callconv.{h,c}`
+- LLVM IR ライブラリ: `src/llvmir/`（最小のテキスト出力）
+- ダンプツール: `src/lsllvmir_dump`
+
+使い方（例）:
+
+```
+echo "(\\x -> 42);" | ./src/lsllvmir_dump > out.ll
+```
+
+詳細なロードマップは `docs/08_llvmir_plan.md` を参照してください。
