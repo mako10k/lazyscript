@@ -1,63 +1,67 @@
-2548 src/parser/parser.c
-2050 src/parser/lexer.c
-877 src/thunk/thunk.c
-536 src/lazyscript.c
-525 src/parser/lexer.h
-421 src/coreir/coreir_clean.c
-417 src/common/str.c
-293 src/common/array.c
-268 src/common/array.h
-260 src/thunk/tpat.c
-257 src/thunk/thunk.h
-180 src/common/hash.c
-152 src/expr/expr.c
-145 src/parser/parser.h
-127 src/pat/palge.c
-122 src/thunk/tenv.c
-117 src/expr/ealge.c
-113 src/common/io.c
-106 src/coreir/coreir.h
-99 src/plugins/prelude_plugin.c
-90 src/pat/palge.h
-83 src/pat/pat.c
-83 src/expr/elist.h
-81 src/expr/ealge.h
-81 src/common/list.h
-81 src/common/list.c
-73 src/expr/eappl.c
-70 src/expr/eappl.h
-62 src/common/hash.h
-60 src/misc/prog.c
-54 src/thunk/tpat.h
-54 src/expr/eclosure.c
-52 src/common/int.c
-51 src/misc/belist.c
-51 src/common/loc.c
-47 src/expr/expr.h
-46 src/common/int.h
-45 src/pat/plist.c
-45 src/expr/elist.c
-41 src/expr/elambda.h
-41 src/expr/echoice.c
-40 src/lazyscript_format.c
-39 src/expr/echoice.h
-38 src/lstypes.h
-37 src/pat/pas.c
-36 src/common/ref.c
-35 src/expr/elambda.c
-34 src/expr/eclosure.h
-30 src/misc/bind.c
-28 src/pat/pat.h
-26 src/common/str.h
-22 src/common/loc.h
-21 src/misc/prog.h
-20 src/thunk/tenv.h
-20 src/misc/belist.h
-19 src/misc/bind.h
-18 src/common/io.h
-16 src/pat/plist.h
-14 src/lazyscript.h
-13 src/pat/pas.h
-10 src/common/ref.h
-9 src/common/malloc.c
-7 src/common/malloc.h
+    38 ./src/lstypes.h
+  2050 ./src/parser/lexer.c
+  2548 ./src/parser/parser.c
+   145 ./src/parser/parser.h
+   525 ./src/parser/lexer.h
+   260 ./src/thunk/tpat.c
+   877 ./src/thunk/thunk.c
+    54 ./src/thunk/tpat.h
+   122 ./src/thunk/tenv.c
+    20 ./src/thunk/tenv.h
+   257 ./src/thunk/thunk.h
+    81 ./src/expr/ealge.h
+    39 ./src/expr/echoice.h
+    34 ./src/expr/eclosure.h
+    73 ./src/expr/eappl.c
+    83 ./src/expr/elist.h
+    35 ./src/expr/elambda.c
+   152 ./src/expr/expr.c
+    41 ./src/expr/echoice.c
+    54 ./src/expr/eclosure.c
+    47 ./src/expr/expr.h
+    41 ./src/expr/elambda.h
+   117 ./src/expr/ealge.c
+    70 ./src/expr/eappl.h
+    45 ./src/expr/elist.c
+    14 ./src/lazyscript.h
+    40 ./src/lazyscript_format.c
+   536 ./src/lazyscript.c
+    99 ./src/plugins/prelude_plugin.c
+    30 ./src/misc/bind.c
+    60 ./src/misc/prog.c
+    51 ./src/misc/belist.c
+    19 ./src/misc/bind.h
+    20 ./src/misc/belist.h
+    21 ./src/misc/prog.h
+    45 ./src/pat/plist.c
+   127 ./src/pat/palge.c
+    13 ./src/pat/pas.h
+    28 ./src/pat/pat.h
+    16 ./src/pat/plist.h
+    37 ./src/pat/pas.c
+    90 ./src/pat/palge.h
+    83 ./src/pat/pat.c
+    81 ./src/common/list.h
+    81 ./src/common/list.c
+    10 ./src/common/ref.h
+    62 ./src/common/hash.h
+    36 ./src/common/ref.c
+    18 ./src/common/io.h
+   417 ./src/common/str.c
+    52 ./src/common/int.c
+   268 ./src/common/array.h
+    46 ./src/common/int.h
+    51 ./src/common/loc.c
+   113 ./src/common/io.c
+    22 ./src/common/loc.h
+     9 ./src/common/malloc.c
+    26 ./src/common/str.h
+   293 ./src/common/array.c
+   180 ./src/common/hash.c
+     7 ./src/common/malloc.h
+   198 ./src/coreir/cir_lower_print.c
+   171 ./src/coreir/cir_effects_type.c
+   137 ./src/coreir/cir_eval_runtime.c
+   106 ./src/coreir/coreir.h
+    10 ./src/coreir/cir_internal.h
+ 11531 total

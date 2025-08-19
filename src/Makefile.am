@@ -30,3 +30,22 @@ lazyscript_format_SOURCES = \
     lazyscript_format.c \
     lazyscript.h \
     lstypes.h
+
+# --- QA helpers ---
+.PHONY: qa qa-clean
+qa:
+    @mkdir -p $(top_srcdir)/logs
+    @echo "[QA] cppcheck (src only)"; \
+    cppcheck --enable=all --inconclusive --std=c11 \
+        --suppress=missingIncludeSystem \
+        --force \
+        -I$(top_srcdir)/src \
+        --template=gcc \
+        $(top_srcdir)/src 2> $(top_srcdir)/logs/cppcheck.log || true; \
+    echo "[QA] lizard (complexity/duplicate)"; \
+    python3 -m lizard -C 10 $(top_srcdir)/src > $(top_srcdir)/logs/lizard_src.txt || true; \
+    python3 -m lizard -C 10 -Eduplicate $(top_srcdir)/src > $(top_srcdir)/logs/lizard_src_highccn.txt || true; \
+    find $(top_srcdir)/src -name '*.c' -o -name '*.h' | xargs wc -l > $(top_srcdir)/logs/loc.txt
+
+qa-clean:
+    rm -f $(top_srcdir)/logs/cppcheck.log $(top_srcdir)/logs/lizard_*.txt $(top_srcdir)/logs/loc.txt || true
