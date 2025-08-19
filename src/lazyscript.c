@@ -15,11 +15,15 @@
 #include <dlfcn.h>
 #include "coreir/coreir.h"
 #include "common/hash.h"
+#include "common/ref.h"
+#include "common/loc.h"
 #include <unistd.h>
 
 static int         g_debug          = 0;
 static int         g_effects_strict = 0; // when true, guard side effects
 static int         g_effects_depth  = 0; // nesting counter for allowed effects
+static int         g_run_main       = 1; // default: on (files). -e path will disable temporarily
+static const char* g_entry_name     = "main"; // entry function name
 
 static inline void ls_effects_begin(void) {
   if (g_effects_strict)
@@ -77,6 +81,29 @@ static const lsprog_t* lsparse_file_nullable(const char* filename) {
   const lsprog_t* prog = lsparse_stream(filename, stream);
   fclose(stream);
   return prog;
+}
+
+// Forward declaration (defined below in Prelude helpers)
+static lsthunk_t* ls_make_unit(void);
+
+// Try to run entry function (~g_entry_name) if configured; returns 1 if invoked.
+static int ls_maybe_run_entry(lstenv_t* tenv) {
+  if (!g_run_main || !tenv || !g_entry_name || !g_entry_name[0])
+    return 0;
+  lstref_target_t* target = lstenv_get(tenv, lsstr_cstr(g_entry_name));
+  if (!target)
+    return 0;
+  lsloc_t        loc    = lsloc("<entry>", 1, 1, 1, 1);
+  const lsref_t* r      = lsref_new(lsstr_cstr(g_entry_name), loc);
+  lsthunk_t*     rthunk = lsthunk_new_ref(r, tenv);
+  if (g_effects_strict) ls_effects_begin();
+  lsthunk_t* v = lsthunk_eval0(rthunk);
+  if (v && lsthunk_get_type(v) == LSTTYPE_LAMBDA) {
+    lsthunk_t* unit = ls_make_unit();
+    (void)lsthunk_eval(v, 1, &unit);
+  }
+  if (g_effects_strict) ls_effects_end();
+  return 1;
 }
 
 // Load and evaluate an initialization script into the given environment (thunk path)
@@ -483,6 +510,8 @@ int main(int argc, char** argv) {
           { "prelude-so", required_argument, NULL, 'p' },
           { "sugar-namespace", required_argument, NULL, 'n' },
           { "strict-effects", no_argument, NULL, 's' },
+          { "run-main", no_argument, NULL, 1003 },
+          { "entry", required_argument, NULL, 1004 },
           { "dump-coreir", no_argument, NULL, 'i' },
           { "eval-coreir", no_argument, NULL, 'c' },
           { "typecheck", no_argument, NULL, 't' },
@@ -555,11 +584,14 @@ int main(int argc, char** argv) {
         ls_register_core_builtins(tenv);
         if (!ls_try_load_prelude_plugin(tenv, prelude_so))
           ls_register_builtin_prelude(tenv);
-        lsthunk_t* ret = lsprog_eval(prog, tenv);
+        int saved_run_main = g_run_main;
+        g_run_main         = 0; // -e は従来通り：最終値を出力
+        lsthunk_t* ret     = lsprog_eval(prog, tenv);
         if (ret != NULL) {
           lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
           lsprintf(stdout, 0, "\n");
         }
+        g_run_main = saved_run_main;
       }
       break;
     }
@@ -571,6 +603,12 @@ int main(int argc, char** argv) {
       break;
     case 's':
       g_effects_strict = 1;
+      break;
+    case 1003: // --run-main
+      g_run_main = 1;
+      break;
+    case 1004: // --entry <name>
+      g_entry_name = optarg;
       break;
     case 'i':
       dump_coreir = 1;
@@ -607,6 +645,8 @@ int main(int argc, char** argv) {
       printf("  -p, --prelude-so <path>  load prelude plugin .so (override)\n");
       printf("  -n, --sugar-namespace <ns>  set namespace for ~~sym sugar (default: prelude)\n");
       printf("  -s, --strict-effects  enforce effect discipline (seq/chain required)\n");
+  printf("      --run-main          run entry function instead of printing top-level value (off)\n");
+  printf("      --entry <name>      set entry function name (default: main)\n");
       printf("  -i, --dump-coreir  print Core IR after parsing (debug)\n");
       printf("  -c, --eval-coreir  run via Core IR evaluator (smoke)\n");
       printf("  -t, --typecheck    run minimal Core IR typechecker and print OK/error\n");
@@ -694,7 +734,7 @@ int main(int argc, char** argv) {
       // Evaluate init script (if any) into the same environment
       ls_maybe_eval_init(tenv);
       lsthunk_t* ret = lsprog_eval(prog, tenv);
-      if (ret != NULL) {
+      if (ret != NULL && !ls_maybe_run_entry(tenv)) {
         lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
         lsprintf(stdout, 0, "\n");
       }
