@@ -282,16 +282,16 @@ dostmts:
         const lsexpr_t *args[] = { unit };
         $$ = lsexpr_new_appl(lseappl_new(ret, 1, args));
       }
-    | dostmt {
+  | dostmt {
         const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
         const lsexpr_t *nsref = lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$));
         const lsexpr_t *ret_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("return"), 0, NULL));
         const lsexpr_t *ret = lsexpr_new_appl(lseappl_new(nsref, 1, &ret_sym));
         lssize_t sz = lsarray_get_size($1);
         if (sz == 1) {
-          const lsexpr_t *e = (const lsexpr_t *)lsarray_get($1)[0];
-          const lsexpr_t *args[] = { e };
-          $$ = lsexpr_new_appl(lseappl_new(ret, 1, args));
+      const lsexpr_t *e = (const lsexpr_t *)lsarray_get($1)[0];
+      const lsexpr_t *args[] = { e };
+      $$ = lsexpr_new_appl(lseappl_new(ret, 1, args));
         } else {
           // tail bind: desugar to bind A (x -> return ())
           const lsexpr_t *xexpr = (const lsexpr_t *)lsarray_get($1)[0];

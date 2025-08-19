@@ -30,17 +30,48 @@ static lsthunk_t* lsbuiltin_prelude_exit(lssize_t argc, lsthunk_t* const* args, 
   exit(is_zero ? 0 : 1);
 }
 
+// Debug tracing toggle
+#ifndef LS_TRACE
+#define LS_TRACE 0
+#endif
+
 static lsthunk_t* lsbuiltin_prelude_println(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data; (void)argc;
   if (!ls_effects_allowed()) {
     lsprintf(stderr, 0, "E: println: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG println: begin\n");
+  #endif
   lsthunk_t* thunk_str = lsthunk_eval0(args[0]);
   if (thunk_str == NULL)
-    return NULL;
+    { 
+      #if LS_TRACE
+      lsprintf(stderr, 0, "DBG println: arg eval -> NULL\n");
+      #endif
+      return NULL;
+    }
+  #if LS_TRACE
+  {
+    const char* vt = "?";
+    switch (lsthunk_get_type(thunk_str)) {
+    case LSTTYPE_INT: vt = "int"; break; case LSTTYPE_STR: vt = "str"; break;
+    case LSTTYPE_ALGE: vt = "alge"; break; case LSTTYPE_APPL: vt = "appl"; break;
+    case LSTTYPE_LAMBDA: vt = "lambda"; break; case LSTTYPE_REF: vt = "ref"; break;
+    case LSTTYPE_CHOICE: vt = "choice"; break; case LSTTYPE_BUILTIN: vt = "builtin"; break; }
+    lsprintf(stderr, 0, "DBG println: arg type=%s\n", vt);
+  }
+  #endif
   if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
     thunk_str = lsbuiltin_to_string(1, args, NULL);
+  #if LS_TRACE
+  if (lsthunk_get_type(thunk_str) != LSTTYPE_STR) {
+    lsprintf(stderr, 0, "DBG println: to_str did not return string\n");
+  } else {
+    lsprintf(stderr, 0, "DBG println: have string\n");
+  }
+  #endif
   const lsstr_t* str = lsthunk_get_str(thunk_str);
   lsstr_print_bare(stdout, LSPREC_LOWEST, 0, str);
   lsprintf(stdout, 0, "\n");
@@ -49,12 +80,21 @@ static lsthunk_t* lsbuiltin_prelude_println(lssize_t argc, lsthunk_t* const* arg
 
 static lsthunk_t* lsbuiltin_prelude_chain(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data; (void)argc;
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG chain: begin\n");
+  #endif
   ls_effects_begin();
   lsthunk_t* action = lsthunk_eval0(args[0]);
   ls_effects_end();
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG chain: after action eval -> %s\n", action ? "ok" : "NULL");
+  #endif
   if (!action) return NULL;
   lsthunk_t* unit = ls_make_unit();
   lsthunk_t* cont = args[1];
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG chain: apply cont\n");
+  #endif
   return lsthunk_eval(cont, 1, &unit);
 }
 

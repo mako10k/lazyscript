@@ -9,6 +9,11 @@
 #include <assert.h>
 #include <stddef.h>
 
+// Debug tracing for thunk evaluation (off by default). Enable with -DLS_TRACE=1
+#ifndef LS_TRACE
+#define LS_TRACE 0
+#endif
+
 struct lstalge {
   const lsstr_t* lta_constr;
   lssize_t       lta_argc;
@@ -416,21 +421,46 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   assert(thunk->lt_type == LSTTYPE_LAMBDA);
   assert(argc > 0);
   assert(args != NULL);
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG lambda: apply argc=%ld\n", (long)argc);
+  #endif
   lstpat_t*         param = lsthunk_get_param(thunk);
   lsthunk_t*        body  = lsthunk_get_body(thunk);
   lsthunk_t*        arg;
   lsthunk_t* const* args1 =
       (lsthunk_t* const*)lsa_shift(argc, (const void* const*)args, (const void**)&arg);
+  if (arg) {
+    #if LS_TRACE
+    const char* at = "?";
+    switch (lsthunk_get_type(arg)) {
+    case LSTTYPE_INT: at = "int"; break; case LSTTYPE_STR: at = "str"; break;
+    case LSTTYPE_ALGE: at = "alge"; break; case LSTTYPE_APPL: at = "appl"; break;
+    case LSTTYPE_LAMBDA: at = "lambda"; break; case LSTTYPE_REF: at = "ref"; break;
+    case LSTTYPE_CHOICE: at = "choice"; break; case LSTTYPE_BUILTIN: at = "builtin"; break; }
+    lsprintf(stderr, 0, "DBG lambda: arg type=%s\n", at);
+    #endif
+  }
   // Bind directly on the lambda's original parameter pattern so that
   // references inside body (which point to the same pattern objects via env)
   // observe the binding.
   body          = lsthunk_clone(body);
   lsmres_t mres = lsthunk_match_pat(arg, param);
-  if (mres != LSMATCH_SUCCESS)
+  if (mres != LSMATCH_SUCCESS) {
+    #if LS_TRACE
+    lsprintf(stderr, 0, "DBG lambda: match failed\n");
+    #endif
     return NULL;
+  }
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG lambda: eval body\n");
+  #endif
   lsthunk_t* ret = lsthunk_eval(body, argc - 1, args1);
-  if (ret == NULL)
+  if (ret == NULL) {
+    #if LS_TRACE
+    lsprintf(stderr, 0, "DBG lambda: body eval returned NULL\n");
+    #endif
     return NULL;
+  }
   // Capture current binding of this parameter inside the returned value by
   // substituting any references to the parameter with the bound thunk. This
   // prevents subsequent applications of the same lambda from mutating the
@@ -439,12 +469,27 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   ret = lsthunk_subst_param(ret, param);
   // Clear the parameter bindings now that the value has captured them.
   lstpat_clear_binds(param);
+  if (ret) {
+    #if LS_TRACE
+    const char* rt = "?";
+    switch (lsthunk_get_type(ret)) {
+    case LSTTYPE_INT: rt = "int"; break; case LSTTYPE_STR: rt = "str"; break;
+    case LSTTYPE_ALGE: rt = "alge"; break; case LSTTYPE_APPL: rt = "appl"; break;
+    case LSTTYPE_LAMBDA: rt = "lambda"; break; case LSTTYPE_REF: rt = "ref"; break;
+    case LSTTYPE_CHOICE: rt = "choice"; break; case LSTTYPE_BUILTIN: rt = "builtin"; break; }
+    lsprintf(stderr, 0, "DBG lambda: ret type=%s\n", rt);
+    #endif
+  }
   return ret;
 }
 
 static lsthunk_t* lsthunk_eval_builtin(lsthunk_t* thunk, lssize_t argc, lsthunk_t* const* args) {
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_BUILTIN);
+  #if LS_TRACE
+  const lsstr_t* bname = lsthunk_get_builtin_name(thunk);
+  lsprintf(stderr, 0, "DBG builtin: call "); if (bname) lsstr_print_bare(stderr, LSPREC_LOWEST, 0, bname); else lsprintf(stderr, 0, "<anon>"); lsprintf(stderr, 0, " argc=%ld (arity=%ld)\n", (long)argc, (long)thunk->lt_builtin->lti_arity);
+  #endif
   if (argc == 0) {
     // For zero-arity builtins, invoke immediately to obtain the value.
     if (thunk->lt_builtin->lti_arity == 0) {
@@ -454,7 +499,7 @@ static lsthunk_t* lsthunk_eval_builtin(lsthunk_t* thunk, lssize_t argc, lsthunk_
       return ret0 ? lsthunk_eval0(ret0) : NULL;
     }
     // Otherwise, it's a function waiting for more args.
-    return thunk;
+  return thunk;
   }
   lssize_t          arity = thunk->lt_builtin->lti_arity;
   lstbuiltin_func_t func  = thunk->lt_builtin->lti_func;
@@ -470,6 +515,9 @@ static lsthunk_t* lsthunk_eval_builtin(lsthunk_t* thunk, lssize_t argc, lsthunk_
     return ret;
   }
   lsthunk_t* ret = func(arity, args, data);
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG builtin: "); if (bname) lsstr_print_bare(stderr, LSPREC_LOWEST, 0, bname); else lsprintf(stderr, 0, "<anon>"); lsprintf(stderr, 0, " returned %s\n", ret ? "ok" : "NULL");
+  #endif
   if (ret == NULL)
     return NULL;
   return lsthunk_eval(ret, argc - arity, args + arity);
@@ -480,6 +528,9 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_REF);
   assert(argc == 0 || args != NULL);
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG ref: begin\n");
+  #endif
   lstref_target_t* target = thunk->lt_ref.ltr_target;
   if (target == NULL) {
     // try lazy lookup in environment captured at construction
@@ -491,7 +542,10 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
       lsref_print(stderr, LSPREC_LOWEST, 0, thunk->lt_ref.ltr_ref);
       lsprintf(stderr, 0, "\n");
       // We don't have a tenv counter here; best-effort: skip increment
-      return NULL;
+  #if LS_TRACE
+  lsprintf(stderr, 0, "DBG ref: undefined reference -> NULL\n");
+  #endif
+    return NULL;
     }
     thunk->lt_ref.ltr_target = target; // cache
   }

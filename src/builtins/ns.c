@@ -58,6 +58,23 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
     lsprintf(stderr, 0, "\n");
     return NULL;
   }
+  if (NS_DLOG_ENABLED) {
+    lsthunk_t* tv = (lsthunk_t*)valp;
+    const char* tt = "?";
+    if (tv) {
+      switch (lsthunk_get_type(tv)) {
+      case LSTTYPE_LAMBDA: tt = "lambda"; break;
+      case LSTTYPE_INT: tt = "int"; break;
+      case LSTTYPE_STR: tt = "str"; break;
+      case LSTTYPE_ALGE: tt = "alge"; break;
+      case LSTTYPE_APPL: tt = "appl"; break;
+      case LSTTYPE_REF: tt = "ref"; break;
+      case LSTTYPE_BUILTIN: tt = "builtin"; break;
+      case LSTTYPE_CHOICE: tt = "choice"; break;
+      }
+    }
+    lsprintf(stderr, 0, "DBG ns_lookup ret type=%s\n", tt);
+  }
   return (lsthunk_t*)valp;
 }
 
