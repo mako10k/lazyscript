@@ -1,1 +1,1 @@
-{ ((~prelude require) "lib_req.ls"); ((~prelude println) "done") };
+!{ ((~prelude require) "lib_req.ls"); ((~prelude println) "done") };

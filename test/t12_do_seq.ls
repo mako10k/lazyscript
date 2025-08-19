@@ -1,1 +1,1 @@
-{ ~~println "A"; ~~println "B" };
+!{ ~~println "A"; ~~println "B" };

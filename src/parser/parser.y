@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 36
+%expect 40
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -198,7 +198,14 @@ efact:
     | closure { $$ = lsexpr_new_closure($1); }
     | '~' LSTSYMBOL { $$ = lsexpr_new_ref(lsref_new($2, @$)); }
     | elambda { $$ = lsexpr_new_lambda($1); }
-    | '{' dostmts '}' { $$ = $2; }
+    | '!' '{' dostmts '}' { $$ = $3; }
+    | '{' dostmts '}' {
+        // Legacy do-block braces: keep parsing but warn for deprecation
+        lsprintf(stderr, 0, "W: ");
+        lsloc_print(stderr, @$);
+        lsprintf(stderr, 0, "legacy do-block '{ ... }' is deprecated; use '!{ ... }'\n");
+        $$ = $2;
+      }
     ;
 
 // do-block style sugar inside braces

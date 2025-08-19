@@ -381,10 +381,12 @@ static lsthunk_t* lsthunk_eval_alge(lsthunk_t* thunk, lssize_t argc, lsthunk_t* 
   if (argc == 0)
     return thunk; // it already is in WHNF
   lssize_t   targc = lsthunk_get_argc(thunk);
+  // Allocate enough space for existing args + new args
   lsthunk_t* thunk_new =
-      lsmalloc(lssizeof(lsthunk_t, lt_alge) + (targc + targc) * sizeof(lsthunk_t*));
+      lsmalloc(lssizeof(lsthunk_t, lt_alge) + (targc + argc) * sizeof(lsthunk_t*));
   thunk_new->lt_type            = LSTTYPE_ALGE;
-  thunk_new->lt_whnf            = thunk;
+  // This node is already in WHNF; point to self, not the old thunk
+  thunk_new->lt_whnf            = thunk_new;
   thunk_new->lt_alge.lta_constr = thunk->lt_alge.lta_constr;
   thunk_new->lt_alge.lta_argc   = targc + argc;
   for (lssize_t i = 0; i < targc; i++)
@@ -421,14 +423,21 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
       (lsthunk_t* const*)lsa_shift(argc, (const void* const*)args, (const void**)&arg);
   // Bind directly on the lambda's original parameter pattern so that
   // references inside body (which point to the same pattern objects via env)
-  // observe the binding. We'll clear bindings after evaluation to keep
-  // the lambda reusable.
+  // observe the binding.
   body          = lsthunk_clone(body);
   lsmres_t mres = lsthunk_match_pat(arg, param);
   if (mres != LSMATCH_SUCCESS)
     return NULL;
   lsthunk_t* ret = lsthunk_eval(body, argc - 1, args1);
-  // Clear parameter bindings for reuse
+  if (ret == NULL)
+    return NULL;
+  // Capture current binding of this parameter inside the returned value by
+  // substituting any references to the parameter with the bound thunk. This
+  // prevents subsequent applications of the same lambda from mutating the
+  // shared parameter pattern and affecting already-produced values.
+  extern lsthunk_t* lsthunk_subst_param(lsthunk_t* thunk, lstpat_t* param);
+  ret = lsthunk_subst_param(ret, param);
+  // Clear the parameter bindings now that the value has captured them.
   lstpat_clear_binds(param);
   return ret;
 }
@@ -751,47 +760,54 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
       // Pretty-print proper lists (x : y : [] => [x, y])
       if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
           thunk->lt_alge.lta_argc == 2) {
-        // Collect elements
-        lssize_t      cap = 8, n = 0;
-        lsthunk_t**   elems = lsmalloc(sizeof(lsthunk_t*) * cap);
+        // Collect elements along cons-chain with a safety cap
+        lssize_t    cap = 8, n = 0;
+        lsthunk_t** elems = lsmalloc(sizeof(lsthunk_t*) * cap);
         const lsthunk_t* cur = thunk;
-        while (cur->lt_type == LSTTYPE_ALGE &&
-               lsstrcmp(cur->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
-               cur->lt_alge.lta_argc == 2) {
+        const lssize_t   max_steps = 4096;
+        lssize_t         steps     = 0;
+        while (1) {
+          if (steps++ > max_steps) { n = -1; break; }
+          const lsthunk_t* curv = lsthunk_eval0((lsthunk_t*)cur);
+          if (!(curv->lt_type == LSTTYPE_ALGE &&
+                lsstrcmp(curv->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
+                curv->lt_alge.lta_argc == 2))
+            break;
           if (n >= cap) {
             cap *= 2;
             lsthunk_t** tmp = lsmalloc(sizeof(lsthunk_t*) * cap);
             for (lssize_t i = 0; i < n; i++) tmp[i] = elems[i];
             elems = tmp;
           }
-          elems[n++] = cur->lt_alge.lta_args[0];
-          cur        = cur->lt_alge.lta_args[1];
+          elems[n++] = curv->lt_alge.lta_args[0];
+          cur        = curv->lt_alge.lta_args[1];
         }
-        int is_nil = (cur->lt_type == LSTTYPE_ALGE &&
-                      lsstrcmp(cur->lt_alge.lta_constr, lsstr_cstr("[]")) == 0 &&
-                      cur->lt_alge.lta_argc == 0);
-        if (is_nil) {
-          // Render as [e0, e1, ...]
-          lsprintf(fp, 0, "[");
-          for (lssize_t i = 0; i < n; i++) {
-            if (i > 0) lsprintf(fp, 0, ", ");
-            lsthunk_t* e = elems[i];
-            // Print simple scalars bare; otherwise fallback to regular printing
-            if (e->lt_type == LSTTYPE_INT) {
-              lsint_print(fp, LSPREC_LOWEST, indent, e->lt_int);
-            } else if (e->lt_type == LSTTYPE_STR) {
-              // Bare string (no quotes) inside list pretty-print
-              lsstr_print_bare(fp, LSPREC_LOWEST, indent, e->lt_str);
-            } else if (e->lt_type == LSTTYPE_ALGE &&
-                       lsstrcmp(e->lt_alge.lta_constr, lsstr_cstr("()")) == 0 &&
-                       e->lt_alge.lta_argc == 0) {
-              lsprintf(fp, 0, "()");
-            } else {
-              lsthunk_print_internal(fp, LSPREC_LOWEST, indent, e, level + 1, colle, mode, 0);
+        if (n >= 0) {
+          const lsthunk_t* tailv = lsthunk_eval0((lsthunk_t*)cur);
+          int is_nil = (tailv->lt_type == LSTTYPE_ALGE &&
+                        lsstrcmp(tailv->lt_alge.lta_constr, lsstr_cstr("[]")) == 0 &&
+                        tailv->lt_alge.lta_argc == 0);
+          if (is_nil) {
+            // Render as [e0, e1, ...]
+            lsprintf(fp, 0, "[");
+            for (lssize_t i = 0; i < n; i++) {
+              if (i > 0) lsprintf(fp, 0, ", ");
+              lsthunk_t* e = lsthunk_eval0(elems[i]);
+              if (e->lt_type == LSTTYPE_INT) {
+                lsint_print(fp, LSPREC_LOWEST, indent, e->lt_int);
+              } else if (e->lt_type == LSTTYPE_STR) {
+                lsstr_print_bare(fp, LSPREC_LOWEST, indent, e->lt_str);
+              } else if (e->lt_type == LSTTYPE_ALGE &&
+                         lsstrcmp(e->lt_alge.lta_constr, lsstr_cstr("()")) == 0 &&
+                         e->lt_alge.lta_argc == 0) {
+                lsprintf(fp, 0, "()");
+              } else {
+                lsthunk_print_internal(fp, LSPREC_LOWEST, indent, e, level + 1, colle, mode, 0);
+              }
             }
+            lsprintf(fp, 0, "]");
+            return;
           }
-          lsprintf(fp, 0, "]");
-          return;
         }
         // else fallthrough to default ':' printing below
       }
@@ -925,4 +941,81 @@ lsthunk_t* lsthunk_clone(lsthunk_t* thunk) {
   // Thunks are treated as immutable graph nodes managed by GC.
   // Returning the same pointer is sufficient for now.
   return thunk;
+}
+
+// --- Capture substitution -------------------------------------------------
+
+typedef struct subst_entry {
+  const lsthunk_t* key;
+  lsthunk_t*       val;
+  struct subst_entry* next;
+} subst_entry_t;
+
+static lsthunk_t* subst_lookup(subst_entry_t* m, const lsthunk_t* k) {
+  for (; m; m = m->next) if (m->key == k) return m->val;
+  return NULL;
+}
+
+static subst_entry_t* subst_bind(subst_entry_t* m, const lsthunk_t* k, lsthunk_t* v) {
+  subst_entry_t* e = lsmalloc(sizeof(subst_entry_t));
+  e->key = k; e->val = v; e->next = m; return e;
+}
+
+static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_entry_t** pmemo) {
+  if (t == NULL) return NULL;
+  lsthunk_t* memo = subst_lookup(*pmemo, t);
+  if (memo) return memo;
+
+  switch (t->lt_type) {
+  case LSTTYPE_REF: {
+    lstref_target_t* target = t->lt_ref.ltr_target;
+    if (target && target->lrt_pat == param) {
+      // Replace with the currently bound thunk
+      lsthunk_t* bound = lstpat_get_refbound(param);
+      return bound ? bound : t;
+    }
+    return t;
+  }
+  case LSTTYPE_ALGE: {
+    lssize_t n = t->lt_alge.lta_argc;
+    lsthunk_t* nt = lsmalloc(lssizeof(lsthunk_t, lt_alge) + n * sizeof(lsthunk_t*));
+    nt->lt_type = LSTTYPE_ALGE; nt->lt_whnf = nt;
+    nt->lt_alge.lta_constr = t->lt_alge.lta_constr;
+    nt->lt_alge.lta_argc = n;
+    *pmemo = subst_bind(*pmemo, t, nt);
+    for (lssize_t i = 0; i < n; i++)
+      nt->lt_alge.lta_args[i] = lsthunk_subst_param_rec(t->lt_alge.lta_args[i], param, pmemo);
+    return nt;
+  }
+  case LSTTYPE_APPL: {
+    lssize_t n = t->lt_appl.lta_argc;
+    lsthunk_t* nt = lsmalloc(lssizeof(lsthunk_t, lt_appl) + n * sizeof(lsthunk_t*));
+    nt->lt_type = LSTTYPE_APPL; nt->lt_whnf = NULL;
+    nt->lt_appl.lta_func = lsthunk_subst_param_rec(t->lt_appl.lta_func, param, pmemo);
+    nt->lt_appl.lta_argc = n;
+    *pmemo = subst_bind(*pmemo, t, nt);
+    for (lssize_t i = 0; i < n; i++)
+      nt->lt_appl.lta_args[i] = lsthunk_subst_param_rec(t->lt_appl.lta_args[i], param, pmemo);
+    return nt;
+  }
+  case LSTTYPE_CHOICE: {
+    lsthunk_t* nt = lsmalloc(sizeof(lsthunk_t));
+    nt->lt_type = LSTTYPE_CHOICE; nt->lt_whnf = nt;
+    *pmemo = subst_bind(*pmemo, t, nt);
+    nt->lt_choice.ltc_left = lsthunk_subst_param_rec(t->lt_choice.ltc_left, param, pmemo);
+    nt->lt_choice.ltc_right = lsthunk_subst_param_rec(t->lt_choice.ltc_right, param, pmemo);
+    return nt;
+  }
+  case LSTTYPE_LAMBDA:
+  case LSTTYPE_INT:
+  case LSTTYPE_STR:
+  case LSTTYPE_BUILTIN:
+  default:
+    return t;
+  }
+}
+
+lsthunk_t* lsthunk_subst_param(lsthunk_t* thunk, lstpat_t* param) {
+  subst_entry_t* memo = NULL;
+  return lsthunk_subst_param_rec(thunk, param, &memo);
 }
