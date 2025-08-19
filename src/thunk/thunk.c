@@ -636,6 +636,22 @@ lstref_target_origin_t* lstref_target_origin_new_builtin(const lsstr_t* name, ls
   return origin;
 }
 
+int lsthunk_is_builtin(const lsthunk_t* thunk) {
+  return thunk && thunk->lt_type == LSTTYPE_BUILTIN;
+}
+
+lstbuiltin_func_t lsthunk_get_builtin_func(const lsthunk_t* thunk) {
+  return (thunk && thunk->lt_type == LSTTYPE_BUILTIN) ? thunk->lt_builtin->lti_func : NULL;
+}
+
+void* lsthunk_get_builtin_data(const lsthunk_t* thunk) {
+  return (thunk && thunk->lt_type == LSTTYPE_BUILTIN) ? thunk->lt_builtin->lti_data : NULL;
+}
+
+const lsstr_t* lsthunk_get_builtin_name(const lsthunk_t* thunk) {
+  return (thunk && thunk->lt_type == LSTTYPE_BUILTIN) ? thunk->lt_builtin->lti_name : NULL;
+}
+
 lsthunk_t* lsprog_eval(const lsprog_t* prog, lstenv_t* tenv) {
   lsthunk_t* thunk = lsthunk_new_expr(lsprog_get_expr(prog), tenv);
   if (thunk == NULL)

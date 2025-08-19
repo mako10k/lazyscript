@@ -5,8 +5,11 @@
 #include "common/str.h"
 #include "common/io.h"
 #include "builtins/prelude.h"
+#include "common/hash.h"
 #include "builtins/ns.h"
 #include "runtime/builtin.h"
+// forward for namespace value constructor (not used now)
+// lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data);
 
 // from to_string.c
 lsthunk_t* lsbuiltin_to_string(lssize_t argc, lsthunk_t* const* args, void* data);
@@ -124,6 +127,11 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsdef")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsnew0")) == 0)
+    // Return the anonymous namespace value directly (0-arity application is awkward)
+    return lsbuiltin_nsnew0(0, NULL, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsdefv")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
   lsprintf(stderr, 0, "E: prelude: unknown symbol: "); lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name); lsprintf(stderr, 0, "\n");
   return NULL;
 }

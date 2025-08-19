@@ -111,6 +111,12 @@ lsthunk_t* lsthunk_new_str(const lsstr_t* strval);
 lsthunk_t* lsthunk_new_builtin(const lsstr_t* name, lssize_t arity, lstbuiltin_func_t func,
                                void* data);
 
+// Builtin helpers (introspection)
+int              lsthunk_is_builtin(const lsthunk_t* thunk);
+lstbuiltin_func_t lsthunk_get_builtin_func(const lsthunk_t* thunk);
+void*            lsthunk_get_builtin_data(const lsthunk_t* thunk);
+const lsstr_t*   lsthunk_get_builtin_name(const lsthunk_t* thunk);
+
 /**
  * Create a new thunk for an expression
  * @param expr The expression

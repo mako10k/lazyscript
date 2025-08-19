@@ -2,6 +2,7 @@
 #include "common/malloc.h"
 #include "common/str.h"
 #include <assert.h>
+#include "common/io.h"
 #include <string.h>
 
 // *******************************
@@ -127,15 +128,21 @@ void lshash_foreach(lshash_t* hash, void (*callback)(const lsstr_t*, lshash_data
  */
 static void lshash_rehash(lshash_t* hash, int new_capacity) {
   assert(hash != NULL);
-  assert(new_capacity >= hash->lh_size);
+  if (new_capacity < hash->lh_size) {
+    // debug + correction
+    lsprintf(stderr, 0, "WARN: rehash grow too small: new=%d size=%d -> fix to %d\n", new_capacity,
+             hash->lh_size, hash->lh_size * 2);
+    new_capacity = hash->lh_size * 2;
+  }
   lshash_entry_t** new_entries = lsmalloc(new_capacity * sizeof(lshash_entry_t*));
   for (int i = 0; i < new_capacity; i++)
     new_entries[i] = NULL;
+  int new_size = 0;
   for (int i = 0; i < hash->lh_capacity; i++) {
     lshash_entry_t* entry = hash->lh_entries[i];
     while (entry != NULL) {
       int hash_value = lsstr_calc_hash(entry->lhe_key) % new_capacity;
-      lshash_put_raw(&new_entries[hash_value], new_capacity, &hash->lh_size, entry->lhe_key,
+      lshash_put_raw(&new_entries[hash_value], new_capacity, &new_size, entry->lhe_key,
                      entry->lhe_value, NULL);
       entry = entry->lhe_next;
     }
@@ -143,11 +150,21 @@ static void lshash_rehash(lshash_t* hash, int new_capacity) {
   lsfree(hash->lh_entries);
   hash->lh_entries  = new_entries;
   hash->lh_capacity = new_capacity;
+  hash->lh_size     = new_size;
 }
 
 int lshash_put(lshash_t* hash, const lsstr_t* key, lshash_data_t value, lshash_data_t* old_value) {
   assert(hash != NULL);
   assert(key != NULL);
+  if (hash->lh_capacity <= 0 || hash->lh_capacity > 1<<26 || hash->lh_size < 0) {
+    lsprintf(stderr, 0, "WARN: hash corrupt pre-put cap=%d size=%d -> reset\n", hash->lh_capacity, hash->lh_size);
+    // attempt to reset to a sane empty table
+    hash->lh_capacity = 16;
+    hash->lh_size = 0;
+    lsfree(hash->lh_entries);
+    hash->lh_entries = lsmalloc(hash->lh_capacity * sizeof(lshash_entry_t*));
+    for (int i=0;i<hash->lh_capacity;i++) hash->lh_entries[i] = NULL;
+  }
   if (hash->lh_size >= hash->lh_capacity * 0.75)
     lshash_rehash(hash, hash->lh_capacity * 2);
   return lshash_put_raw(&hash->lh_entries[lsstr_calc_hash(key) % hash->lh_capacity],

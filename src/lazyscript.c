@@ -29,8 +29,7 @@
 static int         g_debug          = 0;
 static int         g_run_main       = 1; // default: on (files). -e path will disable temporarily
 static const char* g_entry_name     = "main"; // entry function name
-// Global registry for namespaces (avoid peeking into env/thunk internals)
-static lshash_t*   g_namespaces     = NULL; // name(lsstr_t*) -> (lsns_t*)
+// Global registry for namespaces moved to builtins/ns.c
 
 // effects helpers moved to runtime/effects.{h,c}
 static const char* g_sugar_ns       = NULL; // NULL => default (prelude)
