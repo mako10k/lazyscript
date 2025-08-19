@@ -148,6 +148,8 @@ static const rv_t* eval_value(FILE* outfp, const lscir_value_t* v, eval_ctx_t* c
       return rv_natfun("return", 1, 0, NULL);
     if (strcmp(v->var, "cons") == 0)
       return rv_natfun("cons", 2, 0, NULL);
+    if (strcmp(v->var, "concat") == 0)
+      return rv_natfun("concat", 2, 0, NULL);
     if (strcmp(v->var, "is_nil") == 0)
       return rv_natfun("is_nil", 1, 0, NULL);
     if (strcmp(v->var, "head") == 0)
@@ -350,6 +352,45 @@ static const rv_t* apply_natfun(FILE* outfp, const rv_t* nf, int argc, const rv_
     pair[0]           = xs[0];
     pair[1]           = xs[1];
     return rv_constr(":", 2, pair);
+  }
+  if (strcmp(name, "concat") == 0) {
+    // concat: append list xs[0] and list xs[1]; tolerate mixed element types.
+    const rv_t* l = xs[0];
+    const rv_t* r = xs[1];
+    // Collect left spine elements
+    const rv_t** acc = NULL;
+    int          cap = 8, n = 0;
+    acc               = lsmalloc(sizeof(rv_t*) * cap);
+    const rv_t* cur   = l;
+    while (cur && cur->kind == RV_CONSTR &&
+           ((strcmp(cur->con.name, ":") == 0 || strcmp(cur->con.name, "Cons") == 0) && cur->con.argc == 2)) {
+      const rv_t* hd = cur->con.args[0];
+      const rv_t* tl = cur->con.args[1];
+      if (n >= cap) {
+        cap *= 2;
+        const rv_t** tmp = lsmalloc(sizeof(rv_t*) * cap);
+        for (int i = 0; i < n; i++)
+          tmp[i] = acc[i];
+        acc = tmp;
+      }
+      acc[n++] = hd;
+      cur      = tl;
+    }
+    // If left is a proper list (ends with Nil/[]), rebuild onto r
+    if (cur && cur->kind == RV_CONSTR &&
+        ((strcmp(cur->con.name, "[]") == 0 && cur->con.argc == 0) ||
+         (strcmp(cur->con.name, "Nil") == 0 && cur->con.argc == 0))) {
+      const rv_t* res = r;
+      for (int i = n - 1; i >= 0; i--) {
+        const rv_t** pair = lsmalloc(sizeof(rv_t*) * 2);
+        pair[0]          = acc[i];
+        pair[1]          = res;
+        res              = rv_constr(":", 2, pair);
+      }
+      return res;
+    }
+    // If left isn't a proper list, just return right (conservative)
+    return r;
   }
   if (strcmp(name, "is_nil") == 0) {
     const rv_t* v = xs[0];

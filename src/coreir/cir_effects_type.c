@@ -159,6 +159,8 @@ static int natfun_arity(const char* name) {
     return 2;
   if (strcmp(name, "cons") == 0 || strcmp(name, "map") == 0)
     return 2;
+  if (strcmp(name, "concat") == 0)
+    return 2;
   if (strcmp(name, "chain") == 0)
     return 2;
   if (strcmp(name, "return") == 0 || strcmp(name, "is_nil") == 0)
