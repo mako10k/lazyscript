@@ -41,6 +41,7 @@ lstpat_t *lstpat_get_aspattern(const lstpat_t *pat);
 // INT / STR
 const lsint_t *lstpat_get_int(const lstpat_t *pat);
 const lsstr_t *lstpat_get_str(const lstpat_t *pat);
+int lstpat_is_wild(const lstpat_t *pat);
 
 // REF bound management
 void lstpat_set_refbound(lstpat_t *pat, lsthunk_t *thunk);

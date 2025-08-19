@@ -1,5 +1,6 @@
 #include "pat/pat.h"
 #include "common/malloc.h"
+#include "common/io.h"
 #include "common/ref.h"
 #include "lstypes.h"
 #include <assert.h>
@@ -11,7 +12,8 @@ struct lspat {
     const lspas_t *lp_as;
     const lsint_t *lp_int;
     const lsstr_t *lp_str;
-    const lsref_t *lp_ref;
+  const lsref_t *lp_ref;
+  int lp_wild;
   };
 };
 
@@ -72,6 +74,9 @@ void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat) {
   case LSPTYPE_REF:
     lsref_print(fp, prec, indent, pat->lp_ref);
     break;
+  case LSPTYPE_WILDCARD:
+    lsprintf(fp, indent, "_");
+    break;
   }
 }
 
@@ -79,5 +84,12 @@ const lspat_t *lspat_new_ref(const lsref_t *ref) {
   lspat_t *pat = lsmalloc(sizeof(lspat_t));
   pat->lp_type = LSPTYPE_REF;
   pat->lp_ref = ref;
+  return pat;
+}
+
+const lspat_t *lspat_new_wild(void) {
+  lspat_t *pat = lsmalloc(sizeof(lspat_t));
+  pat->lp_type = LSPTYPE_WILDCARD;
+  pat->lp_wild = 1;
   return pat;
 }

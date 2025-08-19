@@ -107,6 +107,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %token <strval> LSTSTR
 %token LSTARROW
 %token LSTLEFTARROW
+%token LSTWILDCARD
 %right '|'
 %right ':'
 
@@ -240,7 +241,7 @@ dostmts:
           // chain A (_ -> rest)
           const lsexpr_t *chain_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("chain"), 0, NULL));
           const lsexpr_t *chain = lsexpr_new_appl(lseappl_new(nsref, 1, &chain_sym));
-          const lspat_t *argpat = lspat_new_ref(lsref_new(lsstr_cstr("_"), @$));
+          const lspat_t *argpat = lspat_new_wild();
           const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(argpat, $3));
           const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[0];
           const lsexpr_t *args2[] = { ae, lam };
@@ -334,6 +335,7 @@ pat3:
     | LSTINT { $$ = lspat_new_int($1); }
     | LSTSTR { $$ = lspat_new_str($1); }
     | pref { $$ = lspat_new_ref($1); }
+  | LSTWILDCARD { $$ = lspat_new_wild(); }
     | pref '@' pat3 { $$ = lspat_new_as(lspas_new($1, $3)); }
     ;
 

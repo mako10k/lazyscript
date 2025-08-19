@@ -355,6 +355,8 @@ lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat) {
     return lsthunk_match_str(thunk, tpat);
   case LSPTYPE_REF:
     return lsthunk_match_ref(thunk, tpat);
+  case LSPTYPE_WILDCARD:
+    return LSMATCH_SUCCESS;
   }
   return LSMATCH_FAILURE;
 }

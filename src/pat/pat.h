@@ -7,7 +7,8 @@ typedef enum lsptype {
   LSPTYPE_AS,
   LSPTYPE_INT,
   LSPTYPE_STR,
-  LSPTYPE_REF
+  LSPTYPE_REF,
+  LSPTYPE_WILDCARD
 } lsptype_t;
 
 #include "common/int.h"
@@ -20,6 +21,7 @@ const lspat_t *lspat_new_as(const lspas_t *as);
 const lspat_t *lspat_new_int(const lsint_t *intval);
 const lspat_t *lspat_new_str(const lsstr_t *strval);
 const lspat_t *lspat_new_ref(const lsref_t *ref);
+const lspat_t *lspat_new_wild(void);
 lsptype_t lspat_get_type(const lspat_t *pat);
 const lspalge_t *lspat_get_alge(const lspat_t *pat);
 const lspas_t *lspat_get_as(const lspat_t *pat);

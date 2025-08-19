@@ -29,6 +29,7 @@
 <COMMENT>.*    { /* ignore comment */ }
 [ \t\n]+    { /* ignore whitespace */ }
 [0-9]+      { yylval->intval = lsint_new(atoi(yytext)); return LSTINT; }
+[_]         { return LSTWILDCARD; }
 [~]{2}[a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext + 2); return LSTPRELUDESYM; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext); return LSTSYMBOL; }
 \"([^\\\"]|\\.)*\" { yylval->strval = lsstr_parse(yytext, yyleng); return LSTSTR; }

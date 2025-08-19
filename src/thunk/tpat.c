@@ -24,6 +24,9 @@ struct lstpat {
       const lsref_t *ref;
       lsthunk_t *bound; // set when matched
     } r;
+    struct {
+      int wild;
+    } w;
   };
 };
 
@@ -95,6 +98,12 @@ lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv,
     }
     return p;
   }
+  case LSPTYPE_WILDCARD: {
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_WILDCARD;
+    ret->w.wild = 1;
+    return ret;
+  }
   }
   return NULL;
 }
@@ -144,6 +153,10 @@ const lsstr_t *lstpat_get_str(const lstpat_t *pat) {
   return pat->strval;
 }
 
+int lstpat_is_wild(const lstpat_t *pat) {
+  return pat->ltp_type == LSPTYPE_WILDCARD;
+}
+
 void lstpat_set_refbound(lstpat_t *pat, lsthunk_t *thunk) {
   assert(pat->ltp_type == LSPTYPE_REF);
   pat->r.bound = thunk;
@@ -169,6 +182,8 @@ static void lstpat_clear_binds_internal(lstpat_t *pat) {
     break;
   case LSPTYPE_REF:
     pat->r.bound = NULL;
+    break;
+  case LSPTYPE_WILDCARD:
     break;
   }
 }
@@ -210,6 +225,12 @@ static lstpat_t *lstpat_clone_internal(const lstpat_t *pat) {
     ret->ltp_type = LSPTYPE_REF;
     ret->r.ref = pat->r.ref;
     ret->r.bound = pat->r.bound;
+    return ret;
+  }
+  case LSPTYPE_WILDCARD: {
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_WILDCARD;
+    ret->w.wild = 1;
     return ret;
   }
   }
@@ -255,6 +276,9 @@ void lstpat_print(FILE *fp, lsprec_t prec, int indent, const lstpat_t *pat) {
     break;
   case LSPTYPE_REF:
     lsref_print(fp, prec, indent, pat->r.ref);
+    break;
+  case LSPTYPE_WILDCARD:
+    lsprintf(fp, indent, "_");
     break;
   }
 }
