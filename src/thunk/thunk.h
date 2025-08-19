@@ -241,6 +241,9 @@ lsthunk_t *lsthunk_eval(lsthunk_t *func, lssize_t argc, lsthunk_t *const *args);
 lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
                                    lstpat_t *pat);
 
+// Accessor for environments/targets: retrieve the pattern associated to target
+lstpat_t *lstref_target_get_pat(lstref_target_t *target);
+
 lstref_target_origin_t *lstref_target_origin_new_builtin(const lsstr_t *name,
                                                          lssize_t arity,
                                                          lstbuiltin_func_t func,

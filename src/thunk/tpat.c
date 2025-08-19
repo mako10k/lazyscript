@@ -27,8 +27,56 @@ struct lstpat {
     struct {
       int wild;
     } w;
+    struct {
+      lstpat_t *left;
+      lstpat_t *right;
+    } orp;
   };
 };
+
+// Sentinels for temporary mark during OR var-set validation
+static int ls_or_mark_present_s;
+static int ls_or_mark_used_s;
+static lsthunk_t *const ls_or_mark_present = (lsthunk_t *)&ls_or_mark_present_s;
+static lsthunk_t *const ls_or_mark_used = (lsthunk_t *)&ls_or_mark_used_s;
+
+// Forward decls for internal helpers
+static void lstpat_mark_refs_present(lstpat_t *pat);
+static void lstpat_mark_clear(lstpat_t *pat);
+static void lstpat_mark_ref_used_by_name(const lsstr_t *name, lstenv_t *tenv);
+static int lstpat_any_mark_present(const lstpat_t *pat);
+static lstpat_t *lstpat_new_pat_reuse_only(const lspat_t *pat, lstenv_t *tenv,
+                                           lstref_target_origin_t *origin);
+static void lspat_walk_mark_right(const lspat_t *p, lstenv_t *tenv);
+
+static void lspat_walk_mark_right(const lspat_t *p, lstenv_t *tenv) {
+  switch (lspat_get_type(p)) {
+  case LSPTYPE_ALGE: {
+    const lspalge_t *pa = lspat_get_alge(p);
+    lssize_t argc = lspalge_get_argc(pa);
+    for (lssize_t i = 0; i < argc; i++)
+      lspat_walk_mark_right(lspalge_get_arg(pa, i), tenv);
+    break; }
+  case LSPTYPE_AS: {
+    const lspas_t *pa = lspat_get_as(p);
+    lspat_walk_mark_right((const lspat_t *)lspas_get_pat(pa), tenv);
+    const lsref_t *r = lspas_get_ref(pa);
+    lstpat_mark_ref_used_by_name(lsref_get_name(r), tenv);
+    break; }
+  case LSPTYPE_INT:
+  case LSPTYPE_STR:
+  case LSPTYPE_WILDCARD:
+    break;
+  case LSPTYPE_REF: {
+    const lsref_t *r = lspat_get_ref(p);
+    lstpat_mark_ref_used_by_name(lsref_get_name(r), tenv);
+    break; }
+  case LSPTYPE_OR:
+    lspat_walk_mark_right(lspat_get_or_left(p), tenv);
+    lspat_walk_mark_right(lspat_get_or_right(p), tenv);
+    break;
+  }
+}
 
 static lstpat_t *lstpat_new_alge_internal(const lsstr_t *constr, lssize_t argc,
                                           lstpat_t *const *args) {
@@ -77,6 +125,45 @@ lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv,
     return lstpat_from_lspalge(lspat_get_alge(pat), tenv, origin);
   case LSPTYPE_AS:
     return lstpat_from_lspas(lspat_get_as(pat), tenv, origin);
+  case LSPTYPE_OR: {
+    // For OR, build left first, then enforce right uses exactly the same
+    // variable set; reuse the same ref nodes via env (no new names allowed).
+    const lspat_t *pleft = lspat_get_or_left(pat);
+    const lspat_t *pright = lspat_get_or_right(pat);
+    lstpat_t *l = lstpat_new_pat(pleft, tenv, origin);
+    if (!l)
+      return NULL;
+
+    // Mark all ref nodes from left as "present"
+    lstpat_mark_refs_present(l);
+
+  // Walk right AST to ensure it introduces no new names and marks all as used
+  lspat_walk_mark_right(pright, tenv);
+
+    // If any left-mark is still present, right missed usage
+    if (lstpat_any_mark_present(l)) {
+      if (tenv) lstenv_incr_nerrors(tenv);
+      lsprintf(stderr, 0, "E: right side of pattern '|' must use all variables bound on the left (use '_' if you want to ignore some)\n");
+      // clear marks before returning
+      lstpat_mark_clear(l);
+      return NULL;
+    }
+
+    // Build right, reusing existing names only
+    lstpat_t *r = lstpat_new_pat_reuse_only(pright, tenv, origin);
+    if (!r) {
+      // clear marks before returning
+      lstpat_mark_clear(l);
+      return NULL;
+    }
+    // clear temporary marks
+    lstpat_mark_clear(l);
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_OR;
+    ret->orp.left = l;
+    ret->orp.right = r;
+    return ret;
+  }
   case LSPTYPE_INT: {
     lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
     ret->ltp_type = LSPTYPE_INT;
@@ -91,12 +178,19 @@ lstpat_t *lstpat_new_pat(const lspat_t *pat, lstenv_t *tenv,
   }
   case LSPTYPE_REF: {
     const lsref_t *ref = lspat_get_ref(pat);
-    lstpat_t *p = lstpat_new_ref(ref);
     if (tenv != NULL && origin != NULL) {
+      // Reuse existing name in current scope if present; else create new
+      lstref_target_t *existing = lstenv_get_self(tenv, lsref_get_name(ref));
+      if (existing != NULL) {
+        return lstref_target_get_pat(existing);
+      }
+      lstpat_t *p = lstpat_new_ref(ref);
       lstref_target_t *target = lstref_target_new(origin, p);
       lstenv_put(tenv, lsref_get_name(ref), target);
+      return p;
+    } else {
+      return lstpat_new_ref(ref);
     }
-    return p;
   }
   case LSPTYPE_WILDCARD: {
     lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
@@ -167,6 +261,16 @@ lsthunk_t *lstpat_get_refbound(const lstpat_t *pat) {
   return pat->r.bound;
 }
 
+lstpat_t *lstpat_get_or_left(const lstpat_t *pat) {
+  assert(pat->ltp_type == LSPTYPE_OR);
+  return pat->orp.left;
+}
+
+lstpat_t *lstpat_get_or_right(const lstpat_t *pat) {
+  assert(pat->ltp_type == LSPTYPE_OR);
+  return pat->orp.right;
+}
+
 static void lstpat_clear_binds_internal(lstpat_t *pat) {
   switch (pat->ltp_type) {
   case LSPTYPE_ALGE:
@@ -184,6 +288,10 @@ static void lstpat_clear_binds_internal(lstpat_t *pat) {
     pat->r.bound = NULL;
     break;
   case LSPTYPE_WILDCARD:
+    break;
+  case LSPTYPE_OR:
+    lstpat_clear_binds_internal(pat->orp.left);
+    lstpat_clear_binds_internal(pat->orp.right);
     break;
   }
 }
@@ -233,6 +341,13 @@ static lstpat_t *lstpat_clone_internal(const lstpat_t *pat) {
     ret->w.wild = 1;
     return ret;
   }
+  case LSPTYPE_OR: {
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_OR;
+    ret->orp.left = lstpat_clone_internal(pat->orp.left);
+    ret->orp.right = lstpat_clone_internal(pat->orp.right);
+    return ret;
+  }
   }
   return NULL;
 }
@@ -280,5 +395,181 @@ void lstpat_print(FILE *fp, lsprec_t prec, int indent, const lstpat_t *pat) {
   case LSPTYPE_WILDCARD:
     lsprintf(fp, indent, "_");
     break;
+  case LSPTYPE_OR:
+    if (prec > LSPREC_CHOICE) lsprintf(fp, indent, "(");
+    lstpat_print(fp, LSPREC_CHOICE + 1, indent, pat->orp.left);
+    lsprintf(fp, indent, " | ");
+    lstpat_print(fp, LSPREC_CHOICE, indent, pat->orp.right);
+    if (prec > LSPREC_CHOICE) lsprintf(fp, indent, ")");
+    break;
   }
+}
+
+// Helpers implementation
+static void lstpat_mark_refs_present(lstpat_t *pat) {
+  switch (pat->ltp_type) {
+  case LSPTYPE_ALGE:
+    for (lssize_t i = 0; i < pat->alge.argc; i++)
+      lstpat_mark_refs_present(pat->alge.args[i]);
+    break;
+  case LSPTYPE_AS:
+    lstpat_mark_refs_present(pat->as.ref);
+    lstpat_mark_refs_present(pat->as.aspattern);
+    break;
+  case LSPTYPE_REF:
+    pat->r.bound = ls_or_mark_present;
+    break;
+  case LSPTYPE_OR:
+    lstpat_mark_refs_present(pat->orp.left);
+    lstpat_mark_refs_present(pat->orp.right);
+    break;
+  case LSPTYPE_INT:
+  case LSPTYPE_STR:
+  case LSPTYPE_WILDCARD:
+    break;
+  }
+}
+
+static void lstpat_mark_ref_used_by_name(const lsstr_t *name, lstenv_t *tenv) {
+  if (!tenv) return;
+  lstref_target_t *target = lstenv_get_self(tenv, name);
+  if (target == NULL) {
+    // new var introduced on right: error is reported by reuse-only builder later
+    lstenv_incr_nerrors(tenv);
+    lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
+    lsstr_print(stderr, LSPREC_LOWEST, 0, name);
+    lsprintf(stderr, 0, "' (not allowed)\n");
+    return;
+  }
+  lstpat_t *pref = lstref_target_get_pat(target);
+  if (pref->ltp_type == LSPTYPE_REF && pref->r.bound == ls_or_mark_present)
+    pref->r.bound = ls_or_mark_used;
+}
+
+static int lstpat_any_mark_present(const lstpat_t *pat) {
+  switch (pat->ltp_type) {
+  case LSPTYPE_ALGE:
+    for (lssize_t i = 0; i < pat->alge.argc; i++)
+      if (lstpat_any_mark_present(pat->alge.args[i])) return 1;
+    return 0;
+  case LSPTYPE_AS:
+    return lstpat_any_mark_present(pat->as.ref) ||
+           lstpat_any_mark_present(pat->as.aspattern);
+  case LSPTYPE_REF:
+    return pat->r.bound == ls_or_mark_present;
+  case LSPTYPE_OR:
+    return lstpat_any_mark_present(pat->orp.left) ||
+           lstpat_any_mark_present(pat->orp.right);
+  case LSPTYPE_INT:
+  case LSPTYPE_STR:
+  case LSPTYPE_WILDCARD:
+    return 0;
+  }
+  return 0;
+}
+
+static void lstpat_mark_clear(lstpat_t *pat) {
+  switch (pat->ltp_type) {
+  case LSPTYPE_ALGE:
+    for (lssize_t i = 0; i < pat->alge.argc; i++)
+      lstpat_mark_clear(pat->alge.args[i]);
+    break;
+  case LSPTYPE_AS:
+    lstpat_mark_clear(pat->as.ref);
+    lstpat_mark_clear(pat->as.aspattern);
+    break;
+  case LSPTYPE_REF:
+    if (pat->r.bound == ls_or_mark_present || pat->r.bound == ls_or_mark_used)
+      pat->r.bound = NULL;
+    break;
+  case LSPTYPE_OR:
+    lstpat_mark_clear(pat->orp.left);
+    lstpat_mark_clear(pat->orp.right);
+    break;
+  case LSPTYPE_INT:
+  case LSPTYPE_STR:
+  case LSPTYPE_WILDCARD:
+    break;
+  }
+}
+
+static lstpat_t *lstpat_new_pat_reuse_only(const lspat_t *pat, lstenv_t *tenv,
+                                           lstref_target_origin_t *origin) {
+  (void)origin;
+  assert(pat != NULL);
+  switch (lspat_get_type(pat)) {
+  case LSPTYPE_ALGE: {
+    const lspalge_t *pa = lspat_get_alge(pat);
+    lssize_t argc = lspalge_get_argc(pa);
+    lstpat_t *args[argc];
+    for (lssize_t i = 0; i < argc; i++) {
+      args[i] = lstpat_new_pat_reuse_only(lspalge_get_arg(pa, i), tenv, origin);
+      if (!args[i]) return NULL;
+    }
+    return lstpat_new_alge_internal(lspalge_get_constr(pa), argc, args);
+  }
+  case LSPTYPE_AS: {
+    const lspas_t *pa = lspat_get_as(pat);
+    const lsref_t *r = lspas_get_ref(pa);
+  lstref_target_t *existing = lstenv_get_self(tenv, lsref_get_name(r));
+    if (!existing) {
+      if (tenv) lstenv_incr_nerrors(tenv);
+      lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
+      lsstr_print(stderr, LSPREC_LOWEST, 0, lsref_get_name(r));
+      lsprintf(stderr, 0, "' (not allowed)\n");
+      return NULL;
+    }
+  lstpat_t *pref = lstref_target_get_pat(existing);
+    lstpat_t *ppat = lstpat_new_pat_reuse_only(lspas_get_pat(pa), tenv, origin);
+    if (!ppat) return NULL;
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_AS;
+    ret->as.ref = pref;
+    ret->as.aspattern = ppat;
+    return ret;
+  }
+  case LSPTYPE_INT: {
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_INT;
+    ret->intval = lspat_get_int(pat);
+    return ret;
+  }
+  case LSPTYPE_STR: {
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_STR;
+    ret->strval = lspat_get_str(pat);
+    return ret;
+  }
+  case LSPTYPE_REF: {
+    const lsref_t *r = lspat_get_ref(pat);
+  lstref_target_t *existing = lstenv_get_self(tenv, lsref_get_name(r));
+    if (!existing) {
+      if (tenv) lstenv_incr_nerrors(tenv);
+      lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
+      lsstr_print(stderr, LSPREC_LOWEST, 0, lsref_get_name(r));
+      lsprintf(stderr, 0, "' (not allowed)\n");
+      return NULL;
+    }
+  return lstref_target_get_pat(existing);
+  }
+  case LSPTYPE_WILDCARD: {
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_WILDCARD;
+    ret->w.wild = 1;
+    return ret;
+  }
+  case LSPTYPE_OR: {
+    // Build both arms under reuse-only constraint
+    lstpat_t *l = lstpat_new_pat_reuse_only(lspat_get_or_left(pat), tenv, origin);
+    if (!l) return NULL;
+    lstpat_t *r = lstpat_new_pat_reuse_only(lspat_get_or_right(pat), tenv, origin);
+    if (!r) return NULL;
+    lstpat_t *ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_OR;
+    ret->orp.left = l;
+    ret->orp.right = r;
+    return ret;
+  }
+  }
+  return NULL;
 }

@@ -14,6 +14,7 @@ struct lspat {
     const lsstr_t *lp_str;
   const lsref_t *lp_ref;
   int lp_wild;
+  struct { const lspat_t *left; const lspat_t *right; } lp_or;
   };
 };
 
@@ -77,6 +78,13 @@ void lspat_print(FILE *fp, lsprec_t prec, int indent, const lspat_t *pat) {
   case LSPTYPE_WILDCARD:
     lsprintf(fp, indent, "_");
     break;
+  case LSPTYPE_OR:
+    if (prec > LSPREC_CHOICE) lsprintf(fp, indent, "(");
+    lspat_print(fp, LSPREC_CHOICE + 1, indent, pat->lp_or.left);
+    lsprintf(fp, indent, " | ");
+    lspat_print(fp, LSPREC_CHOICE, indent, pat->lp_or.right);
+    if (prec > LSPREC_CHOICE) lsprintf(fp, indent, ")");
+    break;
   }
 }
 
@@ -93,3 +101,14 @@ const lspat_t *lspat_new_wild(void) {
   pat->lp_wild = 1;
   return pat;
 }
+
+const lspat_t *lspat_new_or(const lspat_t *left, const lspat_t *right) {
+  lspat_t *pat = lsmalloc(sizeof(lspat_t));
+  pat->lp_type = LSPTYPE_OR;
+  pat->lp_or.left = left;
+  pat->lp_or.right = right;
+  return pat;
+}
+
+const lspat_t *lspat_get_or_left(const lspat_t *pat) { return pat->lp_or.left; }
+const lspat_t *lspat_get_or_right(const lspat_t *pat) { return pat->lp_or.right; }

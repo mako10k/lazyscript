@@ -317,6 +317,7 @@ pcons:
 
 pat1:
       pat2
+    | pat2 '|' pat1 { $$ = lspat_new_or($1, $3); }
     ;
 
 pat2:

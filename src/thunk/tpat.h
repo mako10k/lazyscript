@@ -43,6 +43,10 @@ const lsint_t *lstpat_get_int(const lstpat_t *pat);
 const lsstr_t *lstpat_get_str(const lstpat_t *pat);
 int lstpat_is_wild(const lstpat_t *pat);
 
+// OR pattern accessors (thunk-side)
+lstpat_t *lstpat_get_or_left(const lstpat_t *pat);
+lstpat_t *lstpat_get_or_right(const lstpat_t *pat);
+
 // REF bound management
 void lstpat_set_refbound(lstpat_t *pat, lsthunk_t *thunk);
 lsthunk_t *lstpat_get_refbound(const lstpat_t *pat);

@@ -357,6 +357,16 @@ lsmres_t lsthunk_match_pat(lsthunk_t *thunk, lstpat_t *tpat) {
     return lsthunk_match_ref(thunk, tpat);
   case LSPTYPE_WILDCARD:
     return LSMATCH_SUCCESS;
+  case LSPTYPE_OR: {
+  // Try left; on failure, clear any ref bindings and try right
+  lstpat_t *left = lstpat_get_or_left(tpat);
+  lstpat_t *right = lstpat_get_or_right(tpat);
+    lsmres_t mres = lsthunk_match_pat(thunk, left);
+    if (mres == LSMATCH_SUCCESS)
+      return LSMATCH_SUCCESS;
+    lstpat_clear_binds(left);
+    return lsthunk_match_pat(thunk, right);
+  }
   }
   return LSMATCH_FAILURE;
 }
@@ -597,6 +607,8 @@ lstref_target_t *lstref_target_new(lstref_target_origin_t *origin,
   target->lrt_pat = tpat;
   return target;
 }
+
+lstpat_t *lstref_target_get_pat(lstref_target_t *target) { return target->lrt_pat; }
 
 lsthunk_t *lsthunk_new_builtin(const lsstr_t *name, lssize_t arity,
                                lstbuiltin_func_t func, void *data) {
