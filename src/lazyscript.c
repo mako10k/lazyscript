@@ -53,7 +53,7 @@ const lsprog_t*    lsparse_stream(const char* filename, FILE* in_str) {
      return prog;
 }
 
-static const lsprog_t* lsparse_file(const char* filename) {
+const lsprog_t* lsparse_file(const char* filename) {
   FILE* stream = fopen(filename, "r");
   if (!stream) {
     perror(filename);
@@ -64,7 +64,7 @@ static const lsprog_t* lsparse_file(const char* filename) {
   return prog;
 }
 
-static const lsprog_t* lsparse_string(const char* filename, const char* str) {
+const lsprog_t* lsparse_string(const char* filename, const char* str) {
   FILE*           stream = fmemopen((void*)str, strlen(str), "r");
   const lsprog_t* prog   = lsparse_stream(filename, stream);
   fclose(stream);
@@ -72,7 +72,7 @@ static const lsprog_t* lsparse_string(const char* filename, const char* str) {
 }
 
 // Nullable file parser: returns NULL if file open fails
-static const lsprog_t* lsparse_file_nullable(const char* filename) {
+const lsprog_t* lsparse_file_nullable(const char* filename) {
   FILE* stream = fopen(filename, "r");
   if (!stream)
     return NULL;
@@ -134,81 +134,7 @@ lsthunk_t* lsbuiltin_print(lssize_t argc, lsthunk_t* const* args, void* data);
 
 // Namespaces builtins are now provided by builtins/ns.c
 
-// prelude.require: load and evaluate a LazyScript file at runtime (side-effect)
-lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void* data) {
-  assert(argc == 1);
-  assert(args != NULL);
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: require: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  lstenv_t* tenv = (lstenv_t*)data;
-  if (tenv == NULL)
-    return NULL;
-  lsthunk_t* pathv = lsthunk_eval0(args[0]);
-  if (pathv == NULL)
-    return NULL;
-  if (lsthunk_get_type(pathv) != LSTTYPE_STR) {
-    lsprintf(stderr, 0, "E: require: expected string path\n");
-    return NULL;
-  }
-  const lsstr_t* s   = lsthunk_get_str(pathv);
-  size_t         n   = 0;
-  char*          buf = NULL;
-  FILE*          fp  = lsopen_memstream_gc(&buf, &n);
-  lsstr_print_bare(fp, LSPREC_LOWEST, 0, s);
-  fclose(fp);
-  const char* path = buf;
-  // Resolve path: absolute/relative or via LAZYSCRIPT_PATH
-  const char*     resolved = NULL;
-  const lsprog_t* prog     = NULL;
-  // try as-is
-  prog = lsparse_file_nullable(path);
-  if (prog) {
-    resolved = path;
-  } else {
-    const char* spath = getenv("LAZYSCRIPT_PATH");
-    if (spath && spath[0]) {
-      // copy spath to buffer to tokenize
-      char* buf = strdup(spath);
-      if (buf) {
-        for (char* tok = strtok(buf, ":"); tok != NULL; tok = strtok(NULL, ":")) {
-          size_t need = strlen(tok) + 1 + strlen(path) + 1;
-          char*  cand = (char*)malloc(need);
-          if (!cand)
-            break;
-          snprintf(cand, need, "%s/%s", tok, path);
-          prog = lsparse_file_nullable(cand);
-          if (prog) {
-            resolved = cand;
-            break;
-          }
-          free(cand);
-        }
-        free(buf);
-      }
-    }
-  }
-  if (!prog)
-    return NULL;
-  // module loaded cache
-  if (!g_require_loaded)
-    g_require_loaded = lshash_new(16);
-  const lsstr_t* k = lsstr_cstr(resolved);
-  lshash_data_t  oldv;
-  if (lshash_get(g_require_loaded, k, &oldv)) {
-    // already loaded; do nothing
-    return ls_make_unit();
-  }
-  (void)lshash_put(g_require_loaded, k, (const void*)1, &oldv);
-  if (ls_effects_get_strict())
-    ls_effects_begin();
-  lsthunk_t* ret = lsprog_eval(prog, tenv);
-  if (ls_effects_get_strict())
-    ls_effects_end();
-  (void)ret;
-  return ls_make_unit();
-}
+// prelude.require は builtins/require.c に移動
 // Prelude builtins are implemented in builtins/prelude.c
 
 // seq is implemented in builtins/seq.c

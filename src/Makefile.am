@@ -26,11 +26,13 @@ lazyscript_LDFLAGS = -export-dynamic
 lazyscript_SOURCES = \
     lazyscript.c \
     runtime/effects.c \
+    runtime/modules.c \
     builtins/dump.c \
     builtins/to_string.c \
     builtins/print.c \
     builtins/seq.c \
     builtins/arith.c \
+    builtins/require.c \
     builtins/ns.c \
     builtins/prelude.c \
     lazyscript.h \
