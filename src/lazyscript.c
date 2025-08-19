@@ -19,24 +19,19 @@
 #include "common/ref.h"
 #include "common/loc.h"
 #include <unistd.h>
+#include "runtime/effects.h"
+#include "runtime/unit.h"
+// builtins modules
+#include "builtins/prelude.h"
+#include "builtins/ns.h"
 
 static int         g_debug          = 0;
-static int         g_effects_strict = 0; // when true, guard side effects
-static int         g_effects_depth  = 0; // nesting counter for allowed effects
 static int         g_run_main       = 1; // default: on (files). -e path will disable temporarily
 static const char* g_entry_name     = "main"; // entry function name
 // Global registry for namespaces (avoid peeking into env/thunk internals)
 static lshash_t*   g_namespaces     = NULL; // name(lsstr_t*) -> (lsns_t*)
 
-static inline void ls_effects_begin(void) {
-  if (g_effects_strict)
-    g_effects_depth++;
-}
-static inline void ls_effects_end(void) {
-  if (g_effects_strict && g_effects_depth > 0)
-    g_effects_depth--;
-}
-static inline int  ls_effects_allowed(void) { return !g_effects_strict || g_effects_depth > 0; }
+// effects helpers moved to runtime/effects.{h,c}
 static const char* g_sugar_ns       = NULL; // NULL => default (prelude)
 static const char* g_init_file      = NULL; // Optional init script (from --init or env)
 static lshash_t*   g_require_loaded = NULL; // cache of loaded module paths
@@ -87,7 +82,7 @@ static const lsprog_t* lsparse_file_nullable(const char* filename) {
 }
 
 // Forward declaration (defined below in Prelude helpers)
-static lsthunk_t* ls_make_unit(void);
+// moved to runtime/unit.h as inline
 
 // Try to run entry function (~g_entry_name) if configured; returns 1 if invoked.
 static int ls_maybe_run_entry(lstenv_t* tenv) {
@@ -99,13 +94,13 @@ static int ls_maybe_run_entry(lstenv_t* tenv) {
   lsloc_t        loc    = lsloc("<entry>", 1, 1, 1, 1);
   const lsref_t* r      = lsref_new(lsstr_cstr(g_entry_name), loc);
   lsthunk_t*     rthunk = lsthunk_new_ref(r, tenv);
-  if (g_effects_strict) ls_effects_begin();
+  if (ls_effects_get_strict()) ls_effects_begin();
   lsthunk_t* v = lsthunk_eval0(rthunk);
   if (v && lsthunk_get_type(v) == LSTTYPE_LAMBDA) {
     lsthunk_t* unit = ls_make_unit();
     (void)lsthunk_eval(v, 1, &unit);
   }
-  if (g_effects_strict) ls_effects_end();
+  if (ls_effects_get_strict()) ls_effects_end();
   return 1;
 }
 
@@ -120,228 +115,27 @@ static void ls_maybe_eval_init(lstenv_t* tenv) {
     const lsprog_t* iprog = lsparse_file(g_init_file);
     if (iprog) {
       // Effects in init are allowed if strict-effects is enabled (wrap with begin/end)
-      if (g_effects_strict)
+  if (ls_effects_get_strict())
         ls_effects_begin();
       lsthunk_t* ret = lsprog_eval(iprog, tenv);
-      if (g_effects_strict)
+  if (ls_effects_get_strict())
         ls_effects_end();
       (void)ret; // ignore value, init is for side effects / definitions
     }
   }
 }
 
-static lsthunk_t* lsbuiltin_dump(lssize_t argc, lsthunk_t* const* args, void* data) {
-  assert(argc == 1);
-  assert(args != NULL);
-  lsthunk_print(stdout, LSPREC_LOWEST, 0, args[0]);
-  lsprintf(stdout, 0, "\n");
-  return args[0];
-}
-
-static lsthunk_t* lsbuiltin_to_string(lssize_t argc, lsthunk_t* const* args, void* data) {
-  assert(argc == 1);
-  assert(args != NULL);
-  size_t len = 0;
-  char*  buf = NULL;
-  FILE*  fp  = lsopen_memstream_gc(&buf, &len);
-  // Evaluate to WHNF so values like ints/strings render as such
-  lsthunk_t* v = lsthunk_eval0(args[0]);
-  if (v == NULL) {
-    fclose(fp);
-    return NULL;
-  }
-  lsthunk_dprint(fp, LSPREC_LOWEST, 0, v);
-  fclose(fp);
-  const lsstr_t* str = lsstr_new(buf, len);
-  return lsthunk_new_str(str);
-}
-
-static lsthunk_t* lsbuiltin_print(lssize_t argc, lsthunk_t* const* args, void* data) {
-  assert(argc == 1);
-  assert(args != NULL);
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0,
-             "E: print: effect used in pure context (enable seq/chain or run with effects)\n");
-    return NULL;
-  }
-  lsthunk_t* thunk_str = lsthunk_eval0(args[0]);
-  if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
-    thunk_str = lsbuiltin_to_string(1, args, data);
-  const lsstr_t* str = lsthunk_get_str(thunk_str);
-  lsstr_print_bare(stdout, LSPREC_LOWEST, 0, str);
-  return args[0];
-}
+// builtin symbols defined in separate modules
+lsthunk_t* lsbuiltin_dump(lssize_t argc, lsthunk_t* const* args, void* data);
+lsthunk_t* lsbuiltin_to_string(lssize_t argc, lsthunk_t* const* args, void* data);
+lsthunk_t* lsbuiltin_print(lssize_t argc, lsthunk_t* const* args, void* data);
 
 // --- Prelude helpers/builtins ---
-static lsthunk_t* ls_make_unit(void) {
-  // Build algebraic constructor () with 0 args
-  const lsealge_t* eunit = lsealge_new(lsstr_cstr("()"), 0, NULL);
-  return lsthunk_new_ealge(eunit, NULL);
-}
 
-// --- Namespaces ------------------------------------------------------------
-typedef struct lsns {
-  lshash_t* map; // lsstr_t* -> lsthunk_t*
-} lsns_t;
-
-// Forward decl used by namespace getter
-static lsthunk_t* lsbuiltin_getter0(lssize_t argc, lsthunk_t* const* args, void* data);
-
-static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
-  // (~NS sym) => return 0-arity getter for the value bound to sym in NS
-  assert(argc == 1);
-  assert(args != NULL);
-  lsns_t* ns = (lsns_t*)data;
-  if (!ns || !ns->map) return NULL;
-  lsthunk_t* keyv = lsthunk_eval0(args[0]);
-  if (keyv == NULL) return NULL;
-  if (lsthunk_get_type(keyv) != LSTTYPE_ALGE || lsthunk_get_argc(keyv) != 0) {
-    lsprintf(stderr, 0, "E: namespace: expected bare symbol\n");
-    return NULL;
-  }
-  const lsstr_t* key = lsthunk_get_constr(keyv);
-  lshash_data_t  valp;
-  if (!lshash_get(ns->map, key, &valp)) {
-    lsprintf(stderr, 0, "E: namespace: undefined: ");
-    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, key);
-    lsprintf(stderr, 0, "\n");
-    return NULL;
-  }
-  lsthunk_t* val = (lsthunk_t*)valp;
-  // Return the value directly
-  return val;
-}
-
-static lsthunk_t* lsbuiltin_nsnew(lssize_t argc, lsthunk_t* const* args, void* data) {
-  // nsnew <BareSymbol>
-  assert(argc == 1);
-  assert(args != NULL);
-  lstenv_t* tenv = (lstenv_t*)data;
-  if (tenv == NULL) return NULL;
-  lsthunk_t* namev = lsthunk_eval0(args[0]);
-  if (namev == NULL) return NULL;
-  if (lsthunk_get_type(namev) != LSTTYPE_ALGE || lsthunk_get_argc(namev) != 0) {
-    lsprintf(stderr, 0, "E: nsnew: expected bare symbol\n");
-    return NULL;
-  }
-  const lsstr_t* name = lsthunk_get_constr(namev);
-  // Create namespace object as a builtin dispatcher capturing its map
-  lsns_t* ns = lsmalloc(sizeof(lsns_t));
-  ns->map    = lshash_new(16);
-  lstenv_put_builtin(tenv, name, 1, lsbuiltin_ns_dispatch, ns);
-  if (!g_namespaces)
-    g_namespaces = lshash_new(16);
-  lshash_data_t oldv;
-  (void)lshash_put(g_namespaces, name, (const void*)ns, &oldv);
-  return ls_make_unit();
-}
-
-static lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
-  // nsdef <NS-BareSymbol> <BareSymbol> <Value>
-  assert(argc == 3);
-  assert(args != NULL);
-  lstenv_t* tenv = (lstenv_t*)data;
-  if (tenv == NULL) return NULL;
-  lsthunk_t* nsv = lsthunk_eval0(args[0]);
-  lsthunk_t* symv = lsthunk_eval0(args[1]);
-  if (nsv == NULL || symv == NULL) return NULL;
-  if (lsthunk_get_type(nsv) != LSTTYPE_ALGE || lsthunk_get_argc(nsv) != 0) {
-    lsprintf(stderr, 0, "E: nsdef: expected bare symbol for namespace\n");
-    return NULL;
-  }
-  if (lsthunk_get_type(symv) != LSTTYPE_ALGE || lsthunk_get_argc(symv) != 0) {
-    lsprintf(stderr, 0, "E: nsdef: expected bare symbol name\n");
-    return NULL;
-  }
-  const lsstr_t* nsname  = lsthunk_get_constr(nsv);
-  const lsstr_t* symname = lsthunk_get_constr(symv);
-  if (!g_namespaces) {
-    lsprintf(stderr, 0, "E: nsdef: namespace not found: ");
-    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, nsname);
-    lsprintf(stderr, 0, "\n");
-    return NULL;
-  }
-  lshash_data_t nsp;
-  if (!lshash_get(g_namespaces, nsname, &nsp)) {
-    lsprintf(stderr, 0, "E: nsdef: namespace not found: ");
-    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, nsname);
-    lsprintf(stderr, 0, "\n");
-    return NULL;
-  }
-  lsns_t* ns = (lsns_t*)nsp;
-  if (!ns || !ns->map) return NULL;
-  // Stabilize value and store
-  lsthunk_t* val = lsthunk_eval0(args[2]);
-  if (val == NULL) return NULL;
-  lshash_data_t oldv;
-  (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
-  return ls_make_unit();
-}
-
-static lsthunk_t* lsbuiltin_prelude_exit(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)data;
-  assert(argc == 1);
-  assert(args != NULL);
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: exit: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  lsthunk_t* val = lsthunk_eval0(args[0]);
-  if (val == NULL)
-    return NULL;
-  if (lsthunk_get_type(val) != LSTTYPE_INT) {
-    lsprintf(stderr, 0, "E: exit: invalid type\n");
-    return NULL;
-  }
-  // We only distinguish zero/non-zero to avoid needing a raw int getter.
-  int is_zero = lsint_eq(lsthunk_get_int(val), lsint_new(0));
-  exit(is_zero ? 0 : 1);
-}
-
-static lsthunk_t* lsbuiltin_prelude_println(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)data;
-  assert(argc == 1);
-  assert(args != NULL);
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: println: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  lsthunk_t* thunk_str = lsthunk_eval0(args[0]);
-  if (thunk_str == NULL)
-    return NULL;
-  if (lsthunk_get_type(thunk_str) != LSTTYPE_STR)
-    thunk_str = lsbuiltin_to_string(1, args, NULL);
-  const lsstr_t* str = lsthunk_get_str(thunk_str);
-  lsstr_print_bare(stdout, LSPREC_LOWEST, 0, str);
-  lsprintf(stdout, 0, "\n");
-  return ls_make_unit();
-}
-
-static lsthunk_t* lsbuiltin_prelude_chain(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)data;
-  assert(argc == 2);
-  assert(args != NULL);
-  // Evaluate the first action for effects
-  ls_effects_begin();
-  lsthunk_t* action = lsthunk_eval0(args[0]);
-  ls_effects_end();
-  if (action == NULL)
-    return NULL;
-  // Apply the continuation to unit
-  lsthunk_t* unit = ls_make_unit();
-  lsthunk_t* cont = args[1];
-  return lsthunk_eval(cont, 1, &unit);
-}
-
-static lsthunk_t* lsbuiltin_prelude_return(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)data;
-  assert(argc == 1);
-  assert(args != NULL);
-  return args[0];
-}
+// Namespaces builtins are now provided by builtins/ns.c
 
 // prelude.require: load and evaluate a LazyScript file at runtime (side-effect)
-static lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void* data) {
+lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void* data) {
   assert(argc == 1);
   assert(args != NULL);
   if (!ls_effects_allowed()) {
@@ -407,163 +201,29 @@ static lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* arg
     return ls_make_unit();
   }
   (void)lshash_put(g_require_loaded, k, (const void*)1, &oldv);
-  if (g_effects_strict)
+  if (ls_effects_get_strict())
     ls_effects_begin();
   lsthunk_t* ret = lsprog_eval(prog, tenv);
-  if (g_effects_strict)
+  if (ls_effects_get_strict())
     ls_effects_end();
   (void)ret;
   return ls_make_unit();
 }
+// Prelude builtins are implemented in builtins/prelude.c
 
-// 0-arity builtin getter for prelude.def: returns captured thunk value
-static lsthunk_t* lsbuiltin_getter0(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc;
-  (void)args;
-  return (lsthunk_t*)data;
-}
+// seq is implemented in builtins/seq.c
 
-// prelude.def: bind a value to a bare symbol in current environment
-static lsthunk_t* lsbuiltin_prelude_def(lssize_t argc, lsthunk_t* const* args, void* data) {
-  assert(argc == 2);
-  assert(args != NULL);
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: def: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  lstenv_t* tenv = (lstenv_t*)data;
-  if (tenv == NULL)
-    return NULL;
-  lsthunk_t* namev = lsthunk_eval0(args[0]);
-  if (namev == NULL)
-    return NULL;
-  if (lsthunk_get_type(namev) != LSTTYPE_ALGE || lsthunk_get_argc(namev) != 0) {
-    lsprintf(stderr, 0, "E: def: expected a bare symbol as first argument\n");
-    return NULL;
-  }
-  const lsstr_t* name = lsthunk_get_constr(namev);
-  // value: allow lazy or strict? evaluate now to stabilize
-  lsthunk_t* val = lsthunk_eval0(args[1]);
-  if (val == NULL)
-    return NULL;
-  // Install as 0-arity builtin that returns captured value
-  lstenv_put_builtin(tenv, name, 0, lsbuiltin_getter0, val);
-  return ls_make_unit();
-}
-
-static lsthunk_t* lsbuiltin_prelude_bind(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)data;
-  assert(argc == 2);
-  assert(args != NULL);
-  // Evaluate the first computation to get its value (with effects enabled)
-  ls_effects_begin();
-  lsthunk_t* val = lsthunk_eval0(args[0]);
-  ls_effects_end();
-  if (val == NULL)
-    return NULL;
-  // Apply the continuation to the value
-  lsthunk_t* cont = args[1];
-  return lsthunk_eval(cont, 1, &val);
-}
-
-static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
-  // data is the current environment for dynamic loading (require)
-  lstenv_t* tenv = (lstenv_t*)data;
-  assert(argc == 1);
-  assert(args != NULL);
-  lsthunk_t* key = lsthunk_eval0(args[0]);
-  if (key == NULL)
-    return NULL;
-  if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
-    lsprintf(stderr, 0, "E: prelude: expected a bare symbol (e.g., exit/println/chain/return)\n");
-    return NULL;
-  }
-  const lsstr_t* name = lsthunk_get_constr(key);
-  if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1, lsbuiltin_prelude_exit, NULL);
-  if (lsstrcmp(name, lsstr_cstr("println")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.println"), 1, lsbuiltin_prelude_println, NULL);
-  if (lsstrcmp(name, lsstr_cstr("def")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, lsbuiltin_prelude_def, tenv);
-  if (lsstrcmp(name, lsstr_cstr("nsnew")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
-  if (lsstrcmp(name, lsstr_cstr("nsdef")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
-  if (lsstrcmp(name, lsstr_cstr("require")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
-  if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, lsbuiltin_prelude_chain, NULL);
-  if (lsstrcmp(name, lsstr_cstr("bind")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.bind"), 2, lsbuiltin_prelude_bind, NULL);
-  if (lsstrcmp(name, lsstr_cstr("return")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1, lsbuiltin_prelude_return, NULL);
-  lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
-  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
-  lsprintf(stderr, 0, "\n");
-  return NULL;
-}
-
-typedef enum lsseq_type {
-  LSSEQ_SIMPLE,
-  LSSEQ_CHAIN,
-} lsseq_type_t;
-
-static lsthunk_t* lsbuiltin_seq(lssize_t argc, lsthunk_t* const* args, void* data) {
-  assert(argc == 2);
-  assert(args != NULL);
-  lsthunk_t* fst = args[0];
-  lsthunk_t* snd = args[1];
-  ls_effects_begin();
-  lsthunk_t* fst_evaled = lsthunk_eval0(fst);
-  ls_effects_end();
-  if (fst_evaled == NULL)
-    return NULL;
-  switch ((lsseq_type_t)(intptr_t)data) {
-  case LSSEQ_SIMPLE: // Simple seq
-    return snd;
-  case LSSEQ_CHAIN: { // Chain seq
-    lsthunk_t* fst_new =
-        lsthunk_new_builtin(lsstr_cstr("seqc"), 2, lsbuiltin_seq, (void*)LSSEQ_CHAIN);
-    lsthunk_t* ret = lsthunk_eval(fst_new, 1, &snd);
-    return ret;
-  }
-  }
-}
-
-static lsthunk_t* lsbuiltin_add(lssize_t argc, lsthunk_t* const* args, void* data) {
-  assert(argc == 2);
-  assert(args != NULL);
-  lsthunk_t* lhs = lsthunk_eval0(args[0]);
-  lsthunk_t* rhs = lsthunk_eval0(args[1]);
-  if (lhs == NULL || rhs == NULL)
-    return NULL;
-  if (lsthunk_get_type(lhs) != LSTTYPE_INT || lsthunk_get_type(rhs) != LSTTYPE_INT) {
-    lsprintf(stderr, 0, "E: add: invalid type\n");
-    return NULL;
-  }
-  return lsthunk_new_int(lsint_add(lsthunk_get_int(lhs), lsthunk_get_int(rhs)));
-}
-
-static lsthunk_t* lsbuiltin_sub(lssize_t argc, lsthunk_t* const* args, void* data) {
-  assert(argc == 2);
-  assert(args != NULL);
-  lsthunk_t* lhs = lsthunk_eval0(args[0]);
-  lsthunk_t* rhs = lsthunk_eval0(args[1]);
-  if (lhs == NULL || rhs == NULL)
-    return NULL;
-  if (lsthunk_get_type(lhs) != LSTTYPE_INT || lsthunk_get_type(rhs) != LSTTYPE_INT) {
-    lsprintf(stderr, 0, "E: sub: invalid type\n");
-    return NULL;
-  }
-  return lsthunk_new_int(lsint_sub(lsthunk_get_int(lhs), lsthunk_get_int(rhs)));
-}
+// arithmetic builtins are in builtins/arith.c
 
 static void ls_register_core_builtins(lstenv_t* tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("dump"), 1, lsbuiltin_dump, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("to_str"), 1, lsbuiltin_to_string, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
-  lstenv_put_builtin(tenv, lsstr_cstr("seq"), 2, lsbuiltin_seq, (void*)LSSEQ_SIMPLE);
-  lstenv_put_builtin(tenv, lsstr_cstr("seqc"), 2, lsbuiltin_seq, (void*)LSSEQ_CHAIN);
+  extern lsthunk_t* lsbuiltin_seq(lssize_t,lsthunk_t* const*,void*);
+  lstenv_put_builtin(tenv, lsstr_cstr("seq"), 2, lsbuiltin_seq, (void*)0);
+  lstenv_put_builtin(tenv, lsstr_cstr("seqc"), 2, lsbuiltin_seq, (void*)1);
+  extern lsthunk_t* lsbuiltin_add(lssize_t,lsthunk_t* const*,void*);
+  extern lsthunk_t* lsbuiltin_sub(lssize_t,lsthunk_t* const*,void*);
   lstenv_put_builtin(tenv, lsstr_cstr("add"), 2, lsbuiltin_add, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("sub"), 2, lsbuiltin_sub, NULL);
   // namespaces
@@ -571,10 +231,7 @@ static void ls_register_core_builtins(lstenv_t* tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("nsdef"), 3, lsbuiltin_nsdef, tenv);
 }
 
-static void ls_register_builtin_prelude(lstenv_t* tenv) {
-  // Pass tenv via data to allow prelude.require to load into this environment
-  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, tenv);
-}
+// moved to builtins/prelude.c: ls_register_builtin_prelude
 
 typedef int (*ls_prelude_register_fn)(lstenv_t*);
 
@@ -644,7 +301,7 @@ int main(int argc, char** argv) {
         if (dump_coreir) {
           const lscir_prog_t* cir = lscir_lower_prog(prog);
           lscir_print(stdout, 0, cir);
-          if (g_effects_strict) {
+          if (ls_effects_get_strict()) {
             int errs = lscir_validate_effects(stderr, cir);
             if (errs > 0) {
               fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
@@ -660,7 +317,7 @@ int main(int argc, char** argv) {
           lscir_typecheck_set_kind_warn(kind_warn);
           lscir_typecheck_set_kind_error(kind_error);
           const lscir_prog_t* cir = lscir_lower_prog(prog);
-          if (g_effects_strict) {
+          if (ls_effects_get_strict()) {
             int errs = lscir_validate_effects(stderr, cir);
             if (errs > 0) {
               fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
@@ -671,7 +328,7 @@ int main(int argc, char** argv) {
         }
         if (eval_coreir) {
           const lscir_prog_t* cir = lscir_lower_prog(prog);
-          if (g_effects_strict) {
+          if (ls_effects_get_strict()) {
             int errs = lscir_validate_effects(stderr, cir);
             if (errs > 0) {
               fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
@@ -681,7 +338,7 @@ int main(int argc, char** argv) {
           lscir_eval(stdout, cir);
           break;
         }
-        if (g_effects_strict) {
+  if (ls_effects_get_strict()) {
           const lscir_prog_t* cir  = lscir_lower_prog(prog);
           int                 errs = lscir_validate_effects(stderr, cir);
           if (errs > 0) {
@@ -711,7 +368,7 @@ int main(int argc, char** argv) {
       g_sugar_ns = optarg;
       break;
     case 's':
-      g_effects_strict = 1;
+  ls_effects_set_strict(1);
       break;
     case 1003: // --run-main
       g_run_main = 1;
@@ -786,7 +443,7 @@ int main(int argc, char** argv) {
       if (dump_coreir) {
         const lscir_prog_t* cir = lscir_lower_prog(prog);
         lscir_print(stdout, 0, cir);
-        if (g_effects_strict) {
+  if (ls_effects_get_strict()) {
           int errs = lscir_validate_effects(stderr, cir);
           if (errs > 0) {
             fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
@@ -802,7 +459,7 @@ int main(int argc, char** argv) {
         lscir_typecheck_set_kind_warn(kind_warn);
         lscir_typecheck_set_kind_error(kind_error);
         const lscir_prog_t* cir = lscir_lower_prog(prog);
-        if (g_effects_strict) {
+  if (ls_effects_get_strict()) {
           int errs = lscir_validate_effects(stderr, cir);
           if (errs > 0) {
             fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
@@ -816,7 +473,7 @@ int main(int argc, char** argv) {
       }
       if (eval_coreir) {
         const lscir_prog_t* cir = lscir_lower_prog(prog);
-        if (g_effects_strict) {
+  if (ls_effects_get_strict()) {
           int errs = lscir_validate_effects(stderr, cir);
           if (errs > 0) {
             fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
@@ -826,7 +483,7 @@ int main(int argc, char** argv) {
         lscir_eval(stdout, cir);
         continue;
       }
-      if (g_effects_strict) {
+  if (ls_effects_get_strict()) {
         const lscir_prog_t* cir  = lscir_lower_prog(prog);
         int                 errs = lscir_validate_effects(stderr, cir);
         if (errs > 0) {
@@ -838,8 +495,6 @@ int main(int argc, char** argv) {
       ls_register_core_builtins(tenv);
       if (!ls_try_load_prelude_plugin(tenv, prelude_so))
         ls_register_builtin_prelude(tenv);
-      // Evaluate init script (if any) into the same environment
-      ls_maybe_eval_init(tenv);
       // Evaluate init script (if any) into the same environment
       ls_maybe_eval_init(tenv);
       lsthunk_t* ret = lsprog_eval(prog, tenv);
