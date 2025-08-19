@@ -12,8 +12,8 @@
  * @param indent Indentation.
  * @param fmt Format String.
  */
-void lsprintf(FILE *fp, int indent, const char *fmt, ...);
+void lsprintf(FILE* fp, int indent, const char* fmt, ...);
 
 /* GC 管理のメモリストリームを返す。close/fflush 後に *pbuf と *psize が更新され、
  * バッファは GC により管理されるため free は不要。 */
-FILE *lsopen_memstream_gc(char **pbuf, size_t *psize);
+FILE* lsopen_memstream_gc(char** pbuf, size_t* psize);

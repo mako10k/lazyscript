@@ -20,8 +20,8 @@ typedef struct lspalge lspalge_t;
  * @param args the arguments
  * @return the new algebra
  */
-lsapi_palge_new const lspalge_t *
-lspalge_new(const lsstr_t *constr, lssize_t argc, const lspat_t *const *args);
+lsapi_palge_new const lspalge_t* lspalge_new(const lsstr_t* constr, lssize_t argc,
+                                             const lspat_t* const* args);
 
 /**
  * Add an argument to a pattern algebra.
@@ -30,8 +30,7 @@ lspalge_new(const lsstr_t *constr, lssize_t argc, const lspat_t *const *args);
  * @param arg the argument
  * @return the algebra with the argument added
  */
-lsapi_palge_add_arg const lspalge_t *lspalge_add_arg(const lspalge_t *palge,
-                                                     const lspat_t *arg);
+lsapi_palge_add_arg const lspalge_t* lspalge_add_arg(const lspalge_t* palge, const lspat_t* arg);
 
 /**
  * Concatenate arguments to a pattern algebra.
@@ -41,9 +40,8 @@ lsapi_palge_add_arg const lspalge_t *lspalge_add_arg(const lspalge_t *palge,
  * @param args the arguments
  * @return the algebra with the arguments concatenated
  */
-lsapi_palge_concat_args const lspalge_t *
-lspalge_concat_args(const lspalge_t *palge, lssize_t argc,
-                    const lspat_t *const *args);
+lsapi_palge_concat_args const lspalge_t* lspalge_concat_args(const lspalge_t* palge, lssize_t argc,
+                                                             const lspat_t* const* args);
 
 /**
  * Get the constructor of a pattern algebra.
@@ -51,7 +49,7 @@ lspalge_concat_args(const lspalge_t *palge, lssize_t argc,
  * @param palge the algebra
  * @return the constructor
  */
-lsapi_get const lsstr_t *lspalge_get_constr(const lspalge_t *palge);
+lsapi_get const lsstr_t* lspalge_get_constr(const lspalge_t* palge);
 
 /**
  * Get the number of arguments of a pattern algebra.
@@ -59,7 +57,7 @@ lsapi_get const lsstr_t *lspalge_get_constr(const lspalge_t *palge);
  * @param palge the algebra
  * @return the number of arguments
  */
-lsapi_get lssize_t lspalge_get_argc(const lspalge_t *palge);
+lsapi_get lssize_t lspalge_get_argc(const lspalge_t* palge);
 
 /**
  * Get an argument of a pattern algebra.
@@ -68,7 +66,7 @@ lsapi_get lssize_t lspalge_get_argc(const lspalge_t *palge);
  * @param i the index of the argument
  * @return the argument
  */
-lsapi_get const lspat_t *lspalge_get_arg(const lspalge_t *palge, int i);
+lsapi_get const lspat_t* lspalge_get_arg(const lspalge_t* palge, int i);
 
 /**
  * Get the arguments of a pattern algebra.
@@ -76,7 +74,7 @@ lsapi_get const lspat_t *lspalge_get_arg(const lspalge_t *palge, int i);
  * @param palge the algebra
  * @return the arguments
  */
-lsapi_get const lspat_t *const *lspalge_get_args(const lspalge_t *palge);
+lsapi_get const lspat_t* const* lspalge_get_args(const lspalge_t* palge);
 
 /**
  * Print a pattern algebra.
@@ -86,5 +84,4 @@ lsapi_get const lspat_t *const *lspalge_get_args(const lspalge_t *palge);
  * @param indent the indentation level
  * @param palge the algebra
  */
-lsapi_print void lspalge_print(FILE *fp, int prec, int indent,
-                               const lspalge_t *palge);
+lsapi_print void lspalge_print(FILE* fp, int prec, int indent, const lspalge_t* palge);

@@ -14,15 +14,14 @@ typedef struct lseclosure lseclosure_t;
  * @param binds The binds.
  * @return The new expression closure.
  */
-lsapi_eclosure_new const lseclosure_t *
-lseclosure_new(const lsexpr_t *expr, size_t bindc,
-               const lsbind_t *const *binds);
+lsapi_eclosure_new const lseclosure_t* lseclosure_new(const lsexpr_t* expr, size_t bindc,
+                                                      const lsbind_t* const* binds);
 
-const lsexpr_t *lseclosure_get_expr(const lseclosure_t *eclosure);
+const lsexpr_t*                        lseclosure_get_expr(const lseclosure_t* eclosure);
 
-lssize_t lseclosure_get_bindc(const lseclosure_t *eclosure);
+lssize_t                               lseclosure_get_bindc(const lseclosure_t* eclosure);
 
-const lsbind_t *const *lseclosure_get_binds(const lseclosure_t *eclosure);
+const lsbind_t* const*                 lseclosure_get_binds(const lseclosure_t* eclosure);
 
 /**
  * Print an expression closure.
@@ -31,5 +30,5 @@ const lsbind_t *const *lseclosure_get_binds(const lseclosure_t *eclosure);
  * @param indent The indentation level.
  * @param eclosure The expression closure.
  */
-lsapi_print void lseclosure_print(FILE *stream, lsprec_t prec, int indent,
-                                  const lseclosure_t *eclosure);
+lsapi_print void lseclosure_print(FILE* stream, lsprec_t prec, int indent,
+                                  const lseclosure_t* eclosure);

@@ -3,34 +3,29 @@
 #include "common/malloc.h"
 
 struct lselambda {
-  const lspat_t *lel_param;
-  const lsexpr_t *lel_body;
+  const lspat_t*  lel_param;
+  const lsexpr_t* lel_body;
 };
 
-const lselambda_t *lselambda_new(const lspat_t *arg, const lsexpr_t *body) {
-  lselambda_t *elambda = lsmalloc(sizeof(lselambda_t));
-  elambda->lel_param = arg;
-  elambda->lel_body = body;
+const lselambda_t* lselambda_new(const lspat_t* arg, const lsexpr_t* body) {
+  lselambda_t* elambda = lsmalloc(sizeof(lselambda_t));
+  elambda->lel_param   = arg;
+  elambda->lel_body    = body;
   return elambda;
 }
 
-const lspat_t *lselambda_get_param(const lselambda_t *elambda) {
-  return elambda->lel_param;
-}
+const lspat_t*  lselambda_get_param(const lselambda_t* elambda) { return elambda->lel_param; }
 
-const lsexpr_t *lselambda_get_body(const lselambda_t *elambda) {
-  return elambda->lel_body;
-}
+const lsexpr_t* lselambda_get_body(const lselambda_t* elambda) { return elambda->lel_body; }
 
-void lselambda_print(FILE *fp, lsprec_t prec, int indent,
-                     const lselambda_t *elambda) {
-  (void)prec;
-  if (prec > LSPREC_LAMBDA)
+void            lselambda_print(FILE* fp, lsprec_t prec, int indent, const lselambda_t* elambda) {
+             (void)prec;
+             if (prec > LSPREC_LAMBDA)
     lsprintf(fp, indent, "(");
   lsprintf(fp, indent, "\\");
-  lspat_print(fp, LSPREC_APPL + 1, indent, elambda->lel_param);
-  lsprintf(fp, indent, " -> ");
-  lsexpr_print(fp, LSPREC_LAMBDA + 1, indent, elambda->lel_body);
-  if (prec > LSPREC_LAMBDA)
+             lspat_print(fp, LSPREC_APPL + 1, indent, elambda->lel_param);
+             lsprintf(fp, indent, " -> ");
+             lsexpr_print(fp, LSPREC_LAMBDA + 1, indent, elambda->lel_body);
+             if (prec > LSPREC_LAMBDA)
     lsprintf(fp, indent, ")");
 }

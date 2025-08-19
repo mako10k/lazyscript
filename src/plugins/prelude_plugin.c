@@ -7,16 +7,16 @@
 #include <gc.h>
 #include <assert.h>
 
-static lsthunk_t *ls_make_unit(void) {
-  const lsealge_t *eunit = lsealge_new(lsstr_cstr("()"), 0, NULL);
+static lsthunk_t* ls_make_unit(void) {
+  const lsealge_t* eunit = lsealge_new(lsstr_cstr("()"), 0, NULL);
   return lsthunk_new_ealge(eunit, NULL);
 }
 
-static lsthunk_t *pl_exit(lssize_t argc, lsthunk_t *const *args, void *data) {
+static lsthunk_t* pl_exit(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data;
   assert(argc == 1);
   assert(args != NULL);
-  lsthunk_t *val = lsthunk_eval0(args[0]);
+  lsthunk_t* val = lsthunk_eval0(args[0]);
   if (val == NULL)
     return NULL;
   if (lsthunk_get_type(val) != LSTTYPE_INT) {
@@ -27,56 +27,55 @@ static lsthunk_t *pl_exit(lssize_t argc, lsthunk_t *const *args, void *data) {
   exit(is_zero ? 0 : 1);
 }
 
-static lsthunk_t *pl_println(lssize_t argc, lsthunk_t *const *args, void *data) {
+static lsthunk_t* pl_println(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data;
   assert(argc == 1);
   assert(args != NULL);
-  lsthunk_t *thunk_str = lsthunk_eval0(args[0]);
+  lsthunk_t* thunk_str = lsthunk_eval0(args[0]);
   if (thunk_str == NULL)
     return NULL;
   if (lsthunk_get_type(thunk_str) != LSTTYPE_STR) {
     // Fallback: use to_str if available in env would be nicer; here we print thunk directly
     lsthunk_dprint(stdout, LSPREC_LOWEST, 0, thunk_str);
   } else {
-    const lsstr_t *str = lsthunk_get_str(thunk_str);
+    const lsstr_t* str = lsthunk_get_str(thunk_str);
     lsstr_print_bare(stdout, LSPREC_LOWEST, 0, str);
   }
   lsprintf(stdout, 0, "\n");
   return ls_make_unit();
 }
 
-static lsthunk_t *pl_chain(lssize_t argc, lsthunk_t *const *args, void *data) {
+static lsthunk_t* pl_chain(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data;
   assert(argc == 2);
   assert(args != NULL);
-  lsthunk_t *action = lsthunk_eval0(args[0]);
+  lsthunk_t* action = lsthunk_eval0(args[0]);
   if (action == NULL)
     return NULL;
-  lsthunk_t *unit = ls_make_unit();
-  lsthunk_t *cont = args[1];
+  lsthunk_t* unit = ls_make_unit();
+  lsthunk_t* cont = args[1];
   return lsthunk_eval(cont, 1, &unit);
 }
 
-static lsthunk_t *pl_return(lssize_t argc, lsthunk_t *const *args, void *data) {
+static lsthunk_t* pl_return(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data;
   assert(argc == 1);
   assert(args != NULL);
   return args[0];
 }
 
-static lsthunk_t *pl_dispatch(lssize_t argc, lsthunk_t *const *args, void *data) {
+static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data;
   assert(argc == 1);
   assert(args != NULL);
-  lsthunk_t *key = lsthunk_eval0(args[0]);
+  lsthunk_t* key = lsthunk_eval0(args[0]);
   if (key == NULL)
     return NULL;
   if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
-    lsprintf(stderr, 0,
-             "E: prelude: expected a bare symbol (exit/println/chain/return)\n");
+    lsprintf(stderr, 0, "E: prelude: expected a bare symbol (exit/println/chain/return)\n");
     return NULL;
   }
-  const lsstr_t *name = lsthunk_get_constr(key);
+  const lsstr_t* name = lsthunk_get_constr(key);
   if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1, pl_exit, NULL);
   if (lsstrcmp(name, lsstr_cstr("println")) == 0)
@@ -91,7 +90,7 @@ static lsthunk_t *pl_dispatch(lssize_t argc, lsthunk_t *const *args, void *data)
   return NULL;
 }
 
-int ls_prelude_register(lstenv_t *tenv) {
+int ls_prelude_register(lstenv_t* tenv) {
   if (!tenv)
     return -1;
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, pl_dispatch, NULL);

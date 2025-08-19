@@ -19,7 +19,7 @@ typedef struct lsarray lsarray_t;
  * @param ... Values.
  * @return New C-array. (it may be NULL, if size is 0)
  */
-lsapi_carray const void *const *lsa_new(lssize_t size, ...);
+lsapi_carray const void* const* lsa_new(lssize_t size, ...);
 
 /**
  * Create a new C-array.
@@ -27,7 +27,7 @@ lsapi_carray const void *const *lsa_new(lssize_t size, ...);
  * @param ap Values.
  * @return New C-array. (it may be NULL, when size is 0)
  */
-lsapi_carray const void *const *lsa_newv(lssize_t size, va_list ap);
+lsapi_carray const void* const* lsa_newv(lssize_t size, va_list ap);
 
 /**
  * Create a new C-array.
@@ -35,7 +35,7 @@ lsapi_carray const void *const *lsa_newv(lssize_t size, va_list ap);
  * @param ary Values.
  * @return New C-array. (it may be NULL, when size is 0)
  */
-lsapi_carray const void *const *lsa_newa(lssize_t size, const void *const *ary);
+lsapi_carray const void* const* lsa_newa(lssize_t size, const void* const* ary);
 
 /**
  * Create a new C-array with a value appended at the end.
@@ -44,8 +44,7 @@ lsapi_carray const void *const *lsa_newa(lssize_t size, const void *const *ary);
  * @param val Value.
  * @return New C-array.
  */
-const void *const *lsa_push(lssize_t size, const void *const *ary,
-                            const void *val);
+const void* const* lsa_push(lssize_t size, const void* const* ary, const void* val);
 
 /**
  * Create a new C-array with a value without the last element.
@@ -55,8 +54,7 @@ const void *const *lsa_push(lssize_t size, const void *const *ary,
  * when size is 1)
  * @return New C-array. (it may be NULL, when size is 1)
  */
-const void *const *lsa_pop(lssize_t size, const void *const *ary,
-                           const void **pval);
+const void* const* lsa_pop(lssize_t size, const void* const* ary, const void** pval);
 
 /**
  * Create a new C-array with a value prepended at the beginning.
@@ -65,8 +63,7 @@ const void *const *lsa_pop(lssize_t size, const void *const *ary,
  * @param val Value.
  * @return New C-array.
  */
-const void *const *lsa_unshift(lssize_t size, const void *const *ary,
-                               const void *val);
+const void* const* lsa_unshift(lssize_t size, const void* const* ary, const void* val);
 
 /**
  * Create a new C-array without the first element.
@@ -75,8 +72,7 @@ const void *const *lsa_unshift(lssize_t size, const void *const *ary,
  * @param pval Pointer to returning the first value.
  * @return Value. (it may be NULL, when size is 1)
  */
-const void *const *lsa_shift(lssize_t size, const void *const *ary,
-                             const void **pval);
+const void* const* lsa_shift(lssize_t size, const void* const* ary, const void** pval);
 
 /**
  * Return the concatenated C-array.
@@ -86,8 +82,7 @@ const void *const *lsa_shift(lssize_t size, const void *const *ary,
  * @param ap Second Values.
  * @return Concatenated C-array.
  */
-const void *const *lsa_concatv(lssize_t size1, const void *const *ary1,
-                               lssize_t size2, va_list ap);
+const void* const* lsa_concatv(lssize_t size1, const void* const* ary1, lssize_t size2, va_list ap);
 
 /**
  * Return the concatenated C-array.
@@ -97,8 +92,7 @@ const void *const *lsa_concatv(lssize_t size1, const void *const *ary1,
  * @param ... Second Values
  * @return Concatenated C-array.
  */
-const void *const *lsa_concat(lssize_t size1, const void *const *ary1,
-                              lssize_t size2, ...);
+const void* const* lsa_concat(lssize_t size1, const void* const* ary1, lssize_t size2, ...);
 
 /**
  * Return the concatenated C-array.
@@ -108,8 +102,8 @@ const void *const *lsa_concat(lssize_t size1, const void *const *ary1,
  * @param ary2 The second C-array.
  * @return Concatenated C-array.
  */
-const void *const *lsa_concata(lssize_t size1, const void *const *ary1,
-                               lssize_t size2, const void *const *ary2);
+const void* const* lsa_concata(lssize_t size1, const void* const* ary1, lssize_t size2,
+                               const void* const* ary2);
 
 /**
  * Return the sliced C-array.
@@ -119,8 +113,7 @@ const void *const *lsa_concata(lssize_t size1, const void *const *ary1,
  * @param end End index.
  * @return Sliced C-array.
  */
-const void *const *lsa_slice(lssize_t size, const void *const *ary,
-                             lssize_t start, lssize_t end);
+const void* const* lsa_slice(lssize_t size, const void* const* ary, lssize_t start, lssize_t end);
 
 /**
  * Return the spliced C-array.
@@ -132,9 +125,8 @@ const void *const *lsa_slice(lssize_t size, const void *const *ary,
  * @param ap Inserted values.
  * @return Spliced C-array.
  */
-const void *const *lsa_splicev(lssize_t size, const void *const *ary,
-                               lssize_t start, lssize_t end, lssize_t insize,
-                               va_list ap);
+const void* const* lsa_splicev(lssize_t size, const void* const* ary, lssize_t start, lssize_t end,
+                               lssize_t insize, va_list ap);
 
 /**
  * Return the spliced C-array.
@@ -146,9 +138,8 @@ const void *const *lsa_splicev(lssize_t size, const void *const *ary,
  * @param ins Inserted values.
  * @return Spliced C-array.
  */
-const void *const *lsa_splicea(lssize_t size, const void *const *ary,
-                               lssize_t start, lssize_t end, lssize_t insize,
-                               const void *const *ins);
+const void* const* lsa_splicea(lssize_t size, const void* const* ary, lssize_t start, lssize_t end,
+                               lssize_t insize, const void* const* ins);
 
 /**
  * Return the spliced C-array.
@@ -160,9 +151,8 @@ const void *const *lsa_splicea(lssize_t size, const void *const *ary,
  * @param ... Inserted values.
  * @return Spliced C-array.
  */
-const void *const *lsa_splice(lssize_t size, const void *const *ary,
-                              lssize_t start, lssize_t end, lssize_t insize,
-                              ...);
+const void* const* lsa_splice(lssize_t size, const void* const* ary, lssize_t start, lssize_t end,
+                              lssize_t insize, ...);
 
 // *******************************
 // Array.
@@ -173,7 +163,7 @@ const void *const *lsa_splice(lssize_t size, const void *const *ary,
  * @param ... Values.
  * @return New array.
  */
-const lsarray_t *lsarray_new(lssize_t size, ...);
+const lsarray_t* lsarray_new(lssize_t size, ...);
 
 /**
  * Create a new array.
@@ -181,7 +171,7 @@ const lsarray_t *lsarray_new(lssize_t size, ...);
  * @param values Values.
  * @return New array.
  */
-const lsarray_t *lsarray_newa(lssize_t size, const void *const *values);
+const lsarray_t* lsarray_newa(lssize_t size, const void* const* values);
 
 /**
  * Create a new array.
@@ -189,21 +179,21 @@ const lsarray_t *lsarray_newa(lssize_t size, const void *const *values);
  * @param ap Values.
  * @return New array.
  */
-const lsarray_t *lsarray_newv(lssize_t size, va_list ap);
+const lsarray_t* lsarray_newv(lssize_t size, va_list ap);
 
 /**
  * Get a value from an array.
  * @param ary Array.
  * @return C array of value.
  */
-const void *const *lsarray_get(const lsarray_t *ary);
+const void* const* lsarray_get(const lsarray_t* ary);
 
 /**
  * Get the size of an array.
  * @param ary Array.
  * @return Size.
  */
-lssize_t lsarray_get_size(const lsarray_t *ary);
+lssize_t lsarray_get_size(const lsarray_t* ary);
 
 /**
  * Push a value into an array.
@@ -211,7 +201,7 @@ lssize_t lsarray_get_size(const lsarray_t *ary);
  * @param val Value.
  * @return New array.
  */
-const lsarray_t *lsarray_push(const lsarray_t *ary, const void *val);
+const lsarray_t* lsarray_push(const lsarray_t* ary, const void* val);
 
 /**
  * Pop a value from an array.
@@ -219,7 +209,7 @@ const lsarray_t *lsarray_push(const lsarray_t *ary, const void *val);
  * @param pval Pointer to returning the value.
  * @return New array.
  */
-const lsarray_t *lsarray_pop(const lsarray_t *ary, const void **pval);
+const lsarray_t* lsarray_pop(const lsarray_t* ary, const void** pval);
 
 /**
  * Unshift a value into an array.
@@ -227,7 +217,7 @@ const lsarray_t *lsarray_pop(const lsarray_t *ary, const void **pval);
  * @param val Value.
  * @return New array.
  */
-const lsarray_t *lsarray_unshift(const lsarray_t *ary, const void *val);
+const lsarray_t* lsarray_unshift(const lsarray_t* ary, const void* val);
 
 /**
  * Shift a value from an array.
@@ -235,7 +225,7 @@ const lsarray_t *lsarray_unshift(const lsarray_t *ary, const void *val);
  * @param pval Pointer to returning the value.
  * @return New array.
  */
-const lsarray_t *lsarray_shift(const lsarray_t *ary, const void **pval);
+const lsarray_t* lsarray_shift(const lsarray_t* ary, const void** pval);
 
 /**
  * Concatenate two arrays.
@@ -243,7 +233,7 @@ const lsarray_t *lsarray_shift(const lsarray_t *ary, const void **pval);
  * @param ary2 Second array.
  * @return Concatenated array.
  */
-const lsarray_t *lsarray_concat(const lsarray_t *ary1, const lsarray_t *ary2);
+const lsarray_t* lsarray_concat(const lsarray_t* ary1, const lsarray_t* ary2);
 
 /**
  * Splice an array.
@@ -254,8 +244,8 @@ const lsarray_t *lsarray_concat(const lsarray_t *ary1, const lsarray_t *ary2);
  * @param ap Values to insert.
  * @return Spliced array.
  */
-const lsarray_t *lsarray_splicev(const lsarray_t *ary, lssize_t start,
-                                 lssize_t end, lssize_t size, va_list ap);
+const lsarray_t* lsarray_splicev(const lsarray_t* ary, lssize_t start, lssize_t end, lssize_t size,
+                                 va_list ap);
 
 /**
  * Splice an array.
@@ -265,5 +255,5 @@ const lsarray_t *lsarray_splicev(const lsarray_t *ary, lssize_t start,
  * @param ary2 Values to insert.
  * @return Spliced array.
  */
-const lsarray_t *lsarray_splicea(const lsarray_t *ary, lssize_t start,
-                                 lssize_t end, const lsarray_t *ary2);
+const lsarray_t* lsarray_splicea(const lsarray_t* ary, lssize_t start, lssize_t end,
+                                 const lsarray_t* ary2);

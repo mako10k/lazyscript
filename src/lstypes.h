@@ -34,5 +34,4 @@ typedef unsigned int lssize_t;
 #define lsapi_get lsapi_nn1 lsapi_wur
 #define lsapi_print lsapi_nn14
 
-#define lssizeof(tname, fname)                                                 \
-  (offsetof(tname, fname) + sizeof(((tname *)0)->fname))
+#define lssizeof(tname, fname) (offsetof(tname, fname) + sizeof(((tname*)0)->fname))

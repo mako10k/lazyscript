@@ -1,7 +1,7 @@
 #pragma once
 
 typedef struct lshash lshash_t;
-typedef const void *lshash_data_t;
+typedef const void*   lshash_data_t;
 
 #include "common/str.h"
 #include "lstypes.h"
@@ -17,7 +17,7 @@ typedef const void *lshash_data_t;
  * @param capacity Initial capacity.
  * @return New hash table.
  */
-lshash_t *lshash_new(lssize_t capacity);
+lshash_t* lshash_new(lssize_t capacity);
 
 // -------------------------------
 // Accessors.
@@ -29,7 +29,7 @@ lshash_t *lshash_new(lssize_t capacity);
  * @param value Pointer to the variable to store the value.
  * @return not found: 0, found: non-zero.
  */
-int lshash_get(lshash_t *hash, const lsstr_t *key, lshash_data_t *value);
+int lshash_get(lshash_t* hash, const lsstr_t* key, lshash_data_t* value);
 
 /**
  * Put a key-value pair into a hash table.
@@ -39,8 +39,7 @@ int lshash_get(lshash_t *hash, const lsstr_t *key, lshash_data_t *value);
  * @param old_value Pointer to the variable to store the old value.
  * @return 1 if the key already exists, 0 otherwise.
  */
-int lshash_put(lshash_t *hash, const lsstr_t *key, lshash_data_t value,
-               lshash_data_t *old_value);
+int lshash_put(lshash_t* hash, const lsstr_t* key, lshash_data_t value, lshash_data_t* old_value);
 
 /**
  * Remove a key-value pair from a hash table.
@@ -49,7 +48,7 @@ int lshash_put(lshash_t *hash, const lsstr_t *key, lshash_data_t value,
  * @param pvalue Pointer to the variable to store the value.
  * @return 1 if the key exists, 0 otherwise.
  */
-int lshash_remove(lshash_t *hash, const lsstr_t *key, lshash_data_t *pvalue);
+int lshash_remove(lshash_t* hash, const lsstr_t* key, lshash_data_t* pvalue);
 
 /**
  * Iterate over the entries of a hash table.
@@ -57,6 +56,5 @@ int lshash_remove(lshash_t *hash, const lsstr_t *key, lshash_data_t *pvalue);
  * @param callback Callback function.
  * @param data Data to be passed to the callback function.
  */
-void lshash_foreach(lshash_t *hash,
-                    void (*callback)(const lsstr_t *, lshash_data_t, void *),
-                    void *data);
+void lshash_foreach(lshash_t* hash, void (*callback)(const lsstr_t*, lshash_data_t, void*),
+                    void*     data);

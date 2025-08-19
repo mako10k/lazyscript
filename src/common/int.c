@@ -8,15 +8,15 @@ struct lsint {
   int li_val;
 };
 
-const lsint_t *lsint_new(int val) {
+const lsint_t* lsint_new(int val) {
   if (val == 0)
     return NULL;
-  lsint_t *eint = lsmalloc_atomic(sizeof(lsint_t));
-  eint->li_val = val;
+  lsint_t* eint = lsmalloc_atomic(sizeof(lsint_t));
+  eint->li_val  = val;
   return eint;
 }
 
-void lsint_print(FILE *fp, lsprec_t prec, int indent, const lsint_t *val) {
+void lsint_print(FILE* fp, lsprec_t prec, int indent, const lsint_t* val) {
   (void)prec;
   (void)indent;
   assert(fp != NULL);
@@ -26,7 +26,7 @@ void lsint_print(FILE *fp, lsprec_t prec, int indent, const lsint_t *val) {
   lsprintf(fp, 0, "%d", intval);
 }
 
-int lsint_eq(const lsint_t *restrict val1, const lsint_t *restrict val2) {
+int lsint_eq(const lsint_t* restrict val1, const lsint_t* restrict val2) {
   if (val1 == val2)
     return 1;
   if (val1 == NULL)
@@ -36,7 +36,7 @@ int lsint_eq(const lsint_t *restrict val1, const lsint_t *restrict val2) {
   return val1->li_val == val2->li_val;
 }
 
-const lsint_t *lsint_add(const lsint_t *val1, const lsint_t *val2) {
+const lsint_t* lsint_add(const lsint_t* val1, const lsint_t* val2) {
   if (val1 == NULL)
     return val2;
   if (val2 == NULL)
@@ -44,7 +44,7 @@ const lsint_t *lsint_add(const lsint_t *val1, const lsint_t *val2) {
   return lsint_new(val1->li_val + val2->li_val);
 }
 
-const lsint_t *lsint_sub(const lsint_t *val1, const lsint_t *val2) {
+const lsint_t* lsint_sub(const lsint_t* val1, const lsint_t* val2) {
   if (val1 == NULL)
     return val2;
   if (val2 == NULL)

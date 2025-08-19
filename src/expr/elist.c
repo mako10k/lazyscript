@@ -3,44 +3,38 @@
 #include <assert.h>
 
 struct lselist {
-  const lsexpr_t *lel_expr;
-  const lselist_t *lel_next;
+  const lsexpr_t*  lel_expr;
+  const lselist_t* lel_next;
 };
 
-const lselist_t *lselist_new(void) { return (const lselist_t *)lslist_new(); }
+const lselist_t* lselist_new(void) { return (const lselist_t*)lslist_new(); }
 
-const lselist_t *lselist_push(const lselist_t *elist, const lsexpr_t *expr) {
-  return (const lselist_t *)lslist_push((const lslist_t *)elist, expr);
+const lselist_t* lselist_push(const lselist_t* elist, const lsexpr_t* expr) {
+  return (const lselist_t*)lslist_push((const lslist_t*)elist, expr);
 }
 
-const lselist_t *lselist_pop(const lselist_t *elist, const lsexpr_t **pexpr) {
-  return (const lselist_t *)lslist_pop((const lslist_t *)elist,
-                                       (lslist_data_t *)pexpr);
+const lselist_t* lselist_pop(const lselist_t* elist, const lsexpr_t** pexpr) {
+  return (const lselist_t*)lslist_pop((const lslist_t*)elist, (lslist_data_t*)pexpr);
 }
 
-const lselist_t *lselist_unshift(const lselist_t *elist, const lsexpr_t *expr) {
-  return (const lselist_t *)lslist_unshift((const lslist_t *)elist, expr);
+const lselist_t* lselist_unshift(const lselist_t* elist, const lsexpr_t* expr) {
+  return (const lselist_t*)lslist_unshift((const lslist_t*)elist, expr);
 }
 
-const lselist_t *lselist_shift(const lselist_t *elist, const lsexpr_t **pexpr) {
-  return (const lselist_t *)lslist_shift((const lslist_t *)elist,
-                                         (lslist_data_t *)pexpr);
+const lselist_t* lselist_shift(const lselist_t* elist, const lsexpr_t** pexpr) {
+  return (const lselist_t*)lslist_shift((const lslist_t*)elist, (lslist_data_t*)pexpr);
 }
 
-lssize_t lselist_count(const lselist_t *elist) {
-  return lslist_count((const lslist_t *)elist);
+lssize_t lselist_count(const lselist_t* elist) { return lslist_count((const lslist_t*)elist); }
+
+const lsexpr_t* lselist_get(const lselist_t* elist, lssize_t i) {
+  return (const lsexpr_t*)lslist_get((const lslist_t*)elist, i);
 }
 
-const lsexpr_t *lselist_get(const lselist_t *elist, lssize_t i) {
-  return (const lsexpr_t *)lslist_get((const lslist_t *)elist, i);
+const lselist_t* lselist_concat(const lselist_t* elist1, const lselist_t* elist2) {
+  return (const lselist_t*)lslist_concat((const lslist_t*)elist1, (const lslist_t*)elist2);
 }
 
-const lselist_t *lselist_concat(const lselist_t *elist1,
-                                const lselist_t *elist2) {
-  return (const lselist_t *)lslist_concat((const lslist_t *)elist1,
-                                          (const lslist_t *)elist2);
-}
-
-const lselist_t *lselist_get_next(const lselist_t *elist) {
-  return (const lselist_t *)lslist_get_next((const lslist_t *)elist);
+const lselist_t* lselist_get_next(const lselist_t* elist) {
+  return (const lselist_t*)lslist_get_next((const lslist_t*)elist);
 }

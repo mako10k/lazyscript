@@ -11,4 +11,4 @@
 #include "misc/prog.h"
 
 /* パーサAPI: lazyscript_format から利用 */
-extern const lsprog_t *lsparse_stream(const char *filename, FILE *in_str);
+extern const lsprog_t* lsparse_stream(const char* filename, FILE* in_str);

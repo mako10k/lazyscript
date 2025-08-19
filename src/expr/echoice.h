@@ -12,22 +12,21 @@ typedef struct lsechoice lsechoice_t;
  * @param right The right expression.
  * @return The new choice expression.
  */
-lsapi_echoice_new const lsechoice_t *lsechoice_new(const lsexpr_t *left,
-                                                   const lsexpr_t *right);
+lsapi_echoice_new const lsechoice_t* lsechoice_new(const lsexpr_t* left, const lsexpr_t* right);
 
 /**
  * Get the left expression of a choice expression.
  * @param echoice The choice expression.
  * @return The left expression.
  */
-lsapi_get const lsexpr_t *lsechoice_get_left(const lsechoice_t *echoice);
+lsapi_get const lsexpr_t* lsechoice_get_left(const lsechoice_t* echoice);
 
 /**
  * Get the right expression of a choice expression.
  * @param echoice The choice expression.
  * @return The right expression.
  */
-lsapi_get const lsexpr_t *lsechoice_get_right(const lsechoice_t *echoice);
+lsapi_get const lsexpr_t* lsechoice_get_right(const lsechoice_t* echoice);
 
 /**
  * Print a choice expression.
@@ -36,5 +35,4 @@ lsapi_get const lsexpr_t *lsechoice_get_right(const lsechoice_t *echoice);
  * @param indent The indentation level.
  * @param echoice The choice expression.
  */
-lsapi_print void lsechoice_print(FILE *fp, lsprec_t prec, int indent,
-                                 const lsechoice_t *echoice);
+lsapi_print void lsechoice_print(FILE* fp, lsprec_t prec, int indent, const lsechoice_t* echoice);
