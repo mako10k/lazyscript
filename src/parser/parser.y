@@ -295,9 +295,17 @@ earray:
 elist:
       '[' ']' { $$ = lsealge_new(lsstr_cstr("[]"), 0, NULL); }
     | '[' earray ']' {
+        // Desugar [e1, e2, ..., en] into :(e1, :(e2, ...(:(en, [])))
         lssize_t argc = lsarray_get_size($2);
-        const lsexpr_t *const *args = (const lsexpr_t *const *)lsarray_get($2);
-        $$ = lsealge_new(lsstr_cstr("[]"), argc, args); }
+        const lsexpr_t *const *es = (const lsexpr_t *const *)lsarray_get($2);
+        const lsealge_t *chain = lsealge_new(lsstr_cstr("[]"), 0, NULL);
+        for (lssize_t i = argc - 1; i >= 0; i--) {
+          const lsexpr_t *args2[2];
+          args2[0] = es[i];
+          args2[1] = lsexpr_new_alge(chain);
+          chain    = lsealge_new(lsstr_cstr(":"), 2, args2);
+        }
+        $$ = chain; }
     ;
 
 elambda:
@@ -360,9 +368,17 @@ parray:
 plist:
       '[' ']' { $$ = lspalge_new(lsstr_cstr("[]"), 0, NULL); }
     | '[' parray ']' {
+        // Desugar [p1, p2, ..., pn] into :(p1, :(p2, ...(:(pn, [])))
         lssize_t argc = lsarray_get_size($2);
-        const lspat_t *const *args = (const lspat_t *const *)lsarray_get($2);
-        $$ = lspalge_new(lsstr_cstr("[]"), argc, args); }
+        const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
+        const lspalge_t *chain = lspalge_new(lsstr_cstr("[]"), 0, NULL);
+        for (lssize_t i = argc - 1; i >= 0; i--) {
+          const lspat_t *args2[2];
+          args2[0] = ps[i];
+          args2[1] = lspat_new_alge(chain);
+          chain    = lspalge_new(lsstr_cstr(":"), 2, args2);
+        }
+        $$ = chain; }
     ;
 
 %%
