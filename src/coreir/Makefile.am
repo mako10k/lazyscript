@@ -1,7 +1,8 @@
 noinst_LTLIBRARIES = liblscoreir.la
 
 liblscoreir_la_SOURCES = \
-    coreir_clean.c \
+    cir_lower_print.c \
+    cir_eval_runtime.c \
     coreir.h \
     cir_internal.h \
     cir_effects_type.c
