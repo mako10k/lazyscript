@@ -6,6 +6,7 @@
 #include "common/io.h"
 #include "builtins/prelude.h"
 #include "builtins/ns.h"
+#include "runtime/builtin.h"
 
 // from to_string.c
 lsthunk_t* lsbuiltin_to_string(lssize_t argc, lsthunk_t* const* args, void* data);

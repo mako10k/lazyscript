@@ -24,6 +24,7 @@
 // builtins modules
 #include "builtins/prelude.h"
 #include "builtins/ns.h"
+#include "runtime/builtin.h"
 
 static int         g_debug          = 0;
 static int         g_run_main       = 1; // default: on (files). -e path will disable temporarily
@@ -125,10 +126,7 @@ static void ls_maybe_eval_init(lstenv_t* tenv) {
   }
 }
 
-// builtin symbols defined in separate modules
-lsthunk_t* lsbuiltin_dump(lssize_t argc, lsthunk_t* const* args, void* data);
-lsthunk_t* lsbuiltin_to_string(lssize_t argc, lsthunk_t* const* args, void* data);
-lsthunk_t* lsbuiltin_print(lssize_t argc, lsthunk_t* const* args, void* data);
+// builtin prototypes are provided via runtime/builtin.h
 
 // --- Prelude helpers/builtins ---
 
@@ -145,11 +143,8 @@ static void ls_register_core_builtins(lstenv_t* tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("dump"), 1, lsbuiltin_dump, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("to_str"), 1, lsbuiltin_to_string, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
-  extern lsthunk_t* lsbuiltin_seq(lssize_t,lsthunk_t* const*,void*);
   lstenv_put_builtin(tenv, lsstr_cstr("seq"), 2, lsbuiltin_seq, (void*)0);
   lstenv_put_builtin(tenv, lsstr_cstr("seqc"), 2, lsbuiltin_seq, (void*)1);
-  extern lsthunk_t* lsbuiltin_add(lssize_t,lsthunk_t* const*,void*);
-  extern lsthunk_t* lsbuiltin_sub(lssize_t,lsthunk_t* const*,void*);
   lstenv_put_builtin(tenv, lsstr_cstr("add"), 2, lsbuiltin_add, NULL);
   lstenv_put_builtin(tenv, lsstr_cstr("sub"), 2, lsbuiltin_sub, NULL);
   // namespaces
