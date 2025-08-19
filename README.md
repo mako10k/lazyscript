@@ -30,6 +30,8 @@ sudo make install   # 任意
   - `-i, --dump-coreir`: パース後の Core IR を表示
   - `-c, --eval-coreir`: Core IR 評価器で実行（スモーク）
   - `-s, --strict-effects`: 効果の順序付け規律を検証（`chain/seq` 必須）
+  - `--run-main`, `--entry <name>`: ファイル実行時にエントリ関数（既定 `main`）を実行
+  - `--init <file>`: 実行前に初期化スクリプトを評価（同一環境にロード）
   - `-t, --typecheck`: Core IR の最小タイプチェック（OK / E: type error を出力）
   - `--no-kind-warn`: 効果（IO種別）の警告を抑制（既定は警告を stderr に出力）
   - `--kind-error`: 効果（IO種別）をエラーとして扱う（stderr にエラーを出力し非ゼロ終了）
@@ -39,6 +41,27 @@ sudo make install   # 任意
 - 環境変数:
   - `LAZYSCRIPT_PRELUDE_SO`: `--prelude-so` と同義の上書き
   - `LAZYSCRIPT_SUGAR_NS`: `--sugar-namespace` と同義の上書き
+  - `LAZYSCRIPT_INIT`: `--init` と同義の上書き
+
+### 実行セマンティクスの要点
+
+- ファイル実行時は既定で `main` を探して実行します（`--entry` で名前変更可）。
+- `-e/--eval` は従来通り、式の最終値を出力します（`main` は無視）。
+- 効果のあるビルトイン（`println/print/def/require` など）は `strict-effects` が有効な場合、`chain/seq/bind` の文脈内でのみ許可されます。
+
+### 名前空間（Namespace）
+
+- `~~sym` は `(~prelude sym)` に展開（既定）。`--sugar-namespace` で切替可能。
+- ランタイム提供の簡易名前空間:
+  - `~~nsnew NS` で `NS` を作成。
+  - `~~nsdef NS name value` で `NS.name = value` を定義。
+  - `(~NS name)` で名前空間から値を取得（値を直接返します）。
+
+### ビルトインの分割（内部構造）
+
+- 主要ビルトインは 1 ファイル 1 機能に分割しました（`src/builtins/*.c`）。
+- 効果制御は `src/runtime/effects.{h,c}` に集約。ユニット値は `src/runtime/unit.h`。
+- `prelude.require` はホスト側（`lazyscript.c`）で検索パスやキャッシュを実装しています。
 
 詳細は以下も参照:
 - シンタックスシュガーと do 記法: `docs/05_syntax_sugar.md`
