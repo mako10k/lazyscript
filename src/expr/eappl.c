@@ -10,7 +10,8 @@ struct lseappl {
 };
 
 const lseappl_t* lseappl_new(const lsexpr_t* func, size_t argc, const lsexpr_t* args[]) {
-  lseappl_t* eappl = lsmalloc(sizeof(lseappl_t));
+  // allocate space for flexible array member lea_args[argc]
+  lseappl_t* eappl = lsmalloc(sizeof(lseappl_t) + argc * sizeof(lsexpr_t*));
   eappl->lea_func  = func;
   eappl->lea_argc  = argc;
   for (lssize_t i = 0; i < argc; i++)
