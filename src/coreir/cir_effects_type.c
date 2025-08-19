@@ -180,7 +180,8 @@ static int expr_check_arity(const lscir_expr_t* e) {
     int errs = 0;
     if (e->app.func && e->app.func->kind == LCIR_VAL_VAR) {
       int ar = natfun_arity(e->app.func->var);
-      if (ar >= 0 && e->app.argc != ar)
+  // 新仕様: 部分適用は OK。過剰適用 (argc > ar) のみエラー。
+  if (ar >= 0 && e->app.argc > ar)
         errs++;
     }
     return errs;
