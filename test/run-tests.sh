@@ -60,6 +60,32 @@ for name in "${cases[@]}"; do
   fi
 done
 
+# Discover eval (-e) tests: any test/*.ls that has a matching .eval.out
+shopt -s nullglob
+eval_cases=()
+for f in "$DIR"/*.ls; do
+  base="${f%.ls}"
+  if [[ -f "$base.eval.out" ]]; then
+    eval_cases+=("$(basename "$base")")
+  fi
+done
+shopt -u nullglob
+
+for name in "${eval_cases[@]}"; do
+  [[ -z "$name" ]] && continue
+  src="$DIR/$name.ls"
+  exp="$DIR/$name.eval.out"
+  out="$("$BIN" -e "$(cat "$src")" 2>&1)"
+  if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
+    echo "ok - eval $name"
+    ((pass++))
+  else
+    echo "not ok - eval $name"
+    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$exp"; echo "---";
+    ((fail++))
+  fi
+done
+
 # Discover Core IR dump tests: any test/*.ls that has a matching .coreir.out
 shopt -s nullglob
 cir_cases=()
