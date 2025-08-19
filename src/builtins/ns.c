@@ -5,6 +5,7 @@
 #include "common/io.h"
 #include "runtime/unit.h"
 #include "thunk/tenv.h"
+#include "runtime/error.h"
 
 // simple namespace object
 typedef struct lsns { lshash_t* map; } lsns_t;
@@ -34,11 +35,11 @@ lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data)
 static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
   lsns_t* ns = (lsns_t*)data;
-  if (!ns || !ns->map) return NULL;
-  lsthunk_t* keyv = lsthunk_eval0(args[0]); if (!keyv) return NULL;
+  if (!ns || !ns->map) return ls_make_err("namespace: invalid");
+  lsthunk_t* keyv = ls_eval_arg(args[0], "namespace: key");
+  if (lsthunk_is_err(keyv)) return keyv;
   if (lsthunk_get_type(keyv) != LSTTYPE_ALGE || lsthunk_get_argc(keyv) != 0) {
-    lsprintf(stderr, 0, "E: namespace: expected bare symbol\n");
-    return NULL;
+    return ls_make_err("namespace: expected bare symbol");
   }
   const lsstr_t* key = lsthunk_get_constr(keyv);
   // optional debug
@@ -53,10 +54,7 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
   }
   lshash_data_t  valp;
   if (!lshash_get(ns->map, key, &valp)) {
-    lsprintf(stderr, 0, "E: namespace: undefined: ");
-    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, key);
-    lsprintf(stderr, 0, "\n");
-    return NULL;
+    return ls_make_err("namespace: undefined");
   }
   if (NS_DLOG_ENABLED) {
     lsthunk_t* tv = (lsthunk_t*)valp;
@@ -80,13 +78,15 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
 
 // __set helper implementation
 static lsthunk_t* lsbuiltin_ns_set(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; lsns_t* ns = (lsns_t*)data; if (!ns || !ns->map) return NULL;
-  lsthunk_t* symv = lsthunk_eval0(args[0]); if (!symv) return NULL;
+  (void)argc; lsns_t* ns = (lsns_t*)data; if (!ns || !ns->map) return ls_make_err("namespace: invalid");
+  lsthunk_t* symv = ls_eval_arg(args[0], "namespace: __set key");
+  if (lsthunk_is_err(symv)) return symv;
   if (lsthunk_get_type(symv) != LSTTYPE_ALGE || lsthunk_get_argc(symv) != 0) {
-    lsprintf(stderr, 0, "E: namespace: __set expects bare symbol name\n"); return NULL;
+    return ls_make_err("namespace: __set expects bare symbol");
   }
   const lsstr_t* s = lsthunk_get_constr(symv);
-  lsthunk_t* val = lsthunk_eval0(args[1]); if (!val) return NULL;
+  lsthunk_t* val = ls_eval_arg(args[1], "namespace: __set value");
+  if (lsthunk_is_err(val)) return val;
   lshash_data_t oldv; (void)lshash_put(ns->map, s, (const void*)val, &oldv);
   return ls_make_unit();
 }
@@ -103,10 +103,10 @@ static const lsstr_t* ns_make_key(const lsstr_t* base) {
 lsthunk_t* lsbuiltin_nsnew(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
   lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return NULL;
-  lsthunk_t* namev = lsthunk_eval0(args[0]); if (!namev) return NULL;
+  lsthunk_t* namev = ls_eval_arg(args[0], "nsnew: name");
+  if (lsthunk_is_err(namev)) return namev;
   if (lsthunk_get_type(namev) != LSTTYPE_ALGE || lsthunk_get_argc(namev) != 0) {
-    lsprintf(stderr, 0, "E: nsnew: expected bare symbol\n");
-    return NULL;
+    return ls_make_err("nsnew: expected bare symbol");
   }
   const lsstr_t* name = lsthunk_get_constr(namev);
   lsns_t* ns = lsmalloc(sizeof(lsns_t)); ns->map = lshash_new(16);
@@ -123,16 +123,15 @@ lsthunk_t* lsbuiltin_nsnew(lssize_t argc, lsthunk_t* const* args, void* data) {
 
 lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; lstenv_t* tenv = (lstenv_t*)data; (void)tenv; // unused
-  lsthunk_t* nsv = lsthunk_eval0(args[0]);
-  lsthunk_t* symv = lsthunk_eval0(args[1]);
-  if (!nsv || !symv) return NULL;
+  lsthunk_t* nsv = ls_eval_arg(args[0], "nsdef: ns");
+  if (lsthunk_is_err(nsv)) return nsv;
+  lsthunk_t* symv = ls_eval_arg(args[1], "nsdef: key");
+  if (lsthunk_is_err(symv)) return symv;
   if (lsthunk_get_type(nsv) != LSTTYPE_ALGE || lsthunk_get_argc(nsv) != 0) {
-    lsprintf(stderr, 0, "E: nsdef: expected bare symbol for namespace\n");
-    return NULL;
+    return ls_make_err("nsdef: expected ns symbol");
   }
   if (lsthunk_get_type(symv) != LSTTYPE_ALGE || lsthunk_get_argc(symv) != 0) {
-    lsprintf(stderr, 0, "E: nsdef: expected bare symbol name\n");
-    return NULL;
+    return ls_make_err("nsdef: expected name symbol");
   }
   const lsstr_t* nsname  = lsthunk_get_constr(nsv);
   const lsstr_t* symname = lsthunk_get_constr(symv);
@@ -145,8 +144,9 @@ lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
     lsprintf(stderr, 0, "E: nsdef: namespace not found: "); lsstr_print_bare(stderr, LSPREC_LOWEST, 0, nsname); lsprintf(stderr, 0, "\n");
     return NULL;
   }
-  lsns_t* ns = (lsns_t*)nsp; if (!ns || !ns->map) return NULL;
-  lsthunk_t* val = lsthunk_eval0(args[2]); if (!val) return NULL;
+  lsns_t* ns = (lsns_t*)nsp; if (!ns || !ns->map) return ls_make_err("nsdef: invalid namespace");
+  lsthunk_t* val = ls_eval_arg(args[2], "nsdef: value");
+  if (lsthunk_is_err(val)) return val;
   lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
   return ls_make_unit();
 }
@@ -165,7 +165,8 @@ lsthunk_t* lsbuiltin_nsnew0(lssize_t argc, lsthunk_t* const* args, void* data) {
 // Define into a namespace value directly: (nsdefv NS sym value)
 lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; (void)data;
-  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (!nsv) return NULL;
+  lsthunk_t* nsv = ls_eval_arg(args[0], "nsdefv: ns");
+  if (lsthunk_is_err(nsv)) return nsv;
   // Accept either a namespace value (builtin carrying ns pointer) or a bare symbol
   lsns_t* ns = NULL;
   if (lsthunk_is_builtin(nsv)) {
@@ -180,23 +181,16 @@ lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
   }
   // silently accept resolved namespace
   if (!ns || !ns->map) {
-    if (lsthunk_is_builtin(nsv)) {
-      const lsstr_t* bname = lsthunk_get_builtin_name(nsv);
-      lsprintf(stderr, 0, "E: nsdefv: invalid namespace: builtin=");
-      if (bname) lsstr_print_bare(stderr, LSPREC_LOWEST, 0, bname); else lsprintf(stderr, 0, "<null>");
-      lsprintf(stderr, 0, "\n");
-    } else {
-      lsprintf(stderr, 0, "E: nsdefv: invalid namespace: non-builtin\n");
-    }
-    return NULL;
+    return ls_make_err("nsdefv: invalid namespace");
   }
-  lsthunk_t* symv = lsthunk_eval0(args[1]); if (!symv) return NULL;
+  lsthunk_t* symv = ls_eval_arg(args[1], "nsdefv: key");
+  if (lsthunk_is_err(symv)) return symv;
   if (lsthunk_get_type(symv) != LSTTYPE_ALGE || lsthunk_get_argc(symv) != 0) {
-    lsprintf(stderr, 0, "E: nsdefv: expected bare symbol name\n");
-    return NULL;
+    return ls_make_err("nsdefv: expected bare symbol");
   }
   const lsstr_t* symname = lsthunk_get_constr(symv);
-  lsthunk_t* val = lsthunk_eval0(args[2]); if (!val) return NULL;
+  lsthunk_t* val = ls_eval_arg(args[2], "nsdefv: value");
+  if (lsthunk_is_err(val)) return val;
   if (NS_DLOG_ENABLED) {
     lsprintf(stderr, 0, "DBG nsdefv put ns=%p ", (void*)ns);
     lsstr_print_bare(stderr, LSPREC_LOWEST, 0, symname);

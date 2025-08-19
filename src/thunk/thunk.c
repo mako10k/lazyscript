@@ -6,6 +6,7 @@
 #include "lstypes.h"
 #include "thunk/tenv.h"
 #include "thunk/tpat.h"
+#include "runtime/error.h"
 #include <assert.h>
 #include <stddef.h>
 
@@ -449,7 +450,7 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
     #if LS_TRACE
     lsprintf(stderr, 0, "DBG lambda: match failed\n");
     #endif
-    return NULL;
+    return ls_make_err("lambda match failure");
   }
   #if LS_TRACE
   lsprintf(stderr, 0, "DBG lambda: eval body\n");
@@ -496,10 +497,10 @@ static lsthunk_t* lsthunk_eval_builtin(lsthunk_t* thunk, lssize_t argc, lsthunk_
       lstbuiltin_func_t f0   = thunk->lt_builtin->lti_func;
       void*             d0   = thunk->lt_builtin->lti_data;
       lsthunk_t*        ret0 = f0(0, NULL, d0);
-      return ret0 ? lsthunk_eval0(ret0) : NULL;
+      return ret0 ? lsthunk_eval0(ret0) : ls_make_err("builtin: null");
     }
     // Otherwise, it's a function waiting for more args.
-  return thunk;
+    return thunk;
   }
   lssize_t          arity = thunk->lt_builtin->lti_arity;
   lstbuiltin_func_t func  = thunk->lt_builtin->lti_func;
@@ -519,7 +520,9 @@ static lsthunk_t* lsthunk_eval_builtin(lsthunk_t* thunk, lssize_t argc, lsthunk_
   lsprintf(stderr, 0, "DBG builtin: "); if (bname) lsstr_print_bare(stderr, LSPREC_LOWEST, 0, bname); else lsprintf(stderr, 0, "<anon>"); lsprintf(stderr, 0, " returned %s\n", ret ? "ok" : "NULL");
   #endif
   if (ret == NULL)
-    return NULL;
+    return ls_make_err("builtin: null");
+  if (lsthunk_is_err(ret))
+    return ret;
   return lsthunk_eval(ret, argc - arity, args + arity);
 }
 
@@ -541,11 +544,7 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
       lsprintf(stderr, 0, "undefined reference: ");
       lsref_print(stderr, LSPREC_LOWEST, 0, thunk->lt_ref.ltr_ref);
       lsprintf(stderr, 0, "\n");
-      // We don't have a tenv counter here; best-effort: skip increment
-  #if LS_TRACE
-  lsprintf(stderr, 0, "DBG ref: undefined reference -> NULL\n");
-  #endif
-    return NULL;
+      return ls_make_err("undefined reference");
     }
     thunk->lt_ref.ltr_target = target; // cache
   }
@@ -560,7 +559,7 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
   case LSTRTYPE_BIND: {
     lsmres_t mres = lsthunk_match_pat(origin->lrto_bind.ltb_rhs, origin->lrto_bind.ltb_lhs);
     if (mres != LSMATCH_SUCCESS)
-      return NULL;
+      return ls_make_err("ref match failure");
     refbound = lstpat_get_refbound(pat_ref);
     assert(refbound != NULL);
     return lsthunk_eval(refbound, argc, args);
@@ -570,7 +569,7 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
     refbound = lstpat_get_refbound(pat_ref);
     if (refbound == NULL) {
       lsprintf(stderr, 0, "E: unbound lambda parameter reference\n");
-      return NULL;
+      return ls_make_err("unbound lambda param");
     }
     return lsthunk_eval(refbound, argc, args);
   }
@@ -587,6 +586,8 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   lsthunk_t* left = lsthunk_eval(thunk->lt_choice.ltc_left, argc, args);
   if (left == NULL)
     return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
+  if (lsthunk_is_err(left))
+    return left;
   // TODO: if left is fixed type, then we can skip right???
   lsthunk_t* right = lsmalloc(lssizeof(lsthunk_t, lt_appl) + (argc + 1) * sizeof(lsthunk_t*));
   right->lt_type   = LSTTYPE_APPL;
@@ -609,6 +610,8 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
 
 lsthunk_t* lsthunk_eval(lsthunk_t* func, lssize_t argc, lsthunk_t* const* args) {
   assert(func != NULL);
+  if (lsthunk_is_err(func))
+    return func;
   if (argc == 0)
     return lsthunk_eval0(func);
   switch (lsthunk_get_type(func)) {
