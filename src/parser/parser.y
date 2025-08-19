@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 40
+%expect 36
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -201,9 +201,9 @@ efact:
     | '~' LSTSYMBOL { $$ = lsexpr_new_ref(lsref_new($2, @$)); }
     | elambda { $$ = lsexpr_new_lambda($1); }
   | '!' '{' dostmts '}' { $$ = $3; }
-    | '{' nsentries '}' {
+    | '!' '!' '{' nsentries '}' {
         // Anonymous namespace literal sugar:
-        // { a = e1; b = e2; }  =>
+        // !!{ a = e1; b = e2; }  =>
         //   bind (~prelude nsnew0) (ns ->
         //     chain ((~prelude nsdefv) ns 'a e1) (_ ->
         //       chain ((~prelude nsdefv) ns 'b e2) (_ ->
@@ -230,9 +230,9 @@ efact:
 
         // fold entries in reverse: build chain of nsdefv calls
         const lsexpr_t *body = body_return_ns;
-        lssize_t ec = lsarray_get_size($2);
+        lssize_t ec = lsarray_get_size($4);
         for (lssize_t i = ec; i > 0; i--) {
-          const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i-1];
+          const lsarray_t *ent = (const lsarray_t*)lsarray_get($4)[i-1];
           const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[0];
           const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[1];
           const lsexpr_t *defv_args[] = { nsvar, sym, rhs };
@@ -251,7 +251,7 @@ efact:
       }
     ;
 
-// { a = e; b = e2; } entries
+// !!{ a = e; b = e2; } entries
 nsentries:
   /* empty */ { $$ = NULL; }
     | nsentry { $$ = lsarray_new(1, $1); }
