@@ -1,0 +1,1 @@
+((~prelude return) 7);

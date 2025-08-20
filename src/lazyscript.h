@@ -1,24 +1,14 @@
 #pragma once
 
-#include "array.h"
-#include "prog.h"
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#else
+#define PACKAGE_VERSION "0.0.1"
+#define PACKAGE_NAME "lazyscript"
+#endif
+
 #include <stdio.h>
+#include "misc/prog.h"
 
-typedef struct lsscan {
-  const char *filename;
-  lsprog_t *prog;
-} lsscan_t;
-
-#include "parser.h"
-
-int yylex(YYSTYPE *yylval, YYLTYPE *yylloc, yyscan_t scanner);
-void yyerror(YYLTYPE *yylloc, yyscan_t scanner, const char *s);
-
-void lsprintf(FILE *fp, int indent, const char *fmt, ...);
-
-enum {
-  LSPREC_LOWEST = 0,
-  LSPREC_CONS,
-  LSPREC_LAMBDA,
-  LSPREC_APPL,
-};
+/* パーサAPI: lazyscript_format から利用 */
+extern const lsprog_t* lsparse_stream(const char* filename, FILE* in_str);

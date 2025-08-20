@@ -5,6 +5,7 @@ AC_PREREQ([2.71])
 AC_INIT([lazyscript],[0.0.1],[mako10k@mk10.org])
 AC_CONFIG_SRCDIR([Makefile.am])
 AM_INIT_AUTOMAKE([foreign])
+LT_INIT
 
 # Checks for programs.
 AC_PROG_CC
@@ -17,6 +18,18 @@ else
 fi
 
 AC_PROG_LEX([noyywrap])
+
+DX_DOXYGEN_FEATURE(ON)
+DX_DOT_FEATURE(ON)
+DX_HTML_FEATURE(ON)
+DX_CHM_FEATURE(OFF)
+DX_CHI_FEATURE(OFF)
+DX_MAN_FEATURE(ON)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(OFF)
+DX_PS_FEATURE(OFF)
+DX_INIT_DOXYGEN([$PACKAGE_NAME],[Doxyfile],[doc])
 
 # Checks for libraries.
 PKG_CHECK_MODULES([GC], [bdw-gc])
@@ -32,7 +45,17 @@ AC_CHECK_TYPES([ptrdiff_t])
 # Checks for library functions.
 AC_FUNC_MALLOC
 
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile
+                 src/Makefile
+                 src/common/Makefile
+                 src/expr/Makefile
+                 src/misc/Makefile
+                 src/parser/Makefile
+                 src/pat/Makefile
+                 src/llvmir/Makefile
+                 src/coreir/Makefile
+                 src/thunk/Makefile
+                 src/plugins/Makefile])
 
 AC_ARG_ENABLE([debug],
   AS_HELP_STRING([--enable-debug], [Enable debugging]),

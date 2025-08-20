@@ -1,56 +1,51 @@
-bin_PROGRAMS = lazyscript
+AUTOMAKE_OPTIONS = subdir-objects
+SUBDIRS = common expr misc parser pat thunk coreir llvmir plugins
 
-CLEANFILES = parser.h parser.c lexer.c
+bin_PROGRAMS = lazyscript lazyscript_format lsllvmir_dump
 
-BUILT_SOURCES = lexer.c parser.h parser.c
-
-AM_CFLAGS = -O0 -g -Wall -Wextra -Werror
-#AM_YFLAGS = -d -Wcounterexamples
-AM_YFLAGS = -d
+lazy_script_common_libs = \
+    parser/liblsparser.la \
+    misc/liblsmisc.la \
+    thunk/liblsthunk.la \
+    pat/liblspat.la \
+    expr/liblsexpr.la \
+    coreir/liblscoreir.la \
+    llvmir/liblsllvmir.la \
+    common/liblscommon.la \
+    $(GC_LIBS)
 
 lazyscript_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-lazyscript_LDADD = $(GC_LIBS)
+lazyscript_LDADD = $(lazy_script_common_libs)
+
+lazyscript_format_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
+lazyscript_format_LDADD = $(lazy_script_common_libs)
+
+# Export program symbols so dlopen()'d plugins can resolve symbols from the main binary
+lazyscript_LDFLAGS = -export-dynamic
 
 lazyscript_SOURCES = \
-    alge.c \
-    alge.h \
-    appl.c \
-    appl.h \
-    array.c \
-    array.h \
-    as.c \
-    as.h \
-    bind.c \
-    bind.h \
-    closure.c \
-    closure.h \
-    ealge.c \
-    ealge.h \
-    eref.c \
-    eref.h \
-    erref.c \
-    erref.h \
-    expr.c \
-    expr.h \
-    hash.c \
-    hash.h \
-    int.c \
-    int.h \
-    lambda.c \
-    lambda.h \
     lazyscript.c \
+    runtime/effects.c \
+    runtime/modules.c \
+    builtins/dump.c \
+    builtins/to_string.c \
+    builtins/print.c \
+    builtins/seq.c \
+    builtins/arith.c \
+    builtins/require.c \
+    builtins/ns.c \
+    builtins/prelude.c \
     lazyscript.h \
-    lexer.l \
-    malloc.c \
-    malloc.h \
-    palge.c \
-    palge.h \
-    parser.y \
-    pat.c \
-    pat.h \
-    pref.c \
-    pref.h \
-    prog.c \
-    prog.h \
-    str.c \
-    str.h
+    lstypes.h
+
+lazyscript_format_SOURCES = \
+    lazyscript_format.c \
+    lazyscript.h \
+    lstypes.h
+
+lsllvmir_dump_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
+lsllvmir_dump_LDADD = $(lazy_script_common_libs)
+lsllvmir_dump_SOURCES = \
+    lsllvmir_dump.c \
+    lazyscript.h \
+    lstypes.h

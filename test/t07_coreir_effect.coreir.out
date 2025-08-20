@@ -1,0 +1,2 @@
+; CoreIR dump (temporary)
+(let E$1 (token) (effapp (var println) (var E$1) (str "hi")))

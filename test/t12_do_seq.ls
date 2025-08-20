@@ -1,0 +1,1 @@
+!{ ~~println "A"; ~~println "B" };

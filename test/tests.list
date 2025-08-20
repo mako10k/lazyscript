@@ -1,0 +1,8 @@
+t01_add
+t02_println
+t03_seq
+t05_let_without_keyword
+
+# runtime self-hosting
+t15_runtime_require
+t16_runtime_def

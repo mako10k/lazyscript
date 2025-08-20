@@ -1,0 +1,2 @@
+; CoreIR dump (temporary)
+(if (var true) (int 1) (int 2))
