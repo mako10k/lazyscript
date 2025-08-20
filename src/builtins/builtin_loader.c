@@ -39,6 +39,11 @@ typedef ls_builtin_module_t* (*ls_builtin_init_fn)(void);
 // Simple cache: name -> namespace thunk
 static lshash_t* g_builtin_cache = NULL;
 
+static int debug_enabled(void) {
+  const char* d = getenv("LAZYSCRIPT_DEBUG");
+  return d && *d;
+}
+
 static int file_exists(const char* path) {
   return access(path, R_OK) == 0;
 }
@@ -142,6 +147,7 @@ lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void
   if (!g_builtin_cache) g_builtin_cache = lshash_new(16);
   lshash_data_t cached;
   if (lshash_get(g_builtin_cache, s, &cached)) {
+  if (debug_enabled()) lsprintf(stderr, 0, "I: builtin: cache hit: name=%s\n", modname);
     return (lsthunk_t*)cached;
   }
 
@@ -175,12 +181,14 @@ lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void
   }
 
   if (!chosen[0]) {
+    if (debug_enabled()) lsprintf(stderr, 0, "W: builtin: not found: name=%s\n", modname);
     return ls_make_err("builtin: not found");
   }
 
   void* handle = dlopen(chosen, RTLD_NOW);
   if (!handle) {
     const char* err = dlerror(); (void)err;
+    if (debug_enabled()) lsprintf(stderr, 0, "W: builtin: dlopen failed: path=%s err=%s\n", chosen, err ? err : "(null)");
     return ls_make_err("builtin: dlopen failed");
   }
   dlerror();
@@ -191,6 +199,7 @@ lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void
     dlerror();
     initfn = (ls_builtin_init_fn)dlsym(handle, "lazyscript_module_init");
     if (!initfn) {
+      if (debug_enabled()) lsprintf(stderr, 0, "W: builtin: missing init symbol in %s\n", chosen);
       return ls_make_err("builtin: missing init symbol");
     }
   }
@@ -203,5 +212,6 @@ lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void
   // Cache namespace by module name (copy key so hash owns it)
   const lsstr_t* keycopy = lsstr_new(lsstr_get_buf(s), lsstr_get_len(s));
   lshash_put(g_builtin_cache, keycopy, ns, NULL);
+  if (debug_enabled()) lsprintf(stderr, 0, "I: builtin: loaded: name=%s path=%s entries=%d\n", modname, chosen, mod->entry_count);
   return ns;
 }
