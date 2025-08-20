@@ -33,6 +33,7 @@ lazyscript_SOURCES = \
     builtins/print.c \
     builtins/seq.c \
     builtins/arith.c \
+    builtins/builtin_loader.c \
     builtins/require.c \
     builtins/ns.c \
     builtins/prelude.c \
