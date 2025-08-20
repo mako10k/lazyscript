@@ -45,6 +45,7 @@ src/parser/parser.h
 *.la
 null.d
 *.log
+*.trs
 
 /confdefs.h
 /conftest.h
@@ -55,6 +56,11 @@ conftest.l
 /.vscode/
 /.github/
 
+
+
+# Logs and test harness artifacts
+logs/
+/test-suite.log
 
 # Autotools stamps (should not be tracked)
 **/.dirstamp
