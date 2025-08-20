@@ -48,14 +48,14 @@
    - リテラル NS `{ const = value; ... }` のキー側に symbol を許容。
    - テスト: 構文とエラーメッセージ、既存との非衝突確認。
 
-6. 効果システムとの統合
+6. 効果システムとの統合（対応済み）
    - nsnew/nsdef/nsdefv/__set を効果として宣言し、strict-effects で要トークン（seq/chain）に。
    - 実装: lsbuiltin_nsnew/lsbuiltin_nsdef/lsbuiltin_nsdefv/namespace.__set に ls_effects_allowed() ガードとエラーメッセージを追加。
    - テスト: strict-effects on/off の差異（on で失敗、chain/seq で成功）。
 
-7. 互換性と移行
-   - 旧インターフェイス（もしシンボル表現が存在する場合）を const へブリッジ、または明示エラー+メッセージ。
-   - ドキュメントと CHANGELOG 更新。
+7. 互換性と移行（残件あり）
+   - 旧インターフェイスが残っている場合は const へブリッジ、または明示エラーへ誘導（要棚卸）。
+   - CHANGELOG 更新（残件）。
 
 ## 影響ファイル（予想）
 - レキサ/パーサ: `src/parser/lexer.l`, `src/parser/parser.y`
@@ -73,11 +73,11 @@
 - Const: tagged union { SYMBOL, STR, INT, CONSTR0 }。総合比較関数 cmp_const。
 - Namespace: { map<const,value>, mutable:bool }。map はハッシュ（const のハッシュ実装要）。
 
-## エラーモデル
-- 不変 NS に対する set/nsdefv → ランタイムエラー（メッセージ: immutable namespace）。
-- キーが const でない → 型エラー（const expected）。
-- 名前未登録（~~nsdef の対象 NS が無い）→ ランタイムエラー（unknown namespace）。
- - strict-effects 有効時のミューテーション（nsnew/nsdef/nsdefv/__set）→ 純粋文脈ではエラー（"effect used in pure context (enable seq/chain)"）。
+## エラーモデル（実装反映）
+- 不変 NS に対する set/nsdefv → `#err "namespace: immutable"` / `#err "nsdefv: immutable namespace"`。
+- キーが const でない → `#err "...: const expected"`。
+- 名前未登録（~~nsdef の対象 NS が無い）→ `#err "nsdef: unknown namespace"`。
+- strict-effects 有効時のミューテーション（nsnew/nsdef/nsdefv/__set）→ 純粋文脈では stderr にメッセージを出し `null`（実装互換）。
 
 ## リスク/対策
 - レキサ衝突（.symbol）: ドットの既存用途を確認し、先読みで SYM_LIT を優先。
@@ -85,14 +85,11 @@
 - パフォーマンス: ハッシュ化と比較を軽量に（symbol は id ベース）。
 - 既存コードへの影響: 段階導入＋テスト駆動、フェーズ毎に green を維持。
 
-## テスト計画（抜粋）
-- t34_symbol_basic.ls: `.a == .a`, `.a != .b`, to_string
-- t35_const_order.ls: nsMembers 並び、比較順序の検証
-- t36_ns_mutable.ls: nsnew0/nsdefv/(__set) の成功系
-- t37_ns_immutable.ls: `{ ... }` への更新でエラー
-- t38_ns_named.ls: nsnew/nsdef と参照
-- t39_ns_effects.ls: strict-effects on/off での差異
-- t40_ns_mixed_keys.ls: int/str/symbol/constr0 混在
+## テスト計画（実装対応のマッピング）
+- t35–t36: const キー混在と nsMembers 並び（実装済みテストにより検証済み）
+- t39–t41: strict-effects の on/off と chain 経路（実装済み）
+- t42–t44: リテラル/名前付き NS の不変更新禁止（実装済み）
+- 追加予定: 未登録 NS への nsdef エラー（`nsdef: unknown namespace`）のテスト
 
 ## マイルストーン/所要目安
 - P1（1〜2日）: フェーズ1-2 + 基本テスト

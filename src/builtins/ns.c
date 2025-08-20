@@ -225,7 +225,7 @@ lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* dat
     const lsstr_t* nsname = lsthunk_get_constr(nsv);
     if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
   }
-  if (!ns || !ns->map) return ls_make_err("nsMembers: invalid namespace");
+  if (!ns || !ns->map) return ls_make_err("nsMembers: not a namespace");
 
   ns_collect_ctx_t ctx = {0};
   lshash_foreach(ns->map, ns_collect_cb, &ctx);
@@ -254,7 +254,7 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
     }
   }
   const lsstr_t* key = ns_encode_key_from_thunk(keyv);
-  if (!key) return ls_make_err("namespace: invalid key");
+  if (!key) return ls_make_err("namespace: const expected");
   // optional debug
   if (NS_DLOG_ENABLED) {
     lsprintf(stderr, 0, "DBG ns_lookup ns=%p ", (void*)ns);
@@ -300,7 +300,7 @@ static lsthunk_t* lsbuiltin_ns_set(lssize_t argc, lsthunk_t* const* args, void* 
   if (lsthunk_is_err(keyv)) return keyv;
   if (!keyv) return ls_make_err("namespace: __set key eval");
   const lsstr_t* s = ns_encode_key_from_thunk(keyv);
-  if (!s) return ls_make_err("namespace: __set invalid key");
+  if (!s) return ls_make_err("namespace: const expected");
   lsthunk_t* val = ls_eval_arg(args[1], "namespace: __set value");
   if (lsthunk_is_err(val)) return val;
   if (!val) return ls_make_err("namespace: __set value eval");
@@ -359,15 +359,13 @@ lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
   }
   const lsstr_t* nsname  = lsthunk_get_constr(nsv);
   const lsstr_t* symname = ns_encode_key_from_thunk(symv);
-  if (!symname) return ls_make_err("nsdef: invalid key");
+  if (!symname) return ls_make_err("nsdef: const expected");
   if (!g_namespaces) {
-    lsprintf(stderr, 0, "E: nsdef: namespace not found: "); lsstr_print_bare(stderr, LSPREC_LOWEST, 0, nsname); lsprintf(stderr, 0, "\n");
-    return NULL;
+    return ls_make_err("nsdef: unknown namespace");
   }
   lshash_data_t nsp;
   if (!lshash_get(g_namespaces, nsname, &nsp)) {
-    lsprintf(stderr, 0, "E: nsdef: namespace not found: "); lsstr_print_bare(stderr, LSPREC_LOWEST, 0, nsname); lsprintf(stderr, 0, "\n");
-    return NULL;
+    return ls_make_err("nsdef: unknown namespace");
   }
   lsns_t* ns = (lsns_t*)nsp; if (!ns || !ns->map) return ls_make_err("nsdef: invalid namespace");
   if (!ns->is_mutable) return ls_make_err("nsdef: immutable namespace");
@@ -422,7 +420,7 @@ lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
   if (lsthunk_is_err(symv)) return symv;
   if (!symv) return ls_make_err("nsdefv: key eval");
   const lsstr_t* symname = ns_encode_key_from_thunk(symv);
-  if (!symname) return ls_make_err("nsdefv: invalid key");
+  if (!symname) return ls_make_err("nsdefv: const expected");
   lsthunk_t* val = ls_eval_arg(args[2], "nsdefv: value");
   if (lsthunk_is_err(val)) return val;
   if (!val) return ls_make_err("nsdefv: value eval");
@@ -448,8 +446,8 @@ lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data) {
   for (lssize_t i = 0; i < argc; i += 2) {
     lsthunk_t* symv = ls_eval_arg(args[i], "nslit: key");
     if (lsthunk_is_err(symv)) return symv;
-    const lsstr_t* symname = ns_encode_key_from_thunk(symv);
-    if (!symname) return ls_make_err("nslit: invalid key");
+  const lsstr_t* symname = ns_encode_key_from_thunk(symv);
+  if (!symname) return ls_make_err("nslit: const expected");
     lsthunk_t* val = ls_eval_arg(args[i + 1], "nslit: value");
     if (lsthunk_is_err(val)) return val;
     lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
