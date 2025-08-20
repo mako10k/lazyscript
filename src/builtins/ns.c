@@ -246,6 +246,13 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
   lsthunk_t* keyv = ls_eval_arg(args[0], "namespace: key");
   if (lsthunk_is_err(keyv)) return keyv;
   if (!keyv) return ls_make_err("namespace: key eval");
+  // Backward-compat: allow symbol .__set as setter as well
+  if (lsthunk_get_type(keyv) == LSTTYPE_SYMBOL) {
+    const lsstr_t* s = lsthunk_get_symbol(keyv);
+    if (lsstrcmp(s, lsstr_cstr(".__set")) == 0) {
+      return lsthunk_new_builtin(lsstr_cstr("namespace.__set"), 2, lsbuiltin_ns_set, ns);
+    }
+  }
   // Special setter remains constructor-based: (~NS __set)
   if (lsthunk_get_type(keyv) == LSTTYPE_ALGE && lsthunk_get_argc(keyv) == 0) {
     const lsstr_t* cname = lsthunk_get_constr(keyv);
