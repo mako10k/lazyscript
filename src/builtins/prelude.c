@@ -177,6 +177,8 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return lsbuiltin_nsnew0(0, NULL, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsdefv")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsMembers")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
   // nslit$N dispatch for pure namespace literal
   const char* cname = lsstr_get_buf(name);
   if (strncmp(cname, "nslit$", 6) == 0) {

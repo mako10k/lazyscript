@@ -7,6 +7,9 @@
 #include "runtime/unit.h"
 #include "thunk/tenv.h"
 #include "runtime/error.h"
+#include "expr/expr.h"
+#include <stdlib.h>
+#include <string.h>
 
 // simple namespace object
 typedef struct lsns { lshash_t* map; } lsns_t;
@@ -106,6 +109,130 @@ static const lsstr_t* ns_encode_key_from_thunk(lsthunk_t* keyv) {
   }
   lsprintf(stderr, 0, "E: namespace: key must be one of {symbol, string, int, 0-arity constructor}\n");
   return NULL;
+}
+
+// ----------------------------------------
+// nsMembers implementation helpers
+typedef struct ns_key_item {
+  char         tag;   // 'S','T','I','C'
+  const char*  bytes; // pointer to key bytes after tag
+  lssize_t     len;   // length after tag
+} ns_key_item_t;
+
+typedef struct ns_collect_ctx {
+  ns_key_item_t* items;
+  size_t         count;
+  size_t         cap;
+} ns_collect_ctx_t;
+
+static void ns_collect_cb(const lsstr_t* key, lshash_data_t value, void* data) {
+  (void)value;
+  ns_collect_ctx_t* ctx = (ns_collect_ctx_t*)data;
+  if (!key) return;
+  const char* bytes = lsstr_get_buf(key);
+  lssize_t    len   = lsstr_get_len(key);
+  if (!bytes || len <= 0) return;
+  if (ctx->count == ctx->cap) {
+    size_t ncap = ctx->cap ? ctx->cap * 2 : 16;
+    ctx->items  = (ns_key_item_t*)lsrealloc(ctx->items, ncap * sizeof(ns_key_item_t));
+    ctx->cap    = ncap;
+  }
+  ns_key_item_t it;
+  it.tag   = bytes[0];
+  it.bytes = bytes + 1;
+  it.len   = len - 1;
+  ctx->items[ctx->count++] = it;
+}
+
+static int ns_item_rank(char tag) {
+  switch (tag) {
+    case 'S': return 0; // symbol
+    case 'T': return 1; // string
+    case 'I': return 2; // int
+    case 'C': return 3; // constr
+    default:  return 4; // unknown last
+  }
+}
+
+static int ns_item_cmp(const void* a, const void* b) {
+  const ns_key_item_t* x = (const ns_key_item_t*)a;
+  const ns_key_item_t* y = (const ns_key_item_t*)b;
+  int rx = ns_item_rank(x->tag), ry = ns_item_rank(y->tag);
+  if (rx != ry) return rx - ry;
+  // within type: lexicographic by bytes
+  int min = (int)(x->len < y->len ? x->len : y->len);
+  int c   = memcmp(x->bytes, y->bytes, (size_t)min);
+  if (c != 0) return c;
+  // shorter first
+  if (x->len != y->len) return (int)(x->len - y->len);
+  return 0;
+}
+
+// build cons list from an array of thunks: elems[0] : (elems[1] : ... [] )
+// Convert a collected key item back into an expression representing its const value
+static const lsexpr_t* ns_item_to_expr(const ns_key_item_t* it) {
+  switch (it->tag) {
+    case 'S': {
+      // Symbol literal as a zero-arity constructor (e.g., .name)
+      const lsealge_t* ea = lsealge_new(lsstr_new(it->bytes, it->len), 0, NULL);
+      return lsexpr_new_alge(ea);
+    }
+    case 'T':
+      return lsexpr_new_str(lsstr_new(it->bytes, it->len));
+    case 'I': {
+      char* endp = NULL;
+      long  v    = strtol(it->bytes, &endp, 10);
+      (void)endp;
+      return lsexpr_new_int(lsint_new((int)v));
+    }
+    case 'C': {
+      const lsealge_t* ea = lsealge_new(lsstr_new(it->bytes, it->len), 0, NULL);
+      return lsexpr_new_alge(ea);
+    }
+    default:
+      return NULL;
+  }
+}
+
+// Build cons-list expression from collected items then thunk it once at the end
+static lsthunk_t* ns_build_list(size_t n, const ns_key_item_t* items) {
+  const lsexpr_t* tail = lsexpr_new_alge(lsealge_new(lsstr_cstr("[]"), 0, NULL));
+  for (long i = (long)n - 1; i >= 0; --i) {
+    const lsexpr_t* head = ns_item_to_expr(&items[i]);
+    const lsexpr_t* args2[2] = { head, tail };
+    tail = lsexpr_new_alge(lsealge_new(lsstr_cstr(":"), 2, args2));
+  }
+  return lsthunk_new_expr(tail, NULL);
+}
+
+
+// (~nsMembers ns) => list<const>
+lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; (void)data;
+  // Accept namespace value or named symbol
+  lsthunk_t* nsv = ls_eval_arg(args[0], "nsMembers: ns");
+  if (lsthunk_is_err(nsv)) return nsv;
+  if (!nsv) return ls_make_err("nsMembers: ns eval");
+  lsns_t* ns = NULL;
+  if (lsthunk_is_builtin(nsv)) {
+    lstbuiltin_func_t fn = lsthunk_get_builtin_func(nsv);
+    if (fn == lsbuiltin_ns_value) ns = (lsns_t*)lsthunk_get_builtin_data(nsv);
+  } else if (lsthunk_get_type(nsv) == LSTTYPE_ALGE && lsthunk_get_argc(nsv) == 0) {
+    const lsstr_t* nsname = lsthunk_get_constr(nsv);
+    if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
+  }
+  if (!ns || !ns->map) return ls_make_err("nsMembers: invalid namespace");
+
+  ns_collect_ctx_t ctx = {0};
+  lshash_foreach(ns->map, ns_collect_cb, &ctx);
+  if (ctx.count == 0) {
+    const lsealge_t* nil = lsealge_new(lsstr_cstr("[]"), 0, NULL);
+    return lsthunk_new_ealge(nil, NULL);
+  }
+  qsort(ctx.items, ctx.count, sizeof(ns_key_item_t), ns_item_cmp);
+  lsthunk_t* list = ns_build_list(ctx.count, ctx.items);
+  lsfree(ctx.items);
+  return list;
 }
 
 static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
