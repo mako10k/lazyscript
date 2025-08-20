@@ -64,6 +64,11 @@ static lsthunk_t* pl_return(lssize_t argc, lsthunk_t* const* args, void* data) {
   return args[0];
 }
 
+static lsthunk_t* pl_plugin_hello(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; (void)args; (void)data;
+  return lsthunk_new_str(lsstr_cstr("plugin"));
+}
+
 static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data;
   assert(argc == 1);
@@ -84,6 +89,8 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, pl_chain, NULL);
   if (lsstrcmp(name, lsstr_cstr("return")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1, pl_return, NULL);
+  if (lsstrcmp(name, lsstr_cstr("pluginHello")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.pluginHello"), 0, pl_plugin_hello, NULL);
   lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
   lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
   lsprintf(stderr, 0, "\n");
