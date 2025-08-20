@@ -13,7 +13,10 @@
 #include <string.h>
 
 // simple namespace object
-typedef struct lsns { lshash_t* map; } lsns_t;
+typedef struct lsns {
+  lshash_t* map;
+  int       is_mutable; // 1: mutable (nsnew/nsnew0), 0: immutable (nslit)
+} lsns_t;
 
 // Debug logging: define LS_NS_DEBUG=1 at compile time to enable
 #ifndef LS_NS_DEBUG
@@ -290,6 +293,9 @@ static lsthunk_t* lsbuiltin_ns_set(lssize_t argc, lsthunk_t* const* args, void* 
     lsprintf(stderr, 0, "E: namespace.__set: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
+  if (!ns->is_mutable) {
+    return ls_make_err("namespace: immutable");
+  }
   lsthunk_t* keyv = ls_eval_arg(args[0], "namespace: __set key");
   if (lsthunk_is_err(keyv)) return keyv;
   if (!keyv) return ls_make_err("namespace: __set key eval");
@@ -325,7 +331,7 @@ lsthunk_t* lsbuiltin_nsnew(lssize_t argc, lsthunk_t* const* args, void* data) {
     return ls_make_err("nsnew: expected bare symbol");
   }
   const lsstr_t* name = lsthunk_get_constr(namev);
-  lsns_t* ns = lsmalloc(sizeof(lsns_t)); ns->map = lshash_new(16);
+  lsns_t* ns = lsmalloc(sizeof(lsns_t)); ns->map = lshash_new(16); ns->is_mutable = 1;
   if (!g_namespaces) g_namespaces = lshash_new(16);
   lshash_data_t oldv; (void)lshash_put(g_namespaces, name, (const void*)ns, &oldv);
   // Bind named namespace as (~Name sym)
@@ -364,6 +370,7 @@ lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
     return NULL;
   }
   lsns_t* ns = (lsns_t*)nsp; if (!ns || !ns->map) return ls_make_err("nsdef: invalid namespace");
+  if (!ns->is_mutable) return ls_make_err("nsdef: immutable namespace");
   lsthunk_t* val = ls_eval_arg(args[2], "nsdef: value");
   if (lsthunk_is_err(val)) return val;
   if (!val) return ls_make_err("nsdef: value eval");
@@ -374,7 +381,7 @@ lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
 // Create an anonymous namespace value: returns NS value usable as (~NS sym)
 lsthunk_t* lsbuiltin_nsnew0(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; (void)args; (void)data;
-  lsns_t* ns = lsmalloc(sizeof(lsns_t)); ns->map = lshash_new(16);
+  lsns_t* ns = lsmalloc(sizeof(lsns_t)); ns->map = lshash_new(16); ns->is_mutable = 1;
   if (NS_DLOG_ENABLED) {
     lsprintf(stderr, 0, "DBG nsnew0 ns=%p map=%p\n", (void*)ns, (void*)ns->map);
   }
@@ -408,6 +415,9 @@ lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
   if (!ns || !ns->map) {
     return ls_make_err("nsdefv: invalid namespace");
   }
+  if (!ns->is_mutable) {
+    return ls_make_err("nsdefv: immutable namespace");
+  }
   lsthunk_t* symv = ls_eval_arg(args[1], "nsdefv: key");
   if (lsthunk_is_err(symv)) return symv;
   if (!symv) return ls_make_err("nsdefv: key eval");
@@ -434,6 +444,7 @@ lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data) {
   }
   lsns_t* ns = lsmalloc(sizeof(lsns_t));
   ns->map = lshash_new(16);
+  ns->is_mutable = 0; // immutable literal namespace
   for (lssize_t i = 0; i < argc; i += 2) {
     lsthunk_t* symv = ls_eval_arg(args[i], "nslit: key");
     if (lsthunk_is_err(symv)) return symv;

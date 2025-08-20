@@ -1,4 +1,4 @@
-# Namespaces（設計更新案）
+# Namespaces（仕様）
 
 LazyScript の名前空間は「定数キー const から値への写像」を提供します。名前空間には2種類あります。
 
@@ -11,6 +11,7 @@ LazyScript の名前空間は「定数キー const から値への写像」を�
 - シュガー: `~~sym` は `(~prelude sym)` の短縮。`LAZYSCRIPT_SUGAR_NS` で切替可能（デフォルト prelude）。
 
 キー `const` は次のいずれかの定数型です: `int | str | constr(0-arity) | symbol`。シンボルは `.name` のリテラルで表し、インターンされ `==` 比較できます。
+互換性のため、先頭が `.` の 0 引数コンストラクタ（例: `.Foo`）はキー位置では `symbol` と同一視されます。
 
 ## 名前付き名前空間（Named）
 
@@ -74,11 +75,43 @@ LazyScript の名前空間は「定数キー const から値への写像」を�
 ```
 
 ## 注意
-- `nsdef`/`nsdefv` は効果（環境の更新）を伴います。`strict-effects` 有効時は `seq/chain` でトークンを通してください。
+- ミューテーション（環境更新）は効果です。`strict-effects` 有効時は `seq/chain` でトークンが必要です。
+  - 対象: `nsnew`, `nsnew0`, `nsdef`, `nsdefv`, `(~ns .__set)`
 - `(~NS const)` の `const` は `int | str | constr(0-arity) | symbol(.name)`。
 - 無名 NS は値として渡せるため、クロージャや局所スコープでの辞書用途に向きます。
-- リテラル名前空間（`{ ... }`）は「非副作用」で不変です。作成後に再定義／更新はできません。
+- リテラル名前空間（`{ ... }`）は非副作用です。現実装でもランタイムで更新操作をエラーにします（ソフトな不変）。将来的に型や検査での厳密化も検討します。
 
 ## 列挙（デバッグ）
 - `~~nsMembers NS` / `~~nsMembers ns` は `list<const>` を返します（値は非評価）。
-- 並び順の提案: 型順位（symbol < str < int < constr）→ 型内の辞書/数値順。
+- 並び順（安定）: 型順位（symbol < string < int < constr）→ 型内はバイト列の辞書順。
+  - 整数は 10 進文字列として比較されるため、辞書順になります（例: `10 < 2`）。
+- 表示上の注意: `to_str` でのリスト表示では、文字列はクォート無しで出力されます。
+
+例（列挙の順序）:
+
+```
+!{
+  ns <- ((~prelude nsnew0));
+  ((~prelude nsdefv) ~ns .a 1);
+  ((~prelude nsdefv) ~ns .b 2);
+  ((~prelude nsdefv) ~ns "aa" 3);
+  ((~prelude nsdefv) ~ns "ab" 4);
+  ((~prelude nsdefv) ~ns 2 5);
+  ((~prelude nsdefv) ~ns 10 6);
+  ((~prelude nsdefv) ~ns Foo 7);
+  ((~prelude nsdefv) ~ns Bar 8);
+  ~~println (~to_str ((~prelude nsMembers) ~ns));
+};
+-- 出力: [.a, .b, aa, ab, 10, 2, Bar, Foo]
+```
+
+strict-effects 有効時の例（トークンが必要）:
+
+```
+!{
+  ns <- ((~prelude chain) ((~prelude nsnew0)) (\~x -> ~x));
+  ((~prelude chain) ((~prelude nsdefv) ~ns .x 1) (\~_ -> ()));
+  ((~prelude nsMembers) ~ns)
+};
+-- 出力: [.x]
+```
