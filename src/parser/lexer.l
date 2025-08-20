@@ -31,6 +31,8 @@
 [0-9]+      { yylval->intval = lsint_new(atoi(yytext)); return LSTINT; }
 [_]         { return LSTWILDCARD; }
 [.][a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext); return LSTSYMBOL; }
+"~~nsdefv"  { return LSTNSDEFV; }
+"~~nsdef"   { return LSTNSDEF; }
 [~]{2}[0-9]+      { yylval->intval = lsint_new(atoi(yytext + 2)); return LSTPRELUDE_INT; }
 [~]{2}[.]?[a-zA-Z_][a-zA-Z0-9_]* {
 	/* ~~constr or ~~.symbol */

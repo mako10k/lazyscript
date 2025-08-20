@@ -1,5 +1,5 @@
 {
-  .Result = (!!{ Ok = \~x -> Ok ~x; Err = \~e -> Err ~e });
+  .Result = (!!{ .Ok = \~x -> Ok ~x; .Err = \~e -> Err ~e });
   .map = (\~f -> \~r -> (
     \(Ok ~x) -> Ok (~f ~x) | \(Err ~e) -> Err ~e
   ) ~r);

@@ -1,12 +1,13 @@
-# 名前空間リニューアル 実装計画（symbols + const-keyed namespaces）
+# 名前空間リニューアル 実装計画（symbols-only namespaces）
 
-この文書は、.symbol リテラルと const キー（int/str/0-arity constr/symbol）による名前空間の統一仕様を段階的に実装するための計画です。
+この文書は、.symbol リテラルとシンボルキーによる名前空間の統一仕様を段階的に実装するための計画です。
+現在はキーをシンボルのみに制限しており、旧計画で言及されている `const` キー拡張は撤回されました。
 
 ## 目的と範囲
 - Symbol 型（.name リテラル）の導入とインターン機構
 - const キーでの参照/定義（(~NS const), ~~nsdef/~~nsdefv）
 - 無名 NS（可変）とリテラル NS（不変）の併存
-- nsMembers の `list<const>` 返却と安定ソート
+- nsMembers の `list<symbol>` 返却と安定ソート
 - 効果（nsdef/nsdefv/__set）の扱いを既存ポリシーに統合
    - strict-effects 連携: ns のミューテーション（nsnew/nsdef/nsdefv/__set）は効果としてガードし、pure 文脈では明示エラー。
 - 互換性維持（可能な範囲で旧入力も許容 or 明示エラー）
@@ -38,7 +39,7 @@
    - ~~nsnew0: 無名 NS 値（可変）を返す。
    - ~~nsdefv: 無名 NS に const で定義（効果）。
    - (~ns .__set): セッタ（(const val)->()）。不変ならエラー。
-   - ~~nsMembers: list<const> 返却（安定ソート）。
+   - ~~nsMembers: list<symbol> 返却（安定ソート）。
    - テスト: 代表ケース＋厳密効果モードでの動作。
 
 5. パーサ/レキサ拡張
