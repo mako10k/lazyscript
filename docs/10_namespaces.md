@@ -80,6 +80,8 @@ LazyScript の名前空間は「定数キー const から値への写像」を�
 - `(~NS const)` の `const` は `int | str | constr(0-arity) | symbol(.name)`。
 - 無名 NS は値として渡せるため、クロージャや局所スコープでの辞書用途に向きます。
 - リテラル名前空間（`{ ... }`）は非副作用です。現実装でもランタイムで更新操作をエラーにします（ソフトな不変）。将来的に型や検査での厳密化も検討します。
+ - セッター互換: `(~ns .__set)` も許容され、`(~ns __set)` と同等です。
+ - 誤用ヒント: `(~ns "__set")` や `(~ns ".__set")` は `#err "namespace: use (~ns __set) or (~ns .__set) for setter"` を返します。
 
 ## 列挙（デバッグ）
 - `~~nsMembers NS` / `~~nsMembers ns` は `list<const>` を返します（値は非評価）。
