@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 36
+%expect 40
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -248,6 +248,25 @@ efact:
         const lsexpr_t *lam0 = lsexpr_new_lambda(lselambda_new(nspat, body));
         const lsexpr_t *bind_args[] = { call_nsnew0, lam0 };
         $$ = lsexpr_new_appl(lseappl_new(fn_bind, 2, bind_args));
+      }
+    | '{' nsentries '}' {
+        // Pure namespace literal sugar:
+        // { a = e1; b = e2; } => (~prelude nslit$2) 'a e1 'b e2
+        const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
+        lssize_t ec = $2 ? lsarray_get_size($2) : 0;
+        lssize_t argc = ec * 2;
+        char buf[32];
+        snprintf(buf, sizeof(buf), "nslit$%ld", (long)argc);
+        const lsexpr_t *sym_nslit = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
+        const lsexpr_t *fn_nslit = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_nslit));
+        const lsexpr_t **args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
+        for (lssize_t i = 0; i < ec; i++) {
+          const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
+          args[2*i]   = (const lsexpr_t*)lsarray_get(ent)[0];
+          args[2*i+1] = (const lsexpr_t*)lsarray_get(ent)[1];
+        }
+        $$ = lsexpr_new_appl(lseappl_new(fn_nslit, argc, args));
       }
     ;
 

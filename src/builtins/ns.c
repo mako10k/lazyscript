@@ -200,3 +200,25 @@ lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
   lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
   return ls_make_unit();
 }
+
+// Construct a namespace value from literal pairs: (nslit sym1 val1 sym2 val2 ...)
+lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)data;
+  if (argc % 2 != 0) {
+    return ls_make_err("nslit: expected even number of arguments");
+  }
+  lsns_t* ns = lsmalloc(sizeof(lsns_t));
+  ns->map = lshash_new(16);
+  for (lssize_t i = 0; i < argc; i += 2) {
+    lsthunk_t* symv = ls_eval_arg(args[i], "nslit: key");
+    if (lsthunk_is_err(symv)) return symv;
+    if (lsthunk_get_type(symv) != LSTTYPE_ALGE || lsthunk_get_argc(symv) != 0) {
+      return ls_make_err("nslit: expected bare symbol");
+    }
+    const lsstr_t* symname = lsthunk_get_constr(symv);
+    lsthunk_t* val = ls_eval_arg(args[i + 1], "nslit: value");
+    if (lsthunk_is_err(val)) return val;
+    lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
+  }
+  return lsthunk_new_builtin(lsstr_cstr("namespace"), 1, lsbuiltin_ns_value, (void*)ns);
+}
