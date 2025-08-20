@@ -56,3 +56,7 @@ conftest.l
 /.github/
 
 
+# Autotools stamps (should not be tracked)
+**/.dirstamp
+
+
