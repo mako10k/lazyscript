@@ -84,12 +84,14 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 40
+%expect 53
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
 %nterm <array> dostmt
 %nterm <elambda> elambda
+%nterm <pat> lamparam lamparam2
+%nterm <array> lamparams
 %nterm <array> earray parray
 %nterm <ealge> ealge elist econs etuple
 %nterm <eappl> eappl
@@ -98,14 +100,21 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %nterm <palge> palge plist pcons ptuple
 %nterm <array> bind bind_list
 %nterm <bind> bind_single
+%nterm <ref> funlhs
 %nterm <eclosure> closure
 %nterm <array> nsentries
 %nterm <array> nsentry
+%nterm <array> nslit_entries
+%nterm <array> nslit_entry
 
 
 %token <intval> LSTINT
 %token <strval> LSTSYMBOL
-%token <strval> LSTPRELUDESYM
+%token <strval> LSTPRELUDE_CONSTR
+%token <strval> LSTPRELUDE_SYMBOL
+%token <strval> LSTPRELUDE_STR
+%token <intval> LSTPRELUDE_INT
+%token <strval> LSTREFSYM
 %token <strval> LSTSTR
 %token LSTARROW
 %token LSTLEFTARROW
@@ -125,8 +134,23 @@ bind:
       bind_list { $$ = $1; }
     ;
 
+funlhs:
+      pref { $$ = $1; }
+    ;
+
 bind_single:
-      pat '=' expr { $$ = lsbind_new($1, $3); }
+      funlhs lamparams '=' expr {
+        // ~f p1 p2 ... = body  ==>  ~f = \p1 -> \p2 -> ... -> body
+        const lspat_t *lhs = lspat_new_ref($1);
+        lssize_t argc = lsarray_get_size($2);
+        const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
+        const lsexpr_t *b = $4;
+        for (lssize_t i = argc; i > 0; i--) {
+          b = lsexpr_new_lambda(lselambda_new(ps[i - 1], b));
+        }
+        $$ = lsbind_new(lhs, b);
+      }
+    | pat '=' expr { $$ = lsbind_new($1, $3); }
     ;
 
 bind_list:
@@ -177,19 +201,45 @@ ealge:
 
 expr5:
       efact { $$ = $1; }
-    | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1, 0, NULL)); }
+  | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1, 0, NULL)); }
+    
     ;
 
 efact:
   LSTINT { $$ = lsexpr_with_loc(lsexpr_new_int($1), @$); }
   | LSTSTR { $$ = lsexpr_with_loc(lsexpr_new_str($1), @$); }
-    | LSTPRELUDESYM {
-        // desugar: ~~sym  ==>  (~<ns> sym), where ns = lsscan_get_sugar_ns(yyextra)
+  | LSTREFSYM { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($1, @$)), @$); }
+    | LSTPRELUDE_CONSTR {
+        // ~~constr => (~<ns> constr)
         const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
-  const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
         const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
         const lsexpr_t *args[] = { sym };
-  $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
+      }
+    | LSTPRELUDE_SYMBOL {
+        // ~~.symbol => (~<ns> .symbol)
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+        const lsexpr_t *args[] = { sym };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
+      }
+    | LSTPRELUDE_STR {
+        // ~~"str" => (~<ns> "str")
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *s = lsexpr_with_loc(lsexpr_new_str($1), @$);
+        const lsexpr_t *args[] = { s };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
+      }
+    | LSTPRELUDE_INT {
+        // ~~N => (~<ns> N)
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *n = lsexpr_with_loc(lsexpr_new_int($1), @$);
+        const lsexpr_t *args[] = { n };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
       }
     | etuple {
         lssize_t argc = lsealge_get_argc($1);
@@ -198,7 +248,6 @@ efact:
     }
   | elist { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
   | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
-  | '~' LSTSYMBOL { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($2, @$)), @$); }
   | elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
   | '!' '{' dostmts '}' { $$ = $3; }
     | '!' '!' '{' nsentries '}' {
@@ -249,25 +298,70 @@ efact:
         const lsexpr_t *bind_args[] = { call_nsnew0, lam0 };
         $$ = lsexpr_new_appl(lseappl_new(fn_bind, 2, bind_args));
       }
-    | '{' nsentries '}' {
-        // Pure namespace literal sugar:
-        // { a = e1; b = e2; } => (~prelude nslit$2) 'a e1 'b e2
-        const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
-        const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
-        lssize_t ec = $2 ? lsarray_get_size($2) : 0;
-        lssize_t argc = ec * 2;
-        char buf[32];
-        snprintf(buf, sizeof(buf), "nslit$%ld", (long)argc);
-        const lsexpr_t *sym_nslit = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
-        const lsexpr_t *fn_nslit = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_nslit));
-        const lsexpr_t **args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
-        for (lssize_t i = 0; i < ec; i++) {
-          const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
-          args[2*i]   = (const lsexpr_t*)lsarray_get(ent)[0];
-          args[2*i+1] = (const lsexpr_t*)lsarray_get(ent)[1];
+    | '{' nslit_entries '}' {
+          // Pure namespace literal sugar with optional local bindings:
+          // { a = e1; p <- e2; b = e3; } => (\p -> (~prelude nslit$4) 'a e1 'b e3) e2
+          const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+          const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
+          lssize_t ec = $2 ? lsarray_get_size($2) : 0;
+          // Count members and locals
+          lssize_t memberc = 0, localc = 0;
+          for (lssize_t i = 0; i < ec; i++) {
+            const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
+            const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
+            // tag is a constructor 'member or 'local
+            if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
+              const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
+              if (lsstrcmp(cname, lsstr_cstr("member")) == 0) memberc++;
+              else if (lsstrcmp(cname, lsstr_cstr("local")) == 0) localc++;
+            }
+          }
+          lssize_t argc = memberc * 2;
+          char buf[32];
+          snprintf(buf, sizeof(buf), "nslit$%ld", (long)argc);
+          const lsexpr_t *sym_nslit = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
+          const lsexpr_t *fn_nslit = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_nslit));
+          const lsexpr_t **args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
+          // Fill member args in order
+          lssize_t mi = 0;
+          for (lssize_t i = 0; i < ec; i++) {
+            const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
+            const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
+            if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
+              const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
+              if (lsstrcmp(cname, lsstr_cstr("member")) == 0) {
+                args[2*mi]   = (const lsexpr_t*)lsarray_get(ent)[1];
+                args[2*mi+1] = (const lsexpr_t*)lsarray_get(ent)[2];
+                mi++;
+              }
+            }
+          }
+          const lsexpr_t *base_ns = lsexpr_new_appl(lseappl_new(fn_nslit, argc, args));
+          if (localc == 0) {
+            $$ = base_ns;
+          } else {
+            // Build closure binds from locals without creating empty array
+            const lsarray_t *binds = NULL;
+            for (lssize_t i = 0; i < ec; i++) {
+              const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
+              const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
+              if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
+                const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
+                if (lsstrcmp(cname, lsstr_cstr("local")) == 0) {
+                  const lspat_t *p = (const lspat_t*)lsarray_get(ent)[1];
+                  const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[2];
+                  const lsbind_t *b = lsbind_new(p, rhs);
+                  if (!binds) binds = lsarray_new(1, b);
+                  else binds = lsarray_push((lsarray_t*)binds, (void*)b);
+                }
+              }
+            }
+            lssize_t bc = lsarray_get_size(binds);
+            const lsbind_t *const *bs = (const lsbind_t *const *)lsarray_get(binds);
+            const lseclosure_t *cl = lseclosure_new(base_ns, bc, bs);
+            $$ = lsexpr_with_loc(lsexpr_new_closure(cl), @$);
+          }
         }
-        $$ = lsexpr_new_appl(lseappl_new(fn_nslit, argc, args));
-      }
     ;
 
 // !!{ a = e; b = e2; } entries
@@ -283,7 +377,30 @@ nsentry:
         const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
         $$ = lsarray_new(2, sym, $3);
       }
+    
     ;
+
+// Pure nslit entries: allow both members and locals
+nslit_entries:
+  /* empty */ { $$ = NULL; }
+  | nslit_entry { $$ = lsarray_new(1, $1); }
+  | nslit_entries ';' nslit_entry { $$ = lsarray_push($1, $3); }
+  | nslit_entries ';' { $$ = $1; }
+  ;
+
+nslit_entry:
+  // member: symbol '=' expr
+  LSTSYMBOL '=' expr {
+    const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
+    const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+    $$ = lsarray_new(3, tag, sym, $3);
+  }
+  // local: pattern '<-' expr
+  | pat LSTLEFTARROW expr {
+    const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("local"), 0, NULL));
+    $$ = lsarray_new(3, tag, $1, $3);
+  }
+  ;
 
 // do-block style sugar inside braces
 // Encoding for intermediate stmt node (dostmt: <array>):
@@ -405,7 +522,35 @@ elist:
     ;
 
 elambda:
-      '\\' pat LSTARROW expr3 { $$ = lselambda_new($2, $4); }
+      '\\' lamparams LSTARROW expr3 {
+        // \\p1 p2 ... -> body  ==>  \\p1 -> (\\p2 -> ... -> body)
+        lssize_t argc = lsarray_get_size($2);
+        const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
+        const lsexpr_t *b = $4;
+        for (lssize_t i = argc; i > 1; i--) {
+          b = lsexpr_new_lambda(lselambda_new(ps[i - 1], b));
+        }
+        $$ = lselambda_new(ps[0], b);
+      }
+    ;
+
+// Lambda parameter parsing:
+//  - A bare constructor token (LSTSYMBOL) is treated as zero-arity pattern in parameter position.
+//  - Algebraic patterns with arguments must be parenthesized to be a single parameter.
+lamparam:
+      lamparam2 { $$ = $1; }
+    | lamparam2 '|' lamparam { $$ = lspat_new_or($1, $3); }
+    ;
+
+lamparam2:
+      LSTSYMBOL { $$ = lspat_new_alge(lspalge_new($1, 0, NULL)); }
+    | pat3 { $$ = $1; }
+    | '(' palge ')' { $$ = lspat_new_alge($2); }
+    ;
+
+lamparams:
+      lamparam { $$ = lsarray_new(1, $1); }
+    | lamparams lamparam { $$ = lsarray_push($1, $2); }
     ;
 
 pat:
@@ -445,7 +590,7 @@ pat3:
     ;
 
 pref:
-      '~' LSTSYMBOL { $$ = lsref_new($2, @$); }
+  LSTREFSYM { $$ = lsref_new($1, @$); }
     ;
 
 ptuple:

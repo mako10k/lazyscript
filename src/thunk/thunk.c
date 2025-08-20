@@ -83,6 +83,7 @@ struct lsthunk {
     lstref_t            lt_ref;
     const lsint_t*      lt_int;
     const lsstr_t*      lt_str;
+  const lsstr_t*      lt_symbol;
     const lstbuiltin_t* lt_builtin;
   };
 };
@@ -199,6 +200,16 @@ lsthunk_t* lsthunk_new_str(const lsstr_t* strval) {
   return thunk;
 }
 
+lsthunk_t* lsthunk_new_symbol(const lsstr_t* sym) {
+  lsthunk_t* thunk = lsmalloc(sizeof(lsthunk_t));
+  thunk->lt_type   = LSTTYPE_SYMBOL;
+  thunk->lt_whnf   = thunk;
+  thunk->lt_trace_id = g_trace_next_id++;
+  thunk->lt_symbol = sym;
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
+  return thunk;
+}
+
 lsthunk_t* lsthunk_new_elambda(const lselambda_t* elambda, lstenv_t* tenv) {
   const lspat_t*  pparam         = lselambda_get_param(elambda);
   const lsexpr_t* ebody          = lselambda_get_body(elambda);
@@ -226,7 +237,17 @@ lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
   lstrace_set_pending_loc(lsexpr_get_loc(expr));
   switch (lsexpr_get_type(expr)) {
   case LSETYPE_ALGE:
-    return lsthunk_new_ealge(lsexpr_get_alge(expr), tenv);
+    {
+      const lsealge_t* ealge = lsexpr_get_alge(expr);
+      // If this is a zero-arity constructor and the constructor name starts with '.', treat as Symbol
+      if (lsealge_get_argc(ealge) == 0) {
+        const lsstr_t* c = lsealge_get_constr(ealge);
+        const char*    s = lsstr_get_buf(c);
+        if (s && s[0] == '.')
+          return lsthunk_new_symbol(c);
+      }
+      return lsthunk_new_ealge(ealge, tenv);
+    }
   case LSETYPE_APPL:
     return lsthunk_new_eappl(lsexpr_get_appl(expr), tenv);
   case LSETYPE_CHOICE:
@@ -303,6 +324,11 @@ const lsint_t* lsthunk_get_int(const lsthunk_t* thunk) {
 const lsstr_t* lsthunk_get_str(const lsthunk_t* thunk) {
   assert(thunk->lt_type == LSTTYPE_STR);
   return thunk->lt_str;
+}
+
+const lsstr_t* lsthunk_get_symbol(const lsthunk_t* thunk) {
+  assert(thunk->lt_type == LSTTYPE_SYMBOL);
+  return thunk->lt_symbol;
 }
 
 lsmres_t lsthunk_match_alge(lsthunk_t* thunk, lstpat_t* tpat) {
@@ -673,9 +699,14 @@ lsthunk_t* lsthunk_eval(lsthunk_t* func, lssize_t argc, lsthunk_t* const* args) 
   case LSTTYPE_STR:
     lsprintf(stderr, 0, "F: cannot apply for string\n");
     if (func->lt_trace_id >= 0) lstrace_pop(); return NULL;
+  case LSTTYPE_SYMBOL:
+    lsprintf(stderr, 0, "F: cannot apply for symbol\n");
+    if (func->lt_trace_id >= 0) lstrace_pop(); return NULL;
   case LSTTYPE_BUILTIN:
     { lsthunk_t* r = lsthunk_eval_builtin(func, argc, args); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   }
+  if (func->lt_trace_id >= 0) lstrace_pop();
+  return NULL;
 }
 
 lsthunk_t* lsthunk_eval0(lsthunk_t* thunk) {
@@ -833,6 +864,7 @@ static lsthunk_colle_t* lsthunk_colle_new(lsthunk_t* thunk, lsthunk_colle_t* hea
   case LSTTYPE_REF:
   case LSTTYPE_INT:
   case LSTTYPE_STR:
+  case LSTTYPE_SYMBOL:
   case LSTTYPE_BUILTIN:
     break;
   }
@@ -1027,6 +1059,10 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
       break;
     case LSTTYPE_STR:
       lsstr_print(fp, prec, indent, thunk->lt_str);
+      break;
+    case LSTTYPE_SYMBOL:
+      // Print symbol as bare (already includes leading dot)
+      lsstr_print_bare(fp, prec, indent, thunk->lt_symbol);
       break;
     case LSTTYPE_BUILTIN:
       lsprintf(fp, indent, "~%s{-builtin/%d-}", lsstr_get_buf(thunk->lt_builtin->lti_name),

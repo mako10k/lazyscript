@@ -1,0 +1,2 @@
+E: println: effect used in pure context (enable seq/chain)
+E: #err "builtin: null"
