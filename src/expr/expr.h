@@ -2,6 +2,9 @@
 
 #include <stdio.h>
 
+// Forward-declare location type to avoid include cycles; implementation includes common/loc.h
+typedef struct lsloc lsloc_t;
+
 /** Expression. */
 typedef struct lsexpr lsexpr_t;
 
@@ -45,3 +48,8 @@ lsapi_get const lselambda_t*   lsexpr_get_lambda(const lsexpr_t* expr);
 lsapi_get const lseclosure_t*  lsexpr_get_closure(const lsexpr_t* expr);
 lsapi_get const lsechoice_t*   lsexpr_get_choice(const lsexpr_t* expr);
 lsapi_print void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr);
+
+// Location helpers
+lsapi_get lsloc_t              lsexpr_get_loc(const lsexpr_t* expr);
+// Attach a source location to an expression and return it (same pointer)
+lsapi_nn1 lsapi_wur const lsexpr_t* lsexpr_with_loc(const lsexpr_t* expr, lsloc_t loc);

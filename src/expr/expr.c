@@ -1,5 +1,6 @@
 #include "expr/expr.h"
 #include "common/io.h"
+#include "common/loc.h"
 #include "common/malloc.h"
 #include "common/ref.h"
 #include "expr/ealge.h"
@@ -11,6 +12,7 @@
 
 struct lsexpr {
   lsetype_t le_type;
+  lsloc_t   le_loc;
   union {
     const lsealge_t*    le_alge;
     const lseappl_t*    le_appl;
@@ -26,6 +28,7 @@ struct lsexpr {
 const lsexpr_t* lsexpr_new_alge(const lsealge_t* ealge) {
   lsexpr_t* expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type  = LSETYPE_ALGE;
+    expr->le_loc   = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_alge  = ealge;
   return expr;
 }
@@ -33,6 +36,7 @@ const lsexpr_t* lsexpr_new_alge(const lsealge_t* ealge) {
 const lsexpr_t* lsexpr_new_appl(const lseappl_t* eappl) {
   lsexpr_t* expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type  = LSETYPE_APPL;
+  expr->le_loc   = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_appl  = eappl;
   return expr;
 }
@@ -40,6 +44,7 @@ const lsexpr_t* lsexpr_new_appl(const lseappl_t* eappl) {
 const lsexpr_t* lsexpr_new_ref(const lsref_t* ref) {
   lsexpr_t* expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type  = LSETYPE_REF;
+  expr->le_loc   = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_ref   = ref;
   return expr;
 }
@@ -47,6 +52,7 @@ const lsexpr_t* lsexpr_new_ref(const lsref_t* ref) {
 const lsexpr_t* lsexpr_new_int(const lsint_t* intval) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_INT;
+  expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_intval = intval;
   return expr;
 }
@@ -54,6 +60,7 @@ const lsexpr_t* lsexpr_new_int(const lsint_t* intval) {
 const lsexpr_t* lsexpr_new_str(const lsstr_t* strval) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_STR;
+  expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_strval = strval;
   return expr;
 }
@@ -61,6 +68,7 @@ const lsexpr_t* lsexpr_new_str(const lsstr_t* strval) {
 const lsexpr_t* lsexpr_new_lambda(const lselambda_t* lambda) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_LAMBDA;
+  expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_lambda = lambda;
   return expr;
 }
@@ -68,6 +76,7 @@ const lsexpr_t* lsexpr_new_lambda(const lselambda_t* lambda) {
 const lsexpr_t* lsexpr_new_choice(const lsechoice_t* echoice) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_CHOICE;
+  expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_choice = echoice;
   return expr;
 }
@@ -75,6 +84,7 @@ const lsexpr_t* lsexpr_new_choice(const lsechoice_t* echoice) {
 const lsexpr_t* lsexpr_new_closure(const lseclosure_t* closure) {
   lsexpr_t* expr   = lsmalloc(sizeof(lsexpr_t));
   expr->le_type    = LSETYPE_CLOSURE;
+  expr->le_loc     = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_closure = closure;
   return expr;
 }
@@ -149,4 +159,15 @@ void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr) {
     return;
   }
   lsprintf(fp, indent, "Unknown expression type %d\n", expr->le_type);
+}
+
+lsloc_t lsexpr_get_loc(const lsexpr_t* expr) {
+  return expr->le_loc;
+}
+
+const lsexpr_t* lsexpr_with_loc(const lsexpr_t* expr_in, lsloc_t loc) {
+  // cast away const for internal mutation; API returns same pointer as const
+  lsexpr_t* expr = (lsexpr_t*)expr_in;
+  expr->le_loc = loc;
+  return expr_in;
 }

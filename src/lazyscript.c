@@ -26,10 +26,13 @@
 #include "builtins/prelude.h"
 #include "builtins/ns.h"
 #include "runtime/builtin.h"
+#include "runtime/trace.h"
 
 static int         g_debug          = 0;
 static int         g_run_main       = 1; // default: on (files). -e path will disable temporarily
 static const char* g_entry_name     = "main"; // entry function name
+static int         g_trace_stack_depth = 1; // default: print top frame only
+static const char* g_trace_dump_path   = NULL; // optional: where to emit JSONL in thunk creation order
 // Global registry for namespaces moved to builtins/ns.c
 
 // effects helpers moved to runtime/effects.{h,c}
@@ -192,6 +195,7 @@ int main(int argc, char** argv) {
   int           typecheck_coreir = 0;
   int           kind_warn        = 1; // default warn
   int           kind_error       = 0; // default no error
+  const char*   trace_map_path   = NULL; // optional sourcemap for runtime tracing
   struct option longopts[]       = {
           { "eval", required_argument, NULL, 'e' },
           { "prelude-so", required_argument, NULL, 'p' },
@@ -205,6 +209,9 @@ int main(int argc, char** argv) {
           { "no-kind-warn", no_argument, NULL, 1000 },
           { "kind-error", no_argument, NULL, 1001 },
           { "init", required_argument, NULL, 1002 },
+          { "trace-map", required_argument, NULL, 2000 },
+          { "trace-stack-depth", required_argument, NULL, 2001 },
+          { "trace-dump", required_argument, NULL, 2002 },
           { "debug", no_argument, NULL, 'd' },
           { "help", no_argument, NULL, 'h' },
           { "version", no_argument, NULL, 'v' },
@@ -273,11 +280,15 @@ int main(int argc, char** argv) {
           ls_register_builtin_prelude(tenv);
         int saved_run_main = g_run_main;
         g_run_main         = 0; // -e は従来通り：最終値を出力
+        // Optional: begin trace dump for this evaluation
+        if (g_trace_dump_path && g_trace_dump_path[0]) lstrace_begin_dump(g_trace_dump_path);
         lsthunk_t* ret     = lsprog_eval(prog, tenv);
         if (ret != NULL) {
           if (lsthunk_is_err(ret)) {
             lsprintf(stderr, 0, "E: ");
             lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
+            if (g_lstrace_table && g_trace_stack_depth > 0)
+              lstrace_print_stack(stderr, g_trace_stack_depth);
             lsprintf(stderr, 0, "\n");
           } else {
             lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
@@ -285,6 +296,7 @@ int main(int argc, char** argv) {
           }
         }
         g_run_main = saved_run_main;
+        if (g_trace_dump_path && g_trace_dump_path[0]) lstrace_end_dump();
       }
       break;
     }
@@ -321,6 +333,16 @@ int main(int argc, char** argv) {
     case 1002: // --init <file>
       g_init_file = optarg;
       break;
+    case 2000: // --trace-map <file>
+      trace_map_path = optarg;
+      break;
+    case 2001: // --trace-stack-depth <n>
+      g_trace_stack_depth = atoi(optarg);
+      if (g_trace_stack_depth < 0) g_trace_stack_depth = 0;
+      break;
+    case 2002: // --trace-dump <file>
+      g_trace_dump_path = optarg;
+      break;
     case 'd':
       g_debug = 1;
 #if DEBUG
@@ -347,12 +369,18 @@ int main(int argc, char** argv) {
       printf("      --kind-error    treat kind (Pure/IO) issues as errors during --typecheck\n");
       printf("      --init <file>   load and evaluate an init LazyScript before user code (thunk "
              "path)\n");
+  printf("      --trace-map <file>   load sourcemap JSONL for runtime trace printing (exp)\n");
+  printf("      --trace-stack-depth <n>  print up to N frames on error (default: 1)\n");
+  printf("      --trace-dump <file>  write JSONL sourcemap while evaluating (exp)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
       printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not "
              "set)\n");
       printf("  LAZYSCRIPT_SUGAR_NS     namespace used for ~~sym sugar (if -n not set)\n");
       printf("  LAZYSCRIPT_INIT         path to init LazyScript (used if --init not set)\n");
+  printf("  LAZYSCRIPT_TRACE_MAP    path to sourcemap JSONL (used if --trace-map not set)\n");
+  printf("  LAZYSCRIPT_TRACE_STACK_DEPTH  depth to print (used if --trace-stack-depth not set)\n");
+  printf("  LAZYSCRIPT_TRACE_DUMP   path to write JSONL (used if --trace-dump not set)\n");
       exit(0);
     case 'v':
       printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -360,6 +388,28 @@ int main(int argc, char** argv) {
     default:
       exit(1);
     }
+  }
+
+  // Load trace map if configured via CLI or environment
+  if (trace_map_path == NULL) {
+    const char* env_map = getenv("LAZYSCRIPT_TRACE_MAP");
+    if (env_map && env_map[0]) trace_map_path = env_map;
+  }
+  if (trace_map_path && trace_map_path[0]) {
+    if (lstrace_load_jsonl(trace_map_path) != 0) {
+      lsprintf(stderr, 0, "W: failed to load trace map: %s\n", trace_map_path);
+    }
+  }
+  // Load stack depth and dump path from env if not set via CLI
+  if (g_trace_stack_depth == 1) {
+    const char* env_depth = getenv("LAZYSCRIPT_TRACE_STACK_DEPTH");
+    if (env_depth && env_depth[0]) {
+      int d = atoi(env_depth); if (d >= 0) g_trace_stack_depth = d;
+    }
+  }
+  if (g_trace_dump_path == NULL) {
+    const char* env_dump = getenv("LAZYSCRIPT_TRACE_DUMP");
+    if (env_dump && env_dump[0]) g_trace_dump_path = env_dump;
   }
   for (int i = optind; i < argc; i++) {
     const char* filename = argv[i];
@@ -424,18 +474,24 @@ int main(int argc, char** argv) {
         ls_register_builtin_prelude(tenv);
       // Evaluate init script (if any) into the same environment
       ls_maybe_eval_init(tenv);
-      lsthunk_t* ret = lsprog_eval(prog, tenv);
+  if (g_trace_dump_path && g_trace_dump_path[0]) lstrace_begin_dump(g_trace_dump_path);
+  lsthunk_t* ret = lsprog_eval(prog, tenv);
       if (ret != NULL && !ls_maybe_run_entry(tenv)) {
         if (lsthunk_is_err(ret)) {
           lsprintf(stderr, 0, "E: ");
           lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
+      if (g_lstrace_table && g_trace_stack_depth > 0)
+    lstrace_print_stack(stderr, g_trace_stack_depth);
           lsprintf(stderr, 0, "\n");
         } else {
           lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
           lsprintf(stdout, 0, "\n");
         }
       }
+  if (g_trace_dump_path && g_trace_dump_path[0]) lstrace_end_dump();
     }
   }
+  // Cleanup
+  lstrace_free();
   return 0;
 }

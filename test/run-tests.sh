@@ -49,6 +49,16 @@ for name in "${cases[@]}"; do
       continue 2
     fi
   done
+  # Optional per-test env file (key=value per line)
+  if [[ -f "$base.env" ]]; then
+    # shellcheck source=/dev/null
+    source "$base.env"
+  fi
+  # If a .trace.out exists, enable eager stack printing to stabilize output
+  if [[ -f "$base.trace.out" ]]; then
+    export LAZYSCRIPT_TRACE_EAGER_PRINT=1
+    export LAZYSCRIPT_TRACE_STACK_DEPTH=${LAZYSCRIPT_TRACE_STACK_DEPTH:-1}
+  fi
   # Run program and capture all output (stdout+stderr)
   out="$("$BIN" "$src" 2>&1)"
   if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
@@ -76,6 +86,11 @@ for name in "${eval_cases[@]}"; do
   [[ -z "$name" ]] && continue
   src="$DIR/$name.ls"
   exp="$DIR/$name.eval.out"
+  if [[ -f "$base.env" ]]; then source "$base.env"; fi
+  if [[ -f "$base.trace.out" ]]; then
+    export LAZYSCRIPT_TRACE_EAGER_PRINT=1
+    export LAZYSCRIPT_TRACE_STACK_DEPTH=${LAZYSCRIPT_TRACE_STACK_DEPTH:-1}
+  fi
   out="$("$BIN" -e "$(cat "$src")" 2>&1)"
   if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
     echo "ok - eval $name"

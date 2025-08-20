@@ -1,0 +1,2 @@
+E: /workspaces/lazyscript/test/t32_trace_stack.ls:2.4-21: undefined reference: ~undefined_symbol
+E: #err "undefined reference"
