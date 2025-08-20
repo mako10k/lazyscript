@@ -83,6 +83,11 @@ static void build_search_paths(char* out, size_t outsz) {
     append_path(out, outsz, tmp, NULL);
     snprintf(tmp, sizeof(tmp), "%s/plugins", exedir);
     append_path(out, outsz, tmp, NULL);
+    // When executed from the build tree, shared objects live in .libs/
+    snprintf(tmp, sizeof(tmp), "%s/builtins/.libs", exedir);
+    append_path(out, outsz, tmp, NULL);
+    snprintf(tmp, sizeof(tmp), "%s/plugins/.libs", exedir);
+    append_path(out, outsz, tmp, NULL);
   }
   // Fallback system paths
   append_path(out, outsz, "/usr/local/lib/lazyscript", NULL);
@@ -103,9 +108,10 @@ static lsthunk_t* make_symbol_key(const char* name) {
   char buf[256];
   size_t n = strlen(name);
   if (n + 2 >= sizeof(buf)) n = sizeof(buf) - 2; // truncate long names
-  buf[0] = '.'; memcpy(buf + 1, name, n); buf[1 + n] = '\0';
-  const lsealge_t* ea = lsealge_new(lsstr_cstr(buf), 0, NULL);
-  return lsthunk_new_ealge(ea, NULL);
+  buf[0] = '.';
+  memcpy(buf + 1, name, n);
+  buf[1 + n] = '\0';
+  return lsthunk_new_symbol(lsstr_cstr(buf));
 }
 
 static lsthunk_t* build_namespace_from_module(const ls_builtin_module_t* mod) {
