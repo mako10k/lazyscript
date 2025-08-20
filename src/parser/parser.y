@@ -84,12 +84,14 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 52
+%expect 53
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
 %nterm <array> dostmt
 %nterm <elambda> elambda
+%nterm <pat> lamparam lamparam2
+%nterm <array> lamparams
 %nterm <array> earray parray
 %nterm <ealge> ealge elist econs etuple
 %nterm <eappl> eappl
@@ -98,6 +100,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %nterm <palge> palge plist pcons ptuple
 %nterm <array> bind bind_list
 %nterm <bind> bind_single
+%nterm <ref> funlhs
 %nterm <eclosure> closure
 %nterm <array> nsentries
 %nterm <array> nsentry
@@ -129,8 +132,23 @@ bind:
       bind_list { $$ = $1; }
     ;
 
+funlhs:
+      pref { $$ = $1; }
+    ;
+
 bind_single:
-      pat '=' expr { $$ = lsbind_new($1, $3); }
+      funlhs lamparams '=' expr {
+        // ~f p1 p2 ... = body  ==>  ~f = \p1 -> \p2 -> ... -> body
+        const lspat_t *lhs = lspat_new_ref($1);
+        lssize_t argc = lsarray_get_size($2);
+        const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
+        const lsexpr_t *b = $4;
+        for (lssize_t i = argc; i > 0; i--) {
+          b = lsexpr_new_lambda(lselambda_new(ps[i - 1], b));
+        }
+        $$ = lsbind_new(lhs, b);
+      }
+    | pat '=' expr { $$ = lsbind_new($1, $3); }
     ;
 
 bind_list:
@@ -435,7 +453,35 @@ elist:
     ;
 
 elambda:
-      '\\' pat LSTARROW expr3 { $$ = lselambda_new($2, $4); }
+      '\\' lamparams LSTARROW expr3 {
+        // \\p1 p2 ... -> body  ==>  \\p1 -> (\\p2 -> ... -> body)
+        lssize_t argc = lsarray_get_size($2);
+        const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
+        const lsexpr_t *b = $4;
+        for (lssize_t i = argc; i > 1; i--) {
+          b = lsexpr_new_lambda(lselambda_new(ps[i - 1], b));
+        }
+        $$ = lselambda_new(ps[0], b);
+      }
+    ;
+
+// Lambda parameter parsing:
+//  - A bare constructor token (LSTSYMBOL) is treated as zero-arity pattern in parameter position.
+//  - Algebraic patterns with arguments must be parenthesized to be a single parameter.
+lamparam:
+      lamparam2 { $$ = $1; }
+    | lamparam2 '|' lamparam { $$ = lspat_new_or($1, $3); }
+    ;
+
+lamparam2:
+      LSTSYMBOL { $$ = lspat_new_alge(lspalge_new($1, 0, NULL)); }
+    | pat3 { $$ = $1; }
+    | '(' palge ')' { $$ = lspat_new_alge($2); }
+    ;
+
+lamparams:
+      lamparam { $$ = lsarray_new(1, $1); }
+    | lamparams lamparam { $$ = lsarray_push($1, $2); }
     ;
 
 pat:
