@@ -140,12 +140,12 @@ expr:
 
 expr1:
       expr2 { $$ = $1; }
-    | expr2 '|' expr1 { $$ = lsexpr_new_choice(lsechoice_new($1, $3)); }
+  | expr2 '|' expr1 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new($1, $3)), @$); }
     ;
 
 expr2:
       expr3 { $$ = $1; }
-    | econs { $$ = lsexpr_new_alge($1);}
+  | econs { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$);}    
     ;
 
 econs:
@@ -157,7 +157,7 @@ econs:
 
 expr3:
       expr4 { $$ = $1; }
-    | eappl { $$ = lsexpr_new_appl($1); }
+  | eappl { $$ = lsexpr_with_loc(lsexpr_new_appl($1), @$); }
     ;
 
 eappl:
@@ -167,7 +167,7 @@ eappl:
 
 expr4:
       expr5 { $$ = $1; }
-    | ealge { $$ = lsexpr_new_alge($1); }
+  | ealge { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
     ;
 
 ealge:
@@ -181,25 +181,25 @@ expr5:
     ;
 
 efact:
-      LSTINT { $$ = lsexpr_new_int($1); }
-    | LSTSTR { $$ = lsexpr_new_str($1); }
+  LSTINT { $$ = lsexpr_with_loc(lsexpr_new_int($1), @$); }
+  | LSTSTR { $$ = lsexpr_with_loc(lsexpr_new_str($1), @$); }
     | LSTPRELUDESYM {
         // desugar: ~~sym  ==>  (~<ns> sym), where ns = lsscan_get_sugar_ns(yyextra)
         const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
-        const lsexpr_t *nsref = lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$));
+  const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
         const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
         const lsexpr_t *args[] = { sym };
-        $$ = lsexpr_new_appl(lseappl_new(nsref, 1, args));
+  $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
       }
     | etuple {
         lssize_t argc = lsealge_get_argc($1);
         const lsexpr_t *const *args = lsealge_get_args($1);
-        $$ = argc == 1 ? args[0] : lsexpr_new_alge($1);
+  $$ = argc == 1 ? args[0] : lsexpr_with_loc(lsexpr_new_alge($1), @$);
     }
-    | elist { $$ = lsexpr_new_alge($1); }
-    | closure { $$ = lsexpr_new_closure($1); }
-    | '~' LSTSYMBOL { $$ = lsexpr_new_ref(lsref_new($2, @$)); }
-    | elambda { $$ = lsexpr_new_lambda($1); }
+  | elist { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
+  | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
+  | '~' LSTSYMBOL { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($2, @$)), @$); }
+  | elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
   | '!' '{' dostmts '}' { $$ = $3; }
     | '!' '!' '{' nsentries '}' {
         // Anonymous namespace literal sugar:
@@ -209,12 +209,12 @@ efact:
         //       chain ((~prelude nsdefv) ns 'b e2) (_ ->
         //         return ns)))
         const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
-        const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
+  const lsexpr_t *prelude = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$)), @$);
         // helpers: prelude.bind/chain/return/nsnew0/nsdefv
         const lsexpr_t *sym_bind = lsexpr_new_alge(lsealge_new(lsstr_cstr("bind"), 0, NULL));
-        const lsexpr_t *fn_bind  = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_bind));
+  const lsexpr_t *fn_bind  = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(prelude, 1, &sym_bind)), @$);
         const lsexpr_t *sym_chain = lsexpr_new_alge(lsealge_new(lsstr_cstr("chain"), 0, NULL));
-        const lsexpr_t *fn_chain  = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_chain));
+  const lsexpr_t *fn_chain  = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(prelude, 1, &sym_chain)), @$);
         const lsexpr_t *sym_return = lsexpr_new_alge(lsealge_new(lsstr_cstr("return"), 0, NULL));
         const lsexpr_t *fn_return  = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_return));
   const lsexpr_t *sym_nsnew0 = lsexpr_new_alge(lsealge_new(lsstr_cstr("nsnew0"), 0, NULL));

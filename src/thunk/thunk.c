@@ -10,6 +10,7 @@
 #include "runtime/trace.h"
 #include <assert.h>
 #include <stddef.h>
+#include <string.h>
 
 // Debug tracing for thunk evaluation (off by default). Enable with -DLS_TRACE=1
 #ifndef LS_TRACE
@@ -95,8 +96,7 @@ lsthunk_t* lsthunk_new_ealge(const lsealge_t* ealge, lstenv_t* tenv) {
   thunk->lt_type            = LSTTYPE_ALGE;
   thunk->lt_whnf            = thunk;
   thunk->lt_trace_id        = g_trace_next_id++;
-  // Unknown loc for generic algebraic expressions at parse time; emit placeholder
-  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
   thunk->lt_alge.lta_constr = lsealge_get_constr(ealge);
   thunk->lt_alge.lta_argc   = eargc;
   for (lssize_t i = 0; i < eargc; i++)
@@ -120,7 +120,7 @@ lsthunk_t* lsthunk_new_eappl(const lseappl_t* eappl, lstenv_t* tenv) {
   thunk->lt_type          = LSTTYPE_APPL;
   thunk->lt_whnf          = NULL;
   thunk->lt_trace_id      = g_trace_next_id++;
-  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
   thunk->lt_appl.lta_func = func;
   thunk->lt_appl.lta_argc = eargc;
   for (lssize_t i = 0; i < eargc; i++)
@@ -133,7 +133,7 @@ lsthunk_t* lsthunk_new_echoice(const lsechoice_t* echoice, lstenv_t* tenv) {
   thunk->lt_type             = LSTTYPE_CHOICE;
   thunk->lt_whnf             = NULL;
   thunk->lt_trace_id         = g_trace_next_id++;
-  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
   thunk->lt_choice.ltc_left  = lsthunk_new_expr(lsechoice_get_left(echoice), tenv);
   thunk->lt_choice.ltc_right = lsthunk_new_expr(lsechoice_get_right(echoice), tenv);
   return thunk;
@@ -170,8 +170,12 @@ lsthunk_t* lsthunk_new_ref(const lsref_t* ref, lstenv_t* tenv) {
   thunk->lt_ref.ltr_ref    = ref;
   thunk->lt_ref.ltr_target = target; // may be NULL; resolve lazily at eval
   thunk->lt_ref.ltr_env    = tenv;
-  // Use the reference location for mapping
-  lstrace_emit_loc(lsref_get_loc(ref));
+  // Prefer pending loc; fallback to ref's own loc
+  {
+    lsloc_t loc = lstrace_take_pending_or_unknown();
+    if (loc.filename && strcmp(loc.filename, "<unknown>") != 0) lstrace_emit_loc(loc);
+    else lstrace_emit_loc(lsref_get_loc(ref));
+  }
   return thunk;
 }
 
@@ -181,7 +185,7 @@ lsthunk_t* lsthunk_new_int(const lsint_t* intval) {
   thunk->lt_whnf   = thunk;
   thunk->lt_trace_id = g_trace_next_id++;
   thunk->lt_int    = intval;
-  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
   return thunk;
 }
 
@@ -191,7 +195,7 @@ lsthunk_t* lsthunk_new_str(const lsstr_t* strval) {
   thunk->lt_whnf   = thunk;
   thunk->lt_trace_id = g_trace_next_id++;
   thunk->lt_str    = strval;
-  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
   return thunk;
 }
 
@@ -211,13 +215,15 @@ lsthunk_t* lsthunk_new_elambda(const lselambda_t* elambda, lstenv_t* tenv) {
   thunk->lt_type             = LSTTYPE_LAMBDA;
   thunk->lt_whnf             = thunk;
   thunk->lt_trace_id         = g_trace_next_id++;
-  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
   thunk->lt_lambda.ltl_param = origin->lrto_lambda.ltl_param;
   thunk->lt_lambda.ltl_body  = origin->lrto_lambda.ltl_body;
   return thunk;
 }
 
 lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
+  // Record pending loc for this expression so JSONL emission uses it
+  lstrace_set_pending_loc(lsexpr_get_loc(expr));
   switch (lsexpr_get_type(expr)) {
   case LSETYPE_ALGE:
     return lsthunk_new_ealge(lsexpr_get_alge(expr), tenv);
@@ -565,6 +571,15 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
       lsprintf(stderr, 0, "undefined reference: ");
       lsref_print(stderr, LSPREC_LOWEST, 0, thunk->lt_ref.ltr_ref);
       lsprintf(stderr, 0, "\n");
+      // Optional eager trace stack print while stack is still active (test hook)
+      const char* eager = getenv("LAZYSCRIPT_TRACE_EAGER_PRINT");
+      if (eager && *eager && g_lstrace_table) {
+        int depth = 1;
+        const char* d = getenv("LAZYSCRIPT_TRACE_STACK_DEPTH");
+        if (d && *d) { int v = atoi(d); if (v >= 0) depth = v; }
+        lstrace_print_stack(stderr, depth);
+        // lstrace_print_stack starts each frame with "\n at ", so no extra newline needed
+      }
       return ls_make_err("undefined reference");
     }
     thunk->lt_ref.ltr_target = target; // cache

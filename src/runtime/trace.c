@@ -5,9 +5,12 @@
 #include <string.h>
 
 lstrace_table_t* g_lstrace_table = NULL;
-// Simple global stack for current trace id (process-wide for now)
-static int   g_trace_stack[256];
-static int   g_trace_top = 0;
+// Thread-local stack for current trace id
+static __thread int g_trace_stack[256];
+static __thread int g_trace_top = 0;
+// Thread-local pending loc for next emission
+static __thread int    g_has_pending_loc = 0;
+static __thread lsloc_t g_pending_loc;
 // Optional JSONL dump state
 static FILE* g_trace_dump_fp = NULL;
 
@@ -151,12 +154,17 @@ int lstrace_current(void) {
 }
 
 void lstrace_push(int id) {
-  if (g_trace_top < (int)(sizeof(g_trace_stack) / sizeof(g_trace_stack[0])))
+  int cap = (int)(sizeof(g_trace_stack) / sizeof(g_trace_stack[0]));
+  if (g_trace_top < cap) {
     g_trace_stack[g_trace_top++] = id;
+  } else {
+    fprintf(stderr, "W: trace stack overflow (cap=%d)\n", cap);
+  }
 }
 
 void lstrace_pop(void) {
   if (g_trace_top > 0) g_trace_top--;
+  else fprintf(stderr, "W: trace stack underflow\n");
 }
 
 void lstrace_print_stack(FILE* fp, int max_depth) {
@@ -203,4 +211,13 @@ void lstrace_emit_loc(lsloc_t loc) {
 
 void lstrace_end_dump(void) {
   if (g_trace_dump_fp) { fclose(g_trace_dump_fp); g_trace_dump_fp = NULL; }
+}
+
+void lstrace_set_pending_loc(lsloc_t loc) {
+  g_pending_loc = loc; g_has_pending_loc = 1;
+}
+
+lsloc_t lstrace_take_pending_or_unknown(void) {
+  if (g_has_pending_loc) { g_has_pending_loc = 0; return g_pending_loc; }
+  return lsloc("<unknown>", 1, 1, 1, 1);
 }

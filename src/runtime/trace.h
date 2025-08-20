@@ -54,6 +54,11 @@ void lstrace_emit_loc(lsloc_t loc);
 // Finish dumping and close the file.
 void lstrace_end_dump(void);
 
+// Pending source location for next thunk creation (set by lsthunk_new_expr)
+void   lstrace_set_pending_loc(lsloc_t loc);
+// Take pending loc if any; otherwise return <unknown>
+lsloc_t lstrace_take_pending_or_unknown(void);
+
 #ifdef __cplusplus
 }
 #endif
