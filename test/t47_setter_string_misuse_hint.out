@@ -1,0 +1,1 @@
+E: #err "namespace: use (~ns __set) or (~ns .__set) for setter"

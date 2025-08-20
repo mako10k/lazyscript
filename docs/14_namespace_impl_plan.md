@@ -53,9 +53,11 @@
    - 実装: lsbuiltin_nsnew/lsbuiltin_nsdef/lsbuiltin_nsdefv/namespace.__set に ls_effects_allowed() ガードとエラーメッセージを追加。
    - テスト: strict-effects on/off の差異（on で失敗、chain/seq で成功）。
 
-7. 互換性と移行（残件あり）
-   - 旧インターフェイスが残っている場合は const へブリッジ、または明示エラーへ誘導（要棚卸）。
-   - CHANGELOG 更新（残件）。
+7. 互換性と移行（進行中）
+   - 旧IFブリッジ: `(~ns .__set)` を許容（`(~ns __set)` と等価）。
+   - 誤用ヒント: `(~ns "__set")` / `(~ns ".__set")` は `#err "namespace: use (~ns __set) or (~ns .__set) for setter"` を返す。
+   - 追加棚卸しがあれば順次ブリッジ or 明示エラー化。
+   - CHANGELOG 追加済み。
 
 ## 影響ファイル（予想）
 - レキサ/パーサ: `src/parser/lexer.l`, `src/parser/parser.y`

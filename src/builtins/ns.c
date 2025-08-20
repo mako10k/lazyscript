@@ -246,6 +246,13 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
   lsthunk_t* keyv = ls_eval_arg(args[0], "namespace: key");
   if (lsthunk_is_err(keyv)) return keyv;
   if (!keyv) return ls_make_err("namespace: key eval");
+  // Suggestion for common mistake: passing string "__set"/".__set"
+  if (lsthunk_get_type(keyv) == LSTTYPE_STR) {
+    const lsstr_t* s = lsthunk_get_str(keyv);
+    if (lsstrcmp(s, lsstr_cstr("__set")) == 0 || lsstrcmp(s, lsstr_cstr(".__set")) == 0) {
+      return ls_make_err("namespace: use (~ns __set) or (~ns .__set) for setter");
+    }
+  }
   // Backward-compat: allow symbol .__set as setter as well
   if (lsthunk_get_type(keyv) == LSTTYPE_SYMBOL) {
     const lsstr_t* s = lsthunk_get_symbol(keyv);
