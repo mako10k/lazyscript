@@ -8,6 +8,7 @@
 - 無名 NS（可変）とリテラル NS（不変）の併存
 - nsMembers の `list<const>` 返却と安定ソート
 - 効果（nsdef/nsdefv/__set）の扱いを既存ポリシーに統合
+   - strict-effects 連携: ns のミューテーション（nsnew/nsdef/nsdefv/__set）は効果としてガードし、pure 文脈では明示エラー。
 - 互換性維持（可能な範囲で旧入力も許容 or 明示エラー）
 
 非目標（本計画では扱わない）
@@ -48,8 +49,9 @@
    - テスト: 構文とエラーメッセージ、既存との非衝突確認。
 
 6. 効果システムとの統合
-   - nsdef/nsdefv/__set を効果として宣言し、strict-effects で要トークンに。
-   - テスト: strict-effects on/off の差異。
+   - nsnew/nsdef/nsdefv/__set を効果として宣言し、strict-effects で要トークン（seq/chain）に。
+   - 実装: lsbuiltin_nsnew/lsbuiltin_nsdef/lsbuiltin_nsdefv/namespace.__set に ls_effects_allowed() ガードとエラーメッセージを追加。
+   - テスト: strict-effects on/off の差異（on で失敗、chain/seq で成功）。
 
 7. 互換性と移行
    - 旧インターフェイス（もしシンボル表現が存在する場合）を const へブリッジ、または明示エラー+メッセージ。
@@ -75,6 +77,7 @@
 - 不変 NS に対する set/nsdefv → ランタイムエラー（メッセージ: immutable namespace）。
 - キーが const でない → 型エラー（const expected）。
 - 名前未登録（~~nsdef の対象 NS が無い）→ ランタイムエラー（unknown namespace）。
+ - strict-effects 有効時のミューテーション（nsnew/nsdef/nsdefv/__set）→ 純粋文脈ではエラー（"effect used in pure context (enable seq/chain)"）。
 
 ## リスク/対策
 - レキサ衝突（.symbol）: ドットの既存用途を確認し、先読みで SYM_LIT を優先。

@@ -42,6 +42,7 @@ for name in "${cases[@]}"; do
   [[ -z "$name" ]] && continue
   src="$DIR/$name.ls"
   exp="$DIR/$name.out"
+  base="$DIR/$name"
   # Skip known-bad tests
   for s in "${skip[@]}"; do
     if [[ "$name" == "$s" ]]; then
@@ -60,7 +61,13 @@ for name in "${cases[@]}"; do
     export LAZYSCRIPT_TRACE_STACK_DEPTH=${LAZYSCRIPT_TRACE_STACK_DEPTH:-1}
   fi
   # Run program and capture all output (stdout+stderr)
-  out="$("$BIN" "$src" 2>&1)"
+  # Optional per-test CLI args (from .env): set LAZYSCRIPT_ARGS="-s ..."
+  add_args=()
+  if [[ -n "${LAZYSCRIPT_ARGS:-}" ]]; then
+    # shellcheck disable=SC2206
+    add_args=($LAZYSCRIPT_ARGS)
+  fi
+  out="$("$BIN" "${add_args[@]}" "$src" 2>&1)"
   if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
     echo "ok - $name"
     ((pass++))
@@ -86,12 +93,18 @@ for name in "${eval_cases[@]}"; do
   [[ -z "$name" ]] && continue
   src="$DIR/$name.ls"
   exp="$DIR/$name.eval.out"
+  base="$DIR/$name"
   if [[ -f "$base.env" ]]; then source "$base.env"; fi
   if [[ -f "$base.trace.out" ]]; then
     export LAZYSCRIPT_TRACE_EAGER_PRINT=1
     export LAZYSCRIPT_TRACE_STACK_DEPTH=${LAZYSCRIPT_TRACE_STACK_DEPTH:-1}
   fi
-  out="$("$BIN" -e "$(cat "$src")" 2>&1)"
+  add_args=()
+  if [[ -n "${LAZYSCRIPT_ARGS:-}" ]]; then
+    # shellcheck disable=SC2206
+    add_args=($LAZYSCRIPT_ARGS)
+  fi
+  out="$("$BIN" "${add_args[@]}" -e "$(cat "$src")" 2>&1)"
   if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
     echo "ok - eval $name"
     ((pass++))
@@ -117,8 +130,14 @@ for name in "${cir_cases[@]}"; do
   [[ -z "$name" ]] && continue
   src="$DIR/$name.ls"
   exp="$DIR/$name.coreir.out"
+  base="$DIR/$name"
   # Run program with Core IR dump and capture all output
-  out="$("$BIN" --dump-coreir "$src" 2>&1)"
+  add_args=()
+  if [[ -n "${LAZYSCRIPT_ARGS:-}" ]]; then
+    # shellcheck disable=SC2206
+    add_args=($LAZYSCRIPT_ARGS)
+  fi
+  out="$("$BIN" "${add_args[@]}" --dump-coreir "$src" 2>&1)"
   if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
     echo "ok - coreir $name"
     ((pass++))

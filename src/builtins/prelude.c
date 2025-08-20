@@ -172,9 +172,15 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsdef")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
-  if (lsstrcmp(name, lsstr_cstr("nsnew0")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("nsnew0")) == 0) {
+    // Direct creation is effectful; guard under strict-effects
+    if (!ls_effects_allowed()) {
+      lsprintf(stderr, 0, "E: nsnew0: effect used in pure context (enable seq/chain)\n");
+      return NULL;
+    }
     // Return the anonymous namespace value directly (0-arity application is awkward)
     return lsbuiltin_nsnew0(0, NULL, tenv);
+  }
   if (lsstrcmp(name, lsstr_cstr("nsdefv")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsMembers")) == 0)

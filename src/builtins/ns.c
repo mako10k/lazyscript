@@ -5,6 +5,7 @@
 #include "common/io.h"
 #include "common/int.h"
 #include "runtime/unit.h"
+#include "runtime/effects.h"
 #include "thunk/tenv.h"
 #include "runtime/error.h"
 #include "expr/expr.h"
@@ -285,6 +286,10 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
 // __set helper implementation
 static lsthunk_t* lsbuiltin_ns_set(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; lsns_t* ns = (lsns_t*)data; if (!ns || !ns->map) return ls_make_err("namespace: invalid");
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: namespace.__set: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
   lsthunk_t* keyv = ls_eval_arg(args[0], "namespace: __set key");
   if (lsthunk_is_err(keyv)) return keyv;
   if (!keyv) return ls_make_err("namespace: __set key eval");
@@ -309,6 +314,10 @@ static const lsstr_t* ns_make_key(const lsstr_t* base) {
 lsthunk_t* lsbuiltin_nsnew(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
   lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return NULL;
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: nsnew: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
   lsthunk_t* namev = ls_eval_arg(args[0], "nsnew: name");
   if (lsthunk_is_err(namev)) return namev;
   if (!namev) return ls_make_err("nsnew: name eval");
@@ -330,6 +339,10 @@ lsthunk_t* lsbuiltin_nsnew(lssize_t argc, lsthunk_t* const* args, void* data) {
 
 lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; lstenv_t* tenv = (lstenv_t*)data; (void)tenv; // unused
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: nsdef: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
   lsthunk_t* nsv = ls_eval_arg(args[0], "nsdef: ns");
   if (lsthunk_is_err(nsv)) return nsv;
   lsthunk_t* symv = ls_eval_arg(args[1], "nsdef: key");
@@ -372,6 +385,10 @@ lsthunk_t* lsbuiltin_nsnew0(lssize_t argc, lsthunk_t* const* args, void* data) {
 // Define into a namespace value directly: (nsdefv NS sym value)
 lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; (void)data;
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: nsdefv: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
   lsthunk_t* nsv = ls_eval_arg(args[0], "nsdefv: ns");
   if (lsthunk_is_err(nsv)) return nsv;
   if (!nsv) return ls_make_err("nsdefv: ns eval");
