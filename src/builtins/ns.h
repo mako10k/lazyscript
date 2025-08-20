@@ -14,3 +14,5 @@ lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data);
 lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data);
 // Enumerate namespace members in stable order (symbol < str < int < constr)
 lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* data);
+// Expose prelude.nsSelf (available only within nslit evaluation)
+lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void* data);

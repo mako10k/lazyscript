@@ -1,6 +1,6 @@
 !{
-  ~~require "lib/result.ls";
-  ~~println (~to_str (((~Result Ok) 1)));
-  ~~println (~to_str ((((~map (\~x -> ~add ~x 1))) (((~Result Ok) 2)))));
-  ~~println (~to_str ((((~withDefault 9)) (((~Result Err) "e")))));
+  ~R <- ((~prelude requirePure) "lib/result.ls");
+  ~~println (~to_str ((((~R .Result) Ok) 1)));
+  ~~println (~to_str (((((~R .map) (\~x -> ~add ~x 1))) ((((~R .Result) Ok) 2)))));
+  ~~println (~to_str (((((~R .withDefault) 9)) ((((~R .Result) Err) "e")))));
 };

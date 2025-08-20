@@ -1,6 +1,6 @@
 !{
-  ~~require "lib/option.ls";
-  ~~println (~to_str ((~Option Some) 1));
-  ~~println (~to_str ((~map (\~x -> ~add ~x 1)) ((~Option Some) 2)));
-  ~~println (~to_str (((~getOrElse 99) ((~Option None)))));
+  ~M <- ((~prelude requirePure) "lib/option.ls");
+  ~~println (~to_str (((~M .Option) Some) 1));
+  ~~println (~to_str (((~M .map) (\~x -> ~add ~x 1)) (((~M .Option) Some) 2)));
+  ~~println (~to_str ((((~M .getOrElse) 99) (((~M .Option) None)))));
 };

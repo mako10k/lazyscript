@@ -104,6 +104,8 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %nterm <eclosure> closure
 %nterm <array> nsentries
 %nterm <array> nsentry
+%nterm <array> nslit_entries
+%nterm <array> nslit_entry
 
 
 %token <intval> LSTINT
@@ -296,25 +298,70 @@ efact:
         const lsexpr_t *bind_args[] = { call_nsnew0, lam0 };
         $$ = lsexpr_new_appl(lseappl_new(fn_bind, 2, bind_args));
       }
-    | '{' nsentries '}' {
-        // Pure namespace literal sugar:
-        // { a = e1; b = e2; } => (~prelude nslit$2) 'a e1 'b e2
-        const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
-        const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
-        lssize_t ec = $2 ? lsarray_get_size($2) : 0;
-        lssize_t argc = ec * 2;
-        char buf[32];
-        snprintf(buf, sizeof(buf), "nslit$%ld", (long)argc);
-        const lsexpr_t *sym_nslit = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
-        const lsexpr_t *fn_nslit = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_nslit));
-        const lsexpr_t **args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
-        for (lssize_t i = 0; i < ec; i++) {
-          const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
-          args[2*i]   = (const lsexpr_t*)lsarray_get(ent)[0];
-          args[2*i+1] = (const lsexpr_t*)lsarray_get(ent)[1];
+    | '{' nslit_entries '}' {
+          // Pure namespace literal sugar with optional local bindings:
+          // { a = e1; p <- e2; b = e3; } => (\p -> (~prelude nslit$4) 'a e1 'b e3) e2
+          const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+          const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
+          lssize_t ec = $2 ? lsarray_get_size($2) : 0;
+          // Count members and locals
+          lssize_t memberc = 0, localc = 0;
+          for (lssize_t i = 0; i < ec; i++) {
+            const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
+            const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
+            // tag is a constructor 'member or 'local
+            if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
+              const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
+              if (lsstrcmp(cname, lsstr_cstr("member")) == 0) memberc++;
+              else if (lsstrcmp(cname, lsstr_cstr("local")) == 0) localc++;
+            }
+          }
+          lssize_t argc = memberc * 2;
+          char buf[32];
+          snprintf(buf, sizeof(buf), "nslit$%ld", (long)argc);
+          const lsexpr_t *sym_nslit = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
+          const lsexpr_t *fn_nslit = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_nslit));
+          const lsexpr_t **args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
+          // Fill member args in order
+          lssize_t mi = 0;
+          for (lssize_t i = 0; i < ec; i++) {
+            const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
+            const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
+            if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
+              const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
+              if (lsstrcmp(cname, lsstr_cstr("member")) == 0) {
+                args[2*mi]   = (const lsexpr_t*)lsarray_get(ent)[1];
+                args[2*mi+1] = (const lsexpr_t*)lsarray_get(ent)[2];
+                mi++;
+              }
+            }
+          }
+          const lsexpr_t *base_ns = lsexpr_new_appl(lseappl_new(fn_nslit, argc, args));
+          if (localc == 0) {
+            $$ = base_ns;
+          } else {
+            // Build closure binds from locals without creating empty array
+            const lsarray_t *binds = NULL;
+            for (lssize_t i = 0; i < ec; i++) {
+              const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
+              const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
+              if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
+                const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
+                if (lsstrcmp(cname, lsstr_cstr("local")) == 0) {
+                  const lspat_t *p = (const lspat_t*)lsarray_get(ent)[1];
+                  const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[2];
+                  const lsbind_t *b = lsbind_new(p, rhs);
+                  if (!binds) binds = lsarray_new(1, b);
+                  else binds = lsarray_push((lsarray_t*)binds, (void*)b);
+                }
+              }
+            }
+            lssize_t bc = lsarray_get_size(binds);
+            const lsbind_t *const *bs = (const lsbind_t *const *)lsarray_get(binds);
+            const lseclosure_t *cl = lseclosure_new(base_ns, bc, bs);
+            $$ = lsexpr_with_loc(lsexpr_new_closure(cl), @$);
+          }
         }
-        $$ = lsexpr_new_appl(lseappl_new(fn_nslit, argc, args));
-      }
     ;
 
 // !!{ a = e; b = e2; } entries
@@ -332,6 +379,28 @@ nsentry:
       }
     
     ;
+
+// Pure nslit entries: allow both members and locals
+nslit_entries:
+  /* empty */ { $$ = NULL; }
+  | nslit_entry { $$ = lsarray_new(1, $1); }
+  | nslit_entries ';' nslit_entry { $$ = lsarray_push($1, $3); }
+  | nslit_entries ';' { $$ = $1; }
+  ;
+
+nslit_entry:
+  // member: symbol '=' expr
+  LSTSYMBOL '=' expr {
+    const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
+    const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+    $$ = lsarray_new(3, tag, sym, $3);
+  }
+  // local: pattern '<-' expr
+  | pat LSTLEFTARROW expr {
+    const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("local"), 0, NULL));
+    $$ = lsarray_new(3, tag, $1, $3);
+  }
+  ;
 
 // do-block style sugar inside braces
 // Encoding for intermediate stmt node (dostmt: <array>):
