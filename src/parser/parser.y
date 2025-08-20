@@ -333,7 +333,7 @@ efact:
             // tag is a constructor 'member or 'local
             if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
               const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
-              if (lsstrcmp(cname, lsstr_cstr("member")) == 0) memberc++;
+              if (lsstrcmp(cname, lsstr_cstr("member")) == 0) { memberc++; localc++; }
               else if (lsstrcmp(cname, lsstr_cstr("local")) == 0) localc++;
             }
           }
@@ -351,8 +351,12 @@ efact:
             if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
               const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
               if (lsstrcmp(cname, lsstr_cstr("member")) == 0) {
-                args[2*mi]   = (const lsexpr_t*)lsarray_get(ent)[1];
-                args[2*mi+1] = (const lsexpr_t*)lsarray_get(ent)[2];
+                const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
+                args[2*mi] = sym;
+                lsloc_t loc = lsexpr_get_loc(sym);
+                const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
+                const lsref_t *r = lsref_new(sname, loc);
+                args[2*mi+1] = lsexpr_with_loc(lsexpr_new_ref(r), loc);
                 mi++;
               }
             }
@@ -370,6 +374,16 @@ efact:
                 const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
                 if (lsstrcmp(cname, lsstr_cstr("local")) == 0) {
                   const lspat_t *p = (const lspat_t*)lsarray_get(ent)[1];
+                  const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[2];
+                  const lsbind_t *b = lsbind_new(p, rhs);
+                  if (!binds) binds = lsarray_new(1, b);
+                  else binds = lsarray_push((lsarray_t*)binds, (void*)b);
+                } else if (lsstrcmp(cname, lsstr_cstr("member")) == 0) {
+                  const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
+                  lsloc_t loc = lsexpr_get_loc(sym);
+                  const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
+                  const lsref_t *r = lsref_new(sname, loc);
+                  const lspat_t *p = lspat_new_ref(r);
                   const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[2];
                   const lsbind_t *b = lsbind_new(p, rhs);
                   if (!binds) binds = lsarray_new(1, b);
@@ -413,7 +427,7 @@ nslit_entry:
   // member: symbol '=' expr
   LSTSYMBOL '=' expr {
     const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
-    const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @1);
     $$ = lsarray_new(3, tag, sym, $3);
   }
   // local: pattern '<-' expr
