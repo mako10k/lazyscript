@@ -200,35 +200,44 @@ static const char* ls_find_prelude_so(char* buf, size_t bufsz) {
 
 static int ls_try_load_prelude_plugin(lstenv_t* tenv, const char* path) {
   const char* chosen = path;
+  const char* source = NULL; // for logging
   if (chosen == NULL)
     chosen = getenv("LAZYSCRIPT_PRELUDE_SO");
+  if (chosen && chosen[0]) source = "CLI/ENV";
   char found[PATH_MAX];
   if ((chosen == NULL || chosen[0] == '\0')) {
     // Try to find via LAZYSCRIPT_PRELUDE_PATH / standard locations
     if (ls_find_prelude_so(found, sizeof(found))) {
       chosen = found;
+      source = "AUTO";
     }
   }
-  if (chosen == NULL || chosen[0] == '\0')
+  if (chosen == NULL || chosen[0] == '\0') {
+    if (g_debug) lsprintf(stderr, 0, "I: prelude: plugin not found (auto-discovery)\n");
     return 0;
+  }
   void* handle = dlopen(chosen, RTLD_NOW | RTLD_LOCAL);
   if (!handle) {
-    lsprintf(stderr, 0, "W: dlopen failed: %s\n", dlerror());
+    const char* err = dlerror();
+    lsprintf(stderr, 0, "W: prelude: dlopen failed: path=%s err=%s\n", chosen, err ? err : "(null)");
     return 0;
   }
   dlerror();
   ls_prelude_register_fn reg = (ls_prelude_register_fn)dlsym(handle, "ls_prelude_register");
   const char*            err = dlerror();
   if (err != NULL || reg == NULL) {
-    lsprintf(stderr, 0, "W: dlsym(ls_prelude_register) failed: %s\n", err ? err : "(null)");
+    lsprintf(stderr, 0, "W: prelude: dlsym(ls_prelude_register) failed: %s\n", err ? err : "(null)");
     dlclose(handle);
     return 0;
   }
   int rc = reg(tenv);
   if (rc != 0) {
-    lsprintf(stderr, 0, "W: prelude plugin returned error: %d\n", rc);
+    lsprintf(stderr, 0, "W: prelude: plugin returned error: %d\n", rc);
     // keep handle but report error; fall back
     return 0;
+  }
+  if (g_debug) {
+    lsprintf(stderr, 0, "I: prelude: plugin loaded: path=%s source=%s\n", chosen, source ? source : "(n/a)");
   }
   // Keep handle open for the lifetime of process
   return 1;
@@ -322,8 +331,10 @@ int main(int argc, char** argv) {
         }
         lstenv_t* tenv = lstenv_new(NULL);
         ls_register_core_builtins(tenv);
-        if (!ls_try_load_prelude_plugin(tenv, prelude_so))
+        if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
+          if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
           ls_register_builtin_prelude(tenv);
+        }
         int saved_run_main = g_run_main;
         g_run_main         = 0; // -e は従来通り：最終値を出力
         // Optional: begin trace dump for this evaluation
@@ -403,7 +414,7 @@ int main(int argc, char** argv) {
       printf("Options:\n");
       printf("  -d, --debug     print debug information\n");
       printf("  -e, --eval      evaluate a one-line program string\n");
-      printf("  -p, --prelude-so <path>  load prelude plugin .so (override)\n");
+  printf("  -p, --prelude-so <path>  load prelude plugin .so (override)\n");
       printf("  -n, --sugar-namespace <ns>  set namespace for ~~sym sugar (default: prelude)\n");
       printf("  -s, --strict-effects  enforce effect discipline (seq/chain required)\n");
   printf("      --run-main          run entry function instead of printing top-level value (off)\n");
@@ -420,6 +431,7 @@ int main(int argc, char** argv) {
   printf("      --trace-dump <file>  write JSONL sourcemap while evaluating (exp)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
+  printf("\nDefault prelude: plugin-preferred (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover), then fallback to built-in.\n");
   printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
   printf("  LAZYSCRIPT_PRELUDE_PATH search paths (:) to find liblazyscript_prelude.so when SO not set\n");
       printf("  LAZYSCRIPT_SUGAR_NS     namespace used for ~~sym sugar (if -n not set)\n");
@@ -516,8 +528,10 @@ int main(int argc, char** argv) {
       }
       lstenv_t* tenv = lstenv_new(NULL);
       ls_register_core_builtins(tenv);
-      if (!ls_try_load_prelude_plugin(tenv, prelude_so))
+      if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
+        if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
         ls_register_builtin_prelude(tenv);
+      }
       // Evaluate init script (if any) into the same environment
       ls_maybe_eval_init(tenv);
   if (g_trace_dump_path && g_trace_dump_path[0]) lstrace_begin_dump(g_trace_dump_path);
