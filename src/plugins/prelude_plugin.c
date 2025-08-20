@@ -4,7 +4,10 @@
 #include "common/str.h"
 #include "common/io.h"
 #include "runtime/effects.h"
+#include "builtins/ns.h"
+#include "builtins/builtin_loader.h"
 #include <stdlib.h>
+#include <string.h>
 #include <gc.h>
 #include <assert.h>
 
@@ -159,12 +162,36 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, pl_require, tenv);
   if (lsstrcmp(name, lsstr_cstr("requirePure")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, pl_require_pure, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsSelf"), 0, lsbuiltin_prelude_ns_self, NULL);
   if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, pl_chain, NULL);
   if (lsstrcmp(name, lsstr_cstr("bind")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.bind"), 2, pl_bind, NULL);
   if (lsstrcmp(name, lsstr_cstr("return")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1, pl_return, NULL);
+  if (lsstrcmp(name, lsstr_cstr("nsnew")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsdef")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsnew0")) == 0) {
+    if (!ls_effects_allowed()) {
+      lsprintf(stderr, 0, "E: nsnew0: effect used in pure context (enable seq/chain)\n");
+      return NULL;
+    }
+    return lsbuiltin_nsnew0(0, NULL, tenv);
+  }
+  if (lsstrcmp(name, lsstr_cstr("nsdefv")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsMembers")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
+  if (lsstrcmp(name, lsstr_cstr("builtin")) == 0 || lsstrcmp(name, lsstr_cstr(".builtin")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin, tenv);
+  const char* cname = lsstr_get_buf(name);
+  if (strncmp(cname, "nslit$", 6) == 0) {
+    long n = strtol(cname + 6, NULL, 10);
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), n, lsbuiltin_nslit, NULL);
+  }
   if (lsstrcmp(name, lsstr_cstr("pluginHello")) == 0)
     return pl_plugin_hello();
   lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
