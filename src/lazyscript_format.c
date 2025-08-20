@@ -4,14 +4,22 @@
 #include "parser/lexer.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 // Local parse helper (duplicated from lazyscript.c)
+static const char*     g_sugar_ns = NULL;
+
 static const lsprog_t* lsparse_stream_local(const char* filename, FILE* in_str) {
+  assert(in_str != NULL);
   yyscan_t yyscanner;
   yylex_init(&yyscanner);
   lsscan_t* lsscan = lsscan_new(filename);
   yyset_in(in_str, yyscanner);
   yyset_extra(lsscan, yyscanner);
+  if (g_sugar_ns == NULL)
+    g_sugar_ns = getenv("LAZYSCRIPT_SUGAR_NS");
+  if (g_sugar_ns && g_sugar_ns[0])
+    lsscan_set_sugar_ns(lsscan, g_sugar_ns);
   int             ret  = yyparse(yyscanner);
   const lsprog_t* prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
   yylex_destroy(yyscanner);
