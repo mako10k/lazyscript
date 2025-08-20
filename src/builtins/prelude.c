@@ -9,6 +9,8 @@
 #include "builtins/ns.h"
 #include "runtime/builtin.h"
 #include "runtime/error.h"
+#include <string.h>
+#include <stdlib.h>
 // forward for namespace value constructor (not used now)
 // lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data);
 
@@ -168,6 +170,12 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return lsbuiltin_nsnew0(0, NULL, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsdefv")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  // nslit$N dispatch for pure namespace literal
+  const char* cname = lsstr_get_buf(name);
+  if (strncmp(cname, "nslit$", 6) == 0) {
+    long n = strtol(cname + 6, NULL, 10);
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), n, lsbuiltin_nslit, NULL);
+  }
   lsprintf(stderr, 0, "E: prelude: unknown symbol: "); lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name); lsprintf(stderr, 0, "\n");
   return NULL;
 }
