@@ -12,8 +12,9 @@ if [[ ! -x "$BIN" ]]; then
   exit 1
 fi
 
-# Ensure runtime module search path defaults to the test directory unless overridden
-export LAZYSCRIPT_PATH="${LAZYSCRIPT_PATH:-$DIR}"
+# Ensure runtime module search path defaults to test dir and repo root (so require "lib/..." works)
+# The search order allows tests to override by pre-setting LAZYSCRIPT_PATH.
+export LAZYSCRIPT_PATH="${LAZYSCRIPT_PATH:-$DIR:$ROOT}"
 
 pass=0; fail=0
 
