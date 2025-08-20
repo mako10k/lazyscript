@@ -202,8 +202,13 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     long n = strtol(cname + 6, NULL, 10);
     return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), n, lsbuiltin_nslit, NULL);
   }
-  lsprintf(stderr, 0, "E: prelude: unknown symbol: "); lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name); lsprintf(stderr, 0, "\n");
-  return NULL;
+  lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
+  lsprintf(stderr, 0, "\n");
+  // Returning NULL here would lead to segmentation faults when callers
+  // attempt to use the missing value.  Instead propagate a runtime
+  // error so evaluation can fail gracefully.
+  return ls_make_err("prelude: unknown symbol");
 }
 
 // implemented in host (lazyscript.c)
