@@ -25,6 +25,7 @@ static lsthunk_t* lsbuiltin_prelude_exit(lssize_t argc, lsthunk_t* const* args, 
   }
   lsthunk_t* val = ls_eval_arg(args[0], "exit: arg");
   if (lsthunk_is_err(val)) return val;
+  if (!val) return ls_make_err("exit: arg eval");
   if (lsthunk_get_type(val) != LSTTYPE_INT) {
     return ls_make_err("exit: invalid type");
   }
@@ -48,6 +49,13 @@ static lsthunk_t* lsbuiltin_prelude_println(lssize_t argc, lsthunk_t* const* arg
   #endif
   lsthunk_t* thunk_str = ls_eval_arg(args[0], "println: arg");
   if (lsthunk_is_err(thunk_str)) return thunk_str;
+  if (thunk_str == NULL)
+    {
+      #if LS_TRACE
+      lsprintf(stderr, 0, "DBG println: arg eval -> NULL\n");
+      #endif
+      return ls_make_err("println: arg eval");
+    }
   #if LS_TRACE
   {
     const char* vt = "?";
@@ -87,6 +95,7 @@ static lsthunk_t* lsbuiltin_prelude_chain(lssize_t argc, lsthunk_t* const* args,
   lsprintf(stderr, 0, "DBG chain: after action eval -> %s\n", action ? "ok" : "NULL");
   #endif
   if (lsthunk_is_err(action)) return action;
+  if (!action) return ls_make_err("chain: action eval");
   lsthunk_t* unit = ls_make_unit();
   lsthunk_t* cont = args[1];
   #if LS_TRACE
@@ -107,6 +116,7 @@ static lsthunk_t* lsbuiltin_prelude_bind(lssize_t argc, lsthunk_t* const* args, 
   lsthunk_t* val = ls_eval_arg(args[0], "bind: value");
   ls_effects_end();
   if (lsthunk_is_err(val)) return val;
+  if (!val) return ls_make_err("bind: value eval");
   // Apply the continuation to the value
   lsthunk_t* cont = args[1];
   return lsthunk_eval(cont, 1, &val);
@@ -124,14 +134,12 @@ static lsthunk_t* lsbuiltin_prelude_def(lssize_t argc, lsthunk_t* const* args, v
     return NULL;
   }
   lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return ls_make_err("def: no env");
-  lsthunk_t* namev = ls_eval_arg(args[0], "def: name");
-  if (lsthunk_is_err(namev)) return namev;
+  lsthunk_t* namev = ls_eval_arg(args[0], "def: name"); if (lsthunk_is_err(namev)) return namev; if (!namev) return ls_make_err("def: name eval");
   if (lsthunk_get_type(namev) != LSTTYPE_ALGE || lsthunk_get_argc(namev) != 0) {
     return ls_make_err("def: expected bare symbol");
   }
   const lsstr_t* name = lsthunk_get_constr(namev);
-  lsthunk_t* val = ls_eval_arg(args[1], "def: value");
-  if (lsthunk_is_err(val)) return val;
+  lsthunk_t* val = ls_eval_arg(args[1], "def: value"); if (lsthunk_is_err(val)) return val; if (!val) return ls_make_err("def: value eval");
   lstenv_put_builtin(tenv, name, 0, lsbuiltin_getter0, val);
   return ls_make_unit();
 }
@@ -141,8 +149,7 @@ lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void
 static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   lstenv_t* tenv = (lstenv_t*)data;
   (void)argc;
-  lsthunk_t* key = ls_eval_arg(args[0], "prelude: key");
-  if (lsthunk_is_err(key)) return key;
+  lsthunk_t* key = ls_eval_arg(args[0], "prelude: key"); if (lsthunk_is_err(key)) return key; if (!key) return ls_make_err("prelude: key eval");
   if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
     return ls_make_err("prelude: expected bare symbol");
   }

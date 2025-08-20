@@ -16,6 +16,12 @@ lsthunk_t* lsbuiltin_add(lssize_t argc, lsthunk_t* const* args, void* data) {
   if (lsthunk_is_err(lhs)) return lhs;
   lsthunk_t* rhs = ls_eval_arg(args[1], "add: arg2");
   if (lsthunk_is_err(rhs)) return rhs;
+  if (!lhs || !rhs) {
+    #if LS_TRACE
+    lsprintf(stderr, 0, "DBG add: arg eval NULL\n");
+    #endif
+    return ls_make_err("add: arg eval");
+  }
   if (lsthunk_get_type(lhs) != LSTTYPE_INT || lsthunk_get_type(rhs) != LSTTYPE_INT) {
     return ls_make_err("add: invalid type");
   }
@@ -32,6 +38,7 @@ lsthunk_t* lsbuiltin_sub(lssize_t argc, lsthunk_t* const* args, void* data) {
   if (lsthunk_is_err(lhs)) return lhs;
   lsthunk_t* rhs = ls_eval_arg(args[1], "sub: arg2");
   if (lsthunk_is_err(rhs)) return rhs;
+  if (!lhs || !rhs) return ls_make_err("sub: arg eval");
   if (lsthunk_get_type(lhs) != LSTTYPE_INT || lsthunk_get_type(rhs) != LSTTYPE_INT) {
     return ls_make_err("sub: invalid type");
   }

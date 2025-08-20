@@ -13,6 +13,7 @@ lsthunk_t* lsbuiltin_to_string(lssize_t argc, lsthunk_t* const* args, void* data
   size_t len = 0; char* buf = NULL; FILE* fp = lsopen_memstream_gc(&buf, &len);
   lsthunk_t* v = ls_eval_arg(args[0], "to_string: arg");
   if (lsthunk_is_err(v)) { fclose(fp); return v; }
+  if (!v) { fclose(fp); return ls_make_err("to_string: arg eval"); }
   lsthunk_dprint(fp, LSPREC_LOWEST, 0, v);
   fclose(fp);
   const lsstr_t* str = lsstr_new(buf, len);
