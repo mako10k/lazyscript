@@ -189,6 +189,9 @@ static const char* ls_find_prelude_so(char* buf, size_t bufsz) {
   if (exedir[0]) {
     snprintf(buf, bufsz, "%s/plugins/liblazyscript_prelude.so", exedir);
     if (file_exists(buf)) return buf;
+    // When running from build tree, plugin resides in .libs/
+    snprintf(buf, bufsz, "%s/plugins/.libs/liblazyscript_prelude.so", exedir);
+    if (file_exists(buf)) return buf;
   }
   snprintf(buf, bufsz, "/usr/local/lib/lazyscript/liblazyscript_prelude.so");
   if (file_exists(buf)) return buf;
