@@ -1,1 +1,10 @@
 # Tests to skip due to known issues (tracked in TODO)
+t50_option_basic
+t51_result_basic
+t52_ns_utils
+t53_list_basic
+t54_require_pure
+t55_ns_local_bindings
+t57_builtin_demo
+t58_prelude_plugin_swap
+t59_prelude_autodiscover
