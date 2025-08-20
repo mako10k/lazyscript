@@ -57,6 +57,17 @@ static lsthunk_t* pl_chain(lssize_t argc, lsthunk_t* const* args, void* data) {
   return lsthunk_eval(cont, 1, &unit);
 }
 
+static lsthunk_t* pl_bind(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)data;
+  assert(argc == 2);
+  assert(args != NULL);
+  lsthunk_t* val = lsthunk_eval0(args[0]);
+  if (val == NULL)
+    return NULL;
+  lsthunk_t* cont = args[1];
+  return lsthunk_eval(cont, 1, &val);
+}
+
 static lsthunk_t* pl_return(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)data;
   assert(argc == 1);
@@ -64,8 +75,7 @@ static lsthunk_t* pl_return(lssize_t argc, lsthunk_t* const* args, void* data) {
   return args[0];
 }
 
-static lsthunk_t* pl_plugin_hello(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)args; (void)data;
+static lsthunk_t* pl_plugin_hello(void) {
   return lsthunk_new_str(lsstr_cstr("plugin"));
 }
 
@@ -77,7 +87,7 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
   if (key == NULL)
     return NULL;
   if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
-    lsprintf(stderr, 0, "E: prelude: expected a bare symbol (exit/println/chain/return)\n");
+    lsprintf(stderr, 0, "E: prelude: expected a bare symbol (exit/println/chain/bind/return)\n");
     return NULL;
   }
   const lsstr_t* name = lsthunk_get_constr(key);
@@ -87,10 +97,12 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
     return lsthunk_new_builtin(lsstr_cstr("prelude.println"), 1, pl_println, NULL);
   if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, pl_chain, NULL);
+  if (lsstrcmp(name, lsstr_cstr("bind")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.bind"), 2, pl_bind, NULL);
   if (lsstrcmp(name, lsstr_cstr("return")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1, pl_return, NULL);
   if (lsstrcmp(name, lsstr_cstr("pluginHello")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.pluginHello"), 0, pl_plugin_hello, NULL);
+    return pl_plugin_hello();
   lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
   lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
   lsprintf(stderr, 0, "\n");
