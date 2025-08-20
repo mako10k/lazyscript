@@ -7,6 +7,7 @@
 #include "thunk/tenv.h"
 #include "thunk/tpat.h"
 #include "runtime/error.h"
+#include "runtime/trace.h"
 #include <assert.h>
 #include <stddef.h>
 
@@ -72,6 +73,7 @@ struct lstbuiltin {
 struct lsthunk {
   lsttype_t  lt_type;
   lsthunk_t* lt_whnf;
+  int        lt_trace_id;
   union {
     lstalge_t           lt_alge;
     lstappl_t           lt_appl;
@@ -84,12 +86,17 @@ struct lsthunk {
   };
 };
 
+static int g_trace_next_id = 0;
+
 lsthunk_t* lsthunk_new_ealge(const lsealge_t* ealge, lstenv_t* tenv) {
   lssize_t               eargc = lsealge_get_argc(ealge);
   const lsexpr_t* const* eargs = lsealge_get_args(ealge);
   lsthunk_t* thunk          = lsmalloc(lssizeof(lsthunk_t, lt_alge) + eargc * sizeof(lsthunk_t*));
   thunk->lt_type            = LSTTYPE_ALGE;
   thunk->lt_whnf            = thunk;
+  thunk->lt_trace_id        = g_trace_next_id++;
+  // Unknown loc for generic algebraic expressions at parse time; emit placeholder
+  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
   thunk->lt_alge.lta_constr = lsealge_get_constr(ealge);
   thunk->lt_alge.lta_argc   = eargc;
   for (lssize_t i = 0; i < eargc; i++)
@@ -112,6 +119,8 @@ lsthunk_t* lsthunk_new_eappl(const lseappl_t* eappl, lstenv_t* tenv) {
   lsthunk_t* thunk        = lsmalloc(lssizeof(lsthunk_t, lt_appl) + eargc * sizeof(lsthunk_t*));
   thunk->lt_type          = LSTTYPE_APPL;
   thunk->lt_whnf          = NULL;
+  thunk->lt_trace_id      = g_trace_next_id++;
+  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
   thunk->lt_appl.lta_func = func;
   thunk->lt_appl.lta_argc = eargc;
   for (lssize_t i = 0; i < eargc; i++)
@@ -123,6 +132,8 @@ lsthunk_t* lsthunk_new_echoice(const lsechoice_t* echoice, lstenv_t* tenv) {
   lsthunk_t* thunk           = lsmalloc(offsetof(lsthunk_t, lt_choice));
   thunk->lt_type             = LSTTYPE_CHOICE;
   thunk->lt_whnf             = NULL;
+  thunk->lt_trace_id         = g_trace_next_id++;
+  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
   thunk->lt_choice.ltc_left  = lsthunk_new_expr(lsechoice_get_left(echoice), tenv);
   thunk->lt_choice.ltc_right = lsthunk_new_expr(lsechoice_get_right(echoice), tenv);
   return thunk;
@@ -155,9 +166,12 @@ lsthunk_t* lsthunk_new_ref(const lsref_t* ref, lstenv_t* tenv) {
   lsthunk_t*       thunk   = lsmalloc(lssizeof(lsthunk_t, lt_ref));
   thunk->lt_type           = LSTTYPE_REF;
   thunk->lt_whnf           = NULL;
+  thunk->lt_trace_id       = g_trace_next_id++;
   thunk->lt_ref.ltr_ref    = ref;
   thunk->lt_ref.ltr_target = target; // may be NULL; resolve lazily at eval
   thunk->lt_ref.ltr_env    = tenv;
+  // Use the reference location for mapping
+  lstrace_emit_loc(lsref_get_loc(ref));
   return thunk;
 }
 
@@ -165,7 +179,9 @@ lsthunk_t* lsthunk_new_int(const lsint_t* intval) {
   lsthunk_t* thunk = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type   = LSTTYPE_INT;
   thunk->lt_whnf   = thunk;
+  thunk->lt_trace_id = g_trace_next_id++;
   thunk->lt_int    = intval;
+  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
   return thunk;
 }
 
@@ -173,7 +189,9 @@ lsthunk_t* lsthunk_new_str(const lsstr_t* strval) {
   lsthunk_t* thunk = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type   = LSTTYPE_STR;
   thunk->lt_whnf   = thunk;
+  thunk->lt_trace_id = g_trace_next_id++;
   thunk->lt_str    = strval;
+  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
   return thunk;
 }
 
@@ -192,6 +210,8 @@ lsthunk_t* lsthunk_new_elambda(const lselambda_t* elambda, lstenv_t* tenv) {
   lsthunk_t* thunk           = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type             = LSTTYPE_LAMBDA;
   thunk->lt_whnf             = thunk;
+  thunk->lt_trace_id         = g_trace_next_id++;
+  lstrace_emit_loc(lsloc("<unknown>", 1, 1, 1, 1));
   thunk->lt_lambda.ltl_param = origin->lrto_lambda.ltl_param;
   thunk->lt_lambda.ltl_body  = origin->lrto_lambda.ltl_body;
   return thunk;
@@ -393,6 +413,7 @@ static lsthunk_t* lsthunk_eval_alge(lsthunk_t* thunk, lssize_t argc, lsthunk_t* 
   thunk_new->lt_type            = LSTTYPE_ALGE;
   // This node is already in WHNF; point to self, not the old thunk
   thunk_new->lt_whnf            = thunk_new;
+  thunk_new->lt_trace_id        = thunk->lt_trace_id;
   thunk_new->lt_alge.lta_constr = thunk->lt_alge.lta_constr;
   thunk_new->lt_alge.lta_argc   = targc + argc;
   for (lssize_t i = 0; i < targc; i++)
@@ -592,6 +613,7 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   lsthunk_t* right = lsmalloc(lssizeof(lsthunk_t, lt_appl) + (argc + 1) * sizeof(lsthunk_t*));
   right->lt_type   = LSTTYPE_APPL;
   right->lt_whnf   = NULL;
+  right->lt_trace_id = thunk->lt_trace_id;
   right->lt_appl.lta_func = thunk->lt_choice.ltc_right;
   if (right->lt_appl.lta_func == NULL) {
     // Propagate evaluation failure
@@ -603,6 +625,7 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   lsthunk_t* choice           = lsmalloc(sizeof(lsthunk_t));
   choice->lt_type             = LSTTYPE_CHOICE;
   choice->lt_whnf             = choice;
+  choice->lt_trace_id         = thunk->lt_trace_id;
   choice->lt_choice.ltc_left  = left;
   choice->lt_choice.ltc_right = right;
   return choice;
@@ -610,29 +633,33 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
 
 lsthunk_t* lsthunk_eval(lsthunk_t* func, lssize_t argc, lsthunk_t* const* args) {
   assert(func != NULL);
-  if (lsthunk_is_err(func))
+  // Enter trace context for this evaluation
+  if (func->lt_trace_id >= 0) lstrace_push(func->lt_trace_id);
+  if (lsthunk_is_err(func)) {
+    if (func->lt_trace_id >= 0) lstrace_pop();
     return func;
+  }
   if (argc == 0)
-    return lsthunk_eval0(func);
+    { lsthunk_t* r = lsthunk_eval0(func); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   switch (lsthunk_get_type(func)) {
   case LSTTYPE_ALGE:
-    return lsthunk_eval_alge(func, argc, args);
+    { lsthunk_t* r = lsthunk_eval_alge(func, argc, args); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   case LSTTYPE_APPL:
-    return lsthunk_eval_appl(func, argc, args);
+    { lsthunk_t* r = lsthunk_eval_appl(func, argc, args); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   case LSTTYPE_LAMBDA:
-    return lsthunk_eval_lambda(func, argc, args);
+    { lsthunk_t* r = lsthunk_eval_lambda(func, argc, args); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   case LSTTYPE_REF:
-    return lsthunk_eval_ref(func, argc, args);
+    { lsthunk_t* r = lsthunk_eval_ref(func, argc, args); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   case LSTTYPE_CHOICE:
-    return lsthunk_eval_choice(func, argc, args);
+    { lsthunk_t* r = lsthunk_eval_choice(func, argc, args); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   case LSTTYPE_INT:
     lsprintf(stderr, 0, "F: cannot apply for integer\n");
-    return NULL;
+    if (func->lt_trace_id >= 0) lstrace_pop(); return NULL;
   case LSTTYPE_STR:
     lsprintf(stderr, 0, "F: cannot apply for string\n");
-    return NULL;
+    if (func->lt_trace_id >= 0) lstrace_pop(); return NULL;
   case LSTTYPE_BUILTIN:
-    return lsthunk_eval_builtin(func, argc, args);
+    { lsthunk_t* r = lsthunk_eval_builtin(func, argc, args); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   }
 }
 
@@ -640,6 +667,7 @@ lsthunk_t* lsthunk_eval0(lsthunk_t* thunk) {
   assert(thunk != NULL);
   if (thunk->lt_whnf != NULL)
     return thunk->lt_whnf;
+  if (thunk->lt_trace_id >= 0) lstrace_push(thunk->lt_trace_id);
   switch (thunk->lt_type) {
   case LSTTYPE_APPL:
     thunk->lt_whnf =
@@ -659,6 +687,7 @@ lsthunk_t* lsthunk_eval0(lsthunk_t* thunk) {
     thunk->lt_whnf = thunk;
     break;
   }
+  if (thunk->lt_trace_id >= 0) lstrace_pop();
   return thunk->lt_whnf;
 }
 
@@ -676,6 +705,8 @@ lsthunk_t* lsthunk_new_builtin(const lsstr_t* name, lssize_t arity, lstbuiltin_f
   lsthunk_t* thunk      = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type        = LSTTYPE_BUILTIN;
   thunk->lt_whnf        = thunk;
+  thunk->lt_trace_id    = -1;
+  thunk->lt_trace_id    = -1;
   lstbuiltin_t* builtin = lsmalloc(sizeof(lstbuiltin_t));
   builtin->lti_name     = name;
   builtin->lti_arity    = arity;
