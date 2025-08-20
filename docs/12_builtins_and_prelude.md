@@ -36,10 +36,11 @@
 
 ## `~~nsMembers`: 名前空間メンバー列挙（デバッグ用）
 
-- 構文: `~~nsMembers nsValue` → `list<string>`
+- 構文: `~~nsMembers nsValue` → `list<const>`
 - 振る舞い:
-  - レコード/ビルトインNS/`~prelude` のメンバー名を列挙。
-  - 値は評価しない（非評価）。辞書順（ASCII）で安定返却。
+  - レコード/ビルトインNS/`~prelude` の「キー（定数）」を列挙。
+  - キーは評価不要な定数（const）として保持され、値は評価しない（非評価）。
+  - 返却順は安定ソート。提案: 型順位（symbol < str < int < constr）→ 型内の辞書/数値順。
 - エラー: 非NS → `#err "nsMembers: not a namespace"`。ビルトインNS破損は理由付き `#err`。
 - トレース: 擬似 loc `introspect:nsMembers` を JSONL に記録。
 
@@ -49,3 +50,21 @@
 
 ## 備考（シンボル vs 文字列）
 - シンボル型（例 `:name`）導入案は保留。現状は文字列キーで運用し、将来移行可能とする。
+
+## シンボルリテラル `.symbol` と名前空間キーの const 化
+
+糖衣は導入せず、`.name` は「シンボル型（Symbol）のリテラル」を表します。シンボルはインターンされ、`==` による同値比較が O(1) で可能です。
+
+- 型: `Symbol`（例: `.concat`, `.builtin`）
+- リテラル規則（概要）: `'.' IDENT` を 1 トークンとして読み取る（浮動小数点は未採用のため衝突なし）。
+- インターン: 実行系で一意化（同名は同一値）。`to_string` 表示は `".name"` 風を想定。
+
+### 名前空間の定義と参照
+
+- レコード（名前空間）定義は「定数キー const のマップ」に緩和:
+  - `const := int | str | constr(0-arity) | symbol`
+  - 例: `{ .add = value; "println" = value; 42 = value; :Unit = value; }`
+- 参照は「関数適用」スタイルで統一:
+  - `(~NS const)` で対応する値を取得（キーは `==` で一致判定）。
+  - 例: `~list = (~prelude .builtin) "list"; (~list .concat) [1,2] [3,4]`
+- 注意: 将来、パターンをキーに拡張する余地はあるが、`nsMembers` が取得不能になるため現段階は `const` に限定。

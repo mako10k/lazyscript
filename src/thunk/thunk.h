@@ -35,6 +35,8 @@ typedef enum lsttype {
   LSTTYPE_LAMBDA,
   LSTTYPE_REF,
   LSTTYPE_STR,
+  // First-class symbol literal (e.g., .name)
+  LSTTYPE_SYMBOL,
   LSTTYPE_BUILTIN
 } lsttype_t;
 
@@ -99,6 +101,13 @@ lsthunk_t* lsthunk_new_ref(const lsref_t* ref, lstenv_t* tenv);
  * @return The new thunk
  */
 lsthunk_t* lsthunk_new_str(const lsstr_t* strval);
+
+/**
+ * Create a new thunk for a symbol literal (e.g., .name)
+ * @param sym The symbol identifier (should include leading dot as parsed)
+ * @return The new thunk
+ */
+lsthunk_t* lsthunk_new_symbol(const lsstr_t* sym);
 
 /**
  * Create a new thunk for a builtin data type
@@ -173,6 +182,13 @@ const lsint_t* lsthunk_get_int(const lsthunk_t* thunk);
  * @return The string value
  */
 const lsstr_t*    lsthunk_get_str(const lsthunk_t* thunk);
+
+/**
+ * Get the symbol value of a thunk
+ * @param thunk The thunk (must be of type LSTTYPE_SYMBOL)
+ * @return The symbol identifier string (includes leading dot)
+ */
+const lsstr_t*    lsthunk_get_symbol(const lsthunk_t* thunk);
 
 lssize_t          lsthunk_get_argc(const lsthunk_t* thunk);
 

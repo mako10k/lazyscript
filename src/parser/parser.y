@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 40
+%expect 52
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -105,7 +105,11 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 
 %token <intval> LSTINT
 %token <strval> LSTSYMBOL
-%token <strval> LSTPRELUDESYM
+%token <strval> LSTPRELUDE_CONSTR
+%token <strval> LSTPRELUDE_SYMBOL
+%token <strval> LSTPRELUDE_STR
+%token <intval> LSTPRELUDE_INT
+%token <strval> LSTREFSYM
 %token <strval> LSTSTR
 %token LSTARROW
 %token LSTLEFTARROW
@@ -177,19 +181,45 @@ ealge:
 
 expr5:
       efact { $$ = $1; }
-    | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1, 0, NULL)); }
+  | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1, 0, NULL)); }
+    
     ;
 
 efact:
   LSTINT { $$ = lsexpr_with_loc(lsexpr_new_int($1), @$); }
   | LSTSTR { $$ = lsexpr_with_loc(lsexpr_new_str($1), @$); }
-    | LSTPRELUDESYM {
-        // desugar: ~~sym  ==>  (~<ns> sym), where ns = lsscan_get_sugar_ns(yyextra)
+  | LSTREFSYM { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($1, @$)), @$); }
+    | LSTPRELUDE_CONSTR {
+        // ~~constr => (~<ns> constr)
         const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
-  const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
         const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
         const lsexpr_t *args[] = { sym };
-  $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
+      }
+    | LSTPRELUDE_SYMBOL {
+        // ~~.symbol => (~<ns> .symbol)
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+        const lsexpr_t *args[] = { sym };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
+      }
+    | LSTPRELUDE_STR {
+        // ~~"str" => (~<ns> "str")
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *s = lsexpr_with_loc(lsexpr_new_str($1), @$);
+        const lsexpr_t *args[] = { s };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
+      }
+    | LSTPRELUDE_INT {
+        // ~~N => (~<ns> N)
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *n = lsexpr_with_loc(lsexpr_new_int($1), @$);
+        const lsexpr_t *args[] = { n };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
       }
     | etuple {
         lssize_t argc = lsealge_get_argc($1);
@@ -198,7 +228,6 @@ efact:
     }
   | elist { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
   | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
-  | '~' LSTSYMBOL { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($2, @$)), @$); }
   | elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
   | '!' '{' dostmts '}' { $$ = $3; }
     | '!' '!' '{' nsentries '}' {
@@ -283,6 +312,7 @@ nsentry:
         const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
         $$ = lsarray_new(2, sym, $3);
       }
+    
     ;
 
 // do-block style sugar inside braces
@@ -445,7 +475,7 @@ pat3:
     ;
 
 pref:
-      '~' LSTSYMBOL { $$ = lsref_new($2, @$); }
+  LSTREFSYM { $$ = lsref_new($1, @$); }
     ;
 
 ptuple:
