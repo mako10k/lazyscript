@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 53
+%expect 61
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -114,6 +114,8 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %token <strval> LSTPRELUDE_SYMBOL
 %token <strval> LSTPRELUDE_STR
 %token <intval> LSTPRELUDE_INT
+%token LSTNSDEF
+%token LSTNSDEFV
 %token <strval> LSTREFSYM
 %token <strval> LSTSTR
 %token LSTARROW
@@ -209,6 +211,25 @@ efact:
   LSTINT { $$ = lsexpr_with_loc(lsexpr_new_int($1), @$); }
   | LSTSTR { $$ = lsexpr_with_loc(lsexpr_new_str($1), @$); }
   | LSTREFSYM { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($1, @$)), @$); }
+  | LSTNSDEFV expr5 LSTSYMBOL expr5 {
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *sym_defv = lsexpr_new_alge(lsealge_new(lsstr_cstr("nsdefv"), 0, NULL));
+        const lsexpr_t *fn_defv = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, &sym_defv)), @$);
+        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($3, 0, NULL));
+        const lsexpr_t *args[] = { $2, sym, $4 };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn_defv, 3, args)), @$);
+      }
+  | LSTNSDEF LSTSYMBOL LSTSYMBOL expr5 {
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *sym_def = lsexpr_new_alge(lsealge_new(lsstr_cstr("nsdef"), 0, NULL));
+        const lsexpr_t *fn_def = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, &sym_def)), @$);
+        const lsexpr_t *nsname = lsexpr_new_alge(lsealge_new($2, 0, NULL));
+        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($3, 0, NULL));
+        const lsexpr_t *args[] = { nsname, sym, $4 };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn_def, 3, args)), @$);
+      }
     | LSTPRELUDE_CONSTR {
         // ~~constr => (~<ns> constr)
         const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));

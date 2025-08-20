@@ -7,9 +7,9 @@ All notable changes to this project will be documented in this file.
 
 ## [0.0.1-next] - 2025-08-20
 ### Added
-- Symbol literal `.name` (interned); const keys support: symbol/string/int/0-arity constructor.
+- Symbol literal `.name` (interned); namespace keys restricted to symbols and enforced at parse time.
 - Namespaces overhaul: named namespaces, anonymous namespace values, immutable literal namespaces.
-- nsMembers: returns `list<const>` with stable ordering (symbol < string < int < constr).
+- nsMembers: returns `list<symbol>` with stable lexicographic ordering.
 - Strict-effects integration: guard ns mutations (nsnew/nsnew0/nsdef/nsdefv/__set); tokenized via seq/chain in pure contexts.
 - Runtime immutability for literal namespaces: updates via nsdefv/__set now error.
 - Tests: t39–t41 (strict-effects), t42–t44 (immutable literal/assigned), t45 (unknown namespace).

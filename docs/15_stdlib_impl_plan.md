@@ -4,7 +4,7 @@
 
 ## 方針
 - モジュールは基本「無名名前空間リテラル `{ ... }`」で実装する（不変）。
-- 公開APIは const キー（symbol 推奨）でエクスポート。`nsMembers` に列挙される。
+- 公開APIはシンボルキーでエクスポート。`nsMembers` に列挙される。
 - 作用のある関数は strict-effects に準拠し、必要に応じて `chain` を併用する設計例を docs に示す。
 - 依存は最小限。相互依存は `~~require` のみ。
 
@@ -16,13 +16,13 @@
 - lib/ns.ls: nsMembers 再エクスポート + ユーティリティ（nsHas, nsGetOr）
 
 ## スプリント2
-- lib/set.ls / lib/map.ls: const キーの ns ラップ or 簡易実装
+- lib/set.ls / lib/map.ls: シンボルキーの ns ラップ or 簡易実装
 - lib/array.ls: 可変配列（効果注意） or リストラッパ
 - lib/format.ls: 文字列整形、toString 合成
 
 ## API デザインメモ
 - map/filter 系は第1引数に関数（lambda）を取り、続いてコレクション。
-- 例: `(~List .map) (\~x -> ~x+1) [1,2]` のように `(~NS const)` で参照。
+  - 例: `(~List .map) (\~x -> ~x+1) [1,2]` のように `(~NS sym)` で参照。
 - 失敗は `Result` を優先。例外は最小化。
 
 ## テスト方針

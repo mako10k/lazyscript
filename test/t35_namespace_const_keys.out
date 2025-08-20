@@ -1,5 +1,1 @@
-1
-2
-3
-4
-()
+/workspace/lazyscript/test/t35_namespace_const_keys.ls:4.16-19: syntax error, unexpected LSTSTR, expecting LSTSYMBOL
