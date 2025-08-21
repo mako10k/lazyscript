@@ -44,11 +44,11 @@
     - [ ] 回帰が PR で自動検出される
 
 ### シェルの `!` ヒストリ展開に関する注意の整備
-- 状態: In Progress
+- 状態: Done
 - 対応タスク
-    - [ ] README と実行手順に安全な呼び出し例を明記（histexpand 無効/クオート/printf 経由など）
+    - [x] README と実行手順に安全な呼び出し例を明記（histexpand 無効/クオート/printf 経由など）
 - 受け入れ条件
-    - [ ] 該当注意がトップレベル README と docs に掲載済み
+    - [x] 該当注意がトップレベル README と docs に掲載済み
 
 ### nslit デバッグログのドキュメント化
 - 状態: To Do
