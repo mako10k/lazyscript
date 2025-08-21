@@ -74,7 +74,8 @@ static void lsstr_ht_resize(lsstr_ht_t* str_ht, lssize_t new_capacity) {
   if (str_ht->lsth_cap == new_capacity)
     return;
   lsstr_ht_t new_str_hash = { NULL, 0, new_capacity };
-  new_str_hash.lsth_ents  = lsmalloc_atomic(sizeof(const lsstr_t*) * new_capacity);
+  // Allocate entries in GC-scanned memory so pointers inside are considered roots.
+  new_str_hash.lsth_ents  = lsmalloc(sizeof(const lsstr_t*) * new_capacity);
   for (lssize_t i = 0; i < new_capacity; i++)
     new_str_hash.lsth_ents[i] = NULL;
   for (lssize_t i = 0; i < str_ht->lsth_cap; i++) {
@@ -170,7 +171,8 @@ static const lsstr_t* lsstr_ht_put_raw_resizable(lsstr_ht_t* str_ht, const char*
 static void lsstr_ensure_init(void) {
   if (g_str_ht.lsth_ents != NULL)
     return;
-  g_str_ht.lsth_ents = lsmalloc_atomic(sizeof(const lsstr_t*) * 16);
+  // Allocate entries in GC-scanned memory so they keep interned strings alive.
+  g_str_ht.lsth_ents = lsmalloc(sizeof(const lsstr_t*) * 16);
   g_str_ht.lsth_cap  = 16;
   g_str_ht.lsth_size = 0;
   for (lssize_t i = 0; i < g_str_ht.lsth_cap; i++)
