@@ -36,8 +36,8 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 
 ```
 !{
-  ns <- (~~nsnew0);
-  (~~nsdefv ns .Foo 42);
+  ~ns <- (~~nsnew0);
+  (~~nsdefv ~ns .Foo 42);
   ~~println (~to_str ((~ns .Foo)))  # => 42
 };
 ```
@@ -46,7 +46,7 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 
 ```
 !{
-  ns <- (~~nsnew0);
+  ~ns <- (~~nsnew0);
   ((~ns .__set) .Foo 42);
   ~~println (~to_str ((~ns .Foo)))  # => 42
 };
@@ -64,11 +64,11 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 
 ```
 !{
-  ns <- { .Foo = 42; .Bar = ~Foo; };
+  ~ns <- { .Foo = 42; .Bar = ~Foo; };
   ~~println (~to_str ((~ns .Foo)));        # => 42
   ~~println (~to_str ((~ns .Bar)));        # => 42
   # 次のような更新はエラー（不変のため）:
-  # (~~nsdefv ns .Foo 1)
+  # (~~nsdefv ~ns .Foo 1)
   # ((~ns .__set) .Foo 1)
 };
 ```
@@ -91,7 +91,7 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 
   ```
   !{
-    ns <- ((~prelude nsnew0));
+    ~ns <- ((~prelude nsnew0));
     ~~nsdefv ~ns .a 1;
     ~~nsdefv ~ns .b 2;
     ~~nsdefv ~ns .aa 3;
@@ -105,9 +105,31 @@ strict-effects 有効時の例（トークンが必要）:
 
 ```
 !{
-  ns <- ((~prelude chain) ((~prelude nsnew0)) (\~x -> ~x));
+  ~ns <- ((~prelude chain) ((~prelude nsnew0)) (\~x -> ~x));
   ((~prelude chain) (~~nsdefv ~ns .x 1) (\~_ -> ()));
   ((~prelude nsMembers) ~ns)
 };
 -- 出力: [.x]
 ```
+
+## nslit デバッグログ
+
+環境変数 `LS_NS_LOG_NSLIT` を設定すると、名前空間リテラル（nslit）の評価過程を stderr にログ出力します。値が空文字列または `0` 以外であれば有効になります（既定はオフ）。
+
+### 例
+
+```bash
+LS_NS_LOG_NSLIT=1 ./src/lazyscript -e '!{ ~ns <- { .Foo = 1; }; (~ns .Foo); };'
+```
+
+出力例:
+
+```
+DBG nslit begin argc=2
+DBG nslit key[0] eval
+DBG nslit key=S.Foo
+DBG nslit val[0] eval
+DBG nslit put type=3
+DBG nslit end ns=0x... map=0x...
+```
+
