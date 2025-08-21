@@ -1,12 +1,21 @@
 {
-  .Option = ({ .None = None; .Some = \~x -> Some ~x });
+  .Option = ({ .None = None; .Some = (\~x -> (Some ~x)) });
   .map = (\~f -> \~opt -> (
-    \None -> None | \(Some ~x) -> Some (~f ~x)
-  ) ~opt);
+    !{
+      ~m <- (\(Some ~x) -> (Some (~f ~x)) | \None -> None);
+      (~m ~opt)
+    }
+  ));
   .flatMap = (\~f -> \~opt -> (
-    \None -> None | \(Some ~x) -> ~f ~x
-  ) ~opt);
+    !{
+      ~m <- (\(Some ~x) -> (~f ~x) | \None -> None);
+      (~m ~opt)
+    }
+  ));
   .getOrElse = (\~d -> \~opt -> (
-    \None -> ~d | \(Some ~x) -> ~x
-  ) ~opt)
+    !{
+      ~m <- (\(Some ~x) -> ~x | \None -> ~d);
+      (~m ~opt)
+    }
+  ))
 };

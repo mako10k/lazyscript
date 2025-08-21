@@ -1,1 +1,1 @@
-((~prelude return) 7);
+((~prelude .return) 7);

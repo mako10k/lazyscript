@@ -1,19 +1,22 @@
 {
-  .nsMembers = ((~prelude nsMembers));
+  ~self <- ((~prelude .nsSelf));
+  .nsMembers = ((~prelude .nsMembers));
   .nsHas = (\~ns -> \~k -> (
-    (
-      (\~self -> \~xs -> (
+    !{
+      ~go <- (\~ms -> (
         \[] -> false |
-        \(~h : ~t) -> ((~eq ~h ~k) | ((~self ~self) ~t))
-      ))
-      (\~self -> \~xs -> (
-        \[] -> false |
-        \(~h : ~t) -> ((~eq ~h ~k) | ((~self ~self) ~t))
-      ))
-      (((~prelude nsMembers)) ~ns)
-    )
+        \(~h : ~t) -> ((\(~k) -> true | \_ -> (~go ~t)) ~h)
+      ));
+      (~go ((~prelude .nsMembers) ~ns))
+    }
   ));
   .nsGetOr = (\~ns -> \~k -> \~d -> (
-    ((~ns ~k)) | ~d
+    !{
+      ~go <- (\~ms -> (
+        \[] -> ~d |
+        \(~h : ~t) -> ((\(~k) -> ((~ns ~h)) | \_ -> (~go ~t)) ~h)
+      ));
+      (~go ((~prelude .nsMembers) ~ns))
+    }
   ))
 };

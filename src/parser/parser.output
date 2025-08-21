@@ -1,0 +1,2649 @@
+State 2 conflicts: 15 shift/reduce
+State 22 conflicts: 15 shift/reduce
+State 24 conflicts: 15 shift/reduce
+State 26 conflicts: 15 shift/reduce
+State 78 conflicts: 5 reduce/reduce
+State 79 conflicts: 5 shift/reduce, 5 reduce/reduce
+State 80 conflicts: 5 reduce/reduce
+State 81 conflicts: 5 reduce/reduce
+State 108 conflicts: 1 shift/reduce
+State 119 conflicts: 5 reduce/reduce
+State 120 conflicts: 5 reduce/reduce
+
+
+Grammar
+
+    0 $accept: prog $end
+
+    1 prog: expr ';'
+
+    2 bind: bind_list
+
+    3 funlhs: pref
+
+    4 bind_single: funlhs lamparams '=' expr
+    5            | pat '=' expr
+
+    6 bind_list: ';' bind_single
+    7          | bind_list ';' bind_single
+
+    8 expr: expr1
+
+    9 expr1: expr2
+   10      | expr2 '|' expr1
+
+   11 expr2: expr3
+   12      | econs
+
+   13 econs: expr1 ':' expr3
+
+   14 expr3: expr4
+   15      | eappl
+
+   16 eappl: efact expr5
+   17      | eappl expr5
+
+   18 expr4: expr5
+   19      | ealge
+
+   20 ealge: LSTSYMBOL expr5
+   21      | ealge expr5
+
+   22 expr5: efact
+   23      | LSTSYMBOL
+
+   24 efact: LSTINT
+   25      | LSTSTR
+   26      | LSTREFSYM
+   27      | LSTNSDEFV expr5 LSTSYMBOL expr5
+   28      | LSTNSDEF LSTSYMBOL LSTSYMBOL expr5
+   29      | LSTPRELUDE_CONSTR
+   30      | LSTPRELUDE_SYMBOL
+   31      | LSTPRELUDE_STR
+   32      | LSTPRELUDE_INT
+   33      | etuple
+   34      | elist
+   35      | closure
+   36      | elambda
+   37      | '!' '{' dostmts '}'
+   38      | '!' '!' '{' nsentries '}'
+   39      | '{' nslit_entries '}'
+
+   40 nsentries: ε
+   41          | nsentry
+   42          | nsentries ';' nsentry
+   43          | nsentries ';'
+
+   44 nsentry: LSTSYMBOL '=' expr
+
+   45 nslit_entries: ε
+   46              | nslit_entry
+   47              | nslit_entries ';' nslit_entry
+   48              | nslit_entries ';'
+
+   49 nslit_entry: LSTSYMBOL '=' expr
+   50            | pat LSTLEFTARROW expr
+
+   51 dostmts: ε
+   52        | dostmt
+   53        | dostmt ';' dostmts
+
+   54 dostmt: pat LSTLEFTARROW expr
+   55       | expr
+
+   56 closure: '(' expr bind ')'
+
+   57 etuple: '(' ')'
+   58       | '(' earray ')'
+
+   59 earray: expr
+   60       | earray ',' expr
+
+   61 elist: '[' ']'
+   62      | '[' earray ']'
+
+   63 elambda: '\\' lamparams LSTARROW expr3
+
+   64 lamparam: lamparam2
+   65         | lamparam2 '|' lamparam
+
+   66 lamparam2: LSTSYMBOL
+   67          | pat3
+   68          | '(' palge ')'
+
+   69 lamparams: lamparam
+   70          | lamparams lamparam
+
+   71 pat: pat1
+   72    | pcons
+
+   73 pcons: pat ':' pat
+
+   74 pat1: pat2
+   75     | pat2 '|' pat1
+
+   76 pat2: pat3
+   77     | palge
+
+   78 palge: LSTSYMBOL
+   79      | palge pat3
+
+   80 pat3: ptuple
+   81     | plist
+   82     | LSTINT
+   83     | LSTSTR
+   84     | pref
+   85     | LSTWILDCARD
+   86     | pref '@' pat3
+
+   87 pref: LSTREFSYM
+
+   88 ptuple: '(' ')'
+   89       | '(' parray ')'
+
+   90 parray: pat
+   91       | parray ',' pat
+
+   92 plist: '[' ']'
+   93      | '[' parray ']'
+
+
+Terminals, with rules where they appear
+
+    $end (0) 0
+    '!' (33) 37 38
+    '(' (40) 56 57 58 68 88 89
+    ')' (41) 56 57 58 68 88 89
+    ',' (44) 60 91
+    ':' (58) 13 73
+    ';' (59) 1 6 7 42 43 47 48 53
+    '=' (61) 4 5 44 49
+    '@' (64) 86
+    '[' (91) 61 62 92 93
+    '\\' (92) 63
+    ']' (93) 61 62 92 93
+    '{' (123) 37 38 39
+    '|' (124) 10 65 75
+    '}' (125) 37 38 39
+    error (256)
+    LSTINT <intval> (258) 24 82
+    LSTSYMBOL <strval> (259) 20 23 27 28 44 49 66 78
+    LSTPRELUDE_CONSTR <strval> (260) 29
+    LSTPRELUDE_SYMBOL <strval> (261) 30
+    LSTPRELUDE_STR <strval> (262) 31
+    LSTPRELUDE_INT <intval> (263) 32
+    LSTNSDEF (264) 28
+    LSTNSDEFV (265) 27
+    LSTREFSYM <strval> (266) 26 87
+    LSTSTR <strval> (267) 25 83
+    LSTARROW (268) 63
+    LSTLEFTARROW (269) 50 54
+    LSTWILDCARD (270) 85
+
+
+Nonterminals, with rules where they appear
+
+    $accept (30)
+        on left: 0
+    prog <prog> (31)
+        on left: 1
+        on right: 0
+    bind <array> (32)
+        on left: 2
+        on right: 56
+    funlhs <ref> (33)
+        on left: 3
+        on right: 4
+    bind_single <bind> (34)
+        on left: 4 5
+        on right: 6 7
+    bind_list <array> (35)
+        on left: 6 7
+        on right: 2 7
+    expr <expr> (36)
+        on left: 8
+        on right: 1 4 5 44 49 50 54 55 56 59 60
+    expr1 <expr> (37)
+        on left: 9 10
+        on right: 8 10 13
+    expr2 <expr> (38)
+        on left: 11 12
+        on right: 9 10
+    econs <ealge> (39)
+        on left: 13
+        on right: 12
+    expr3 <expr> (40)
+        on left: 14 15
+        on right: 11 13 63
+    eappl <eappl> (41)
+        on left: 16 17
+        on right: 15 17
+    expr4 <expr> (42)
+        on left: 18 19
+        on right: 14
+    ealge <ealge> (43)
+        on left: 20 21
+        on right: 19 21
+    expr5 <expr> (44)
+        on left: 22 23
+        on right: 16 17 18 20 21 27 28
+    efact <expr> (45)
+        on left: 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
+        on right: 16 22
+    nsentries <array> (46)
+        on left: 40 41 42 43
+        on right: 38 42 43
+    nsentry <array> (47)
+        on left: 44
+        on right: 41 42
+    nslit_entries <array> (48)
+        on left: 45 46 47 48
+        on right: 39 47 48
+    nslit_entry <array> (49)
+        on left: 49 50
+        on right: 46 47
+    dostmts <expr> (50)
+        on left: 51 52 53
+        on right: 37 53
+    dostmt <array> (51)
+        on left: 54 55
+        on right: 52 53
+    closure <eclosure> (52)
+        on left: 56
+        on right: 35
+    etuple <ealge> (53)
+        on left: 57 58
+        on right: 33
+    earray <array> (54)
+        on left: 59 60
+        on right: 58 60 62
+    elist <ealge> (55)
+        on left: 61 62
+        on right: 34
+    elambda <elambda> (56)
+        on left: 63
+        on right: 36
+    lamparam <pat> (57)
+        on left: 64 65
+        on right: 65 69 70
+    lamparam2 <pat> (58)
+        on left: 66 67 68
+        on right: 64 65
+    lamparams <array> (59)
+        on left: 69 70
+        on right: 4 63 70
+    pat <pat> (60)
+        on left: 71 72
+        on right: 5 50 54 73 90 91
+    pcons <palge> (61)
+        on left: 73
+        on right: 72
+    pat1 <pat> (62)
+        on left: 74 75
+        on right: 71 75
+    pat2 <pat> (63)
+        on left: 76 77
+        on right: 74 75
+    palge <palge> (64)
+        on left: 78 79
+        on right: 68 77 79
+    pat3 <pat> (65)
+        on left: 80 81 82 83 84 85 86
+        on right: 67 76 79 86
+    pref <ref> (66)
+        on left: 87
+        on right: 3 84 86
+    ptuple <palge> (67)
+        on left: 88 89
+        on right: 80
+    parray <array> (68)
+        on left: 90 91
+        on right: 89 91 93
+    plist <palge> (69)
+        on left: 92 93
+        on right: 81
+
+
+State 0
+
+    0 $accept: • prog $end
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    prog     go to state 16
+    expr     go to state 17
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 1
+
+   24 efact: LSTINT •
+
+    $default  reduce using rule 24 (efact)
+
+
+State 2
+
+   20 ealge: LSTSYMBOL • expr5
+   23 expr5: LSTSYMBOL •
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 31
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    LSTINT             [reduce using rule 23 (expr5)]
+    LSTSYMBOL          [reduce using rule 23 (expr5)]
+    LSTPRELUDE_CONSTR  [reduce using rule 23 (expr5)]
+    LSTPRELUDE_SYMBOL  [reduce using rule 23 (expr5)]
+    LSTPRELUDE_STR     [reduce using rule 23 (expr5)]
+    LSTPRELUDE_INT     [reduce using rule 23 (expr5)]
+    LSTNSDEF           [reduce using rule 23 (expr5)]
+    LSTNSDEFV          [reduce using rule 23 (expr5)]
+    LSTREFSYM          [reduce using rule 23 (expr5)]
+    LSTSTR             [reduce using rule 23 (expr5)]
+    '!'                [reduce using rule 23 (expr5)]
+    '{'                [reduce using rule 23 (expr5)]
+    '('                [reduce using rule 23 (expr5)]
+    '['                [reduce using rule 23 (expr5)]
+    '\\'               [reduce using rule 23 (expr5)]
+    $default           reduce using rule 23 (expr5)
+
+    expr5    go to state 32
+    efact    go to state 33
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 3
+
+   29 efact: LSTPRELUDE_CONSTR •
+
+    $default  reduce using rule 29 (efact)
+
+
+State 4
+
+   30 efact: LSTPRELUDE_SYMBOL •
+
+    $default  reduce using rule 30 (efact)
+
+
+State 5
+
+   31 efact: LSTPRELUDE_STR •
+
+    $default  reduce using rule 31 (efact)
+
+
+State 6
+
+   32 efact: LSTPRELUDE_INT •
+
+    $default  reduce using rule 32 (efact)
+
+
+State 7
+
+   28 efact: LSTNSDEF • LSTSYMBOL LSTSYMBOL expr5
+
+    LSTSYMBOL  shift, and go to state 34
+
+
+State 8
+
+   27 efact: LSTNSDEFV • expr5 LSTSYMBOL expr5
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 31
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr5    go to state 35
+    efact    go to state 33
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 9
+
+   26 efact: LSTREFSYM •
+
+    $default  reduce using rule 26 (efact)
+
+
+State 10
+
+   25 efact: LSTSTR •
+
+    $default  reduce using rule 25 (efact)
+
+
+State 11
+
+   37 efact: '!' • '{' dostmts '}'
+   38      | '!' • '!' '{' nsentries '}'
+
+    '!'  shift, and go to state 36
+    '{'  shift, and go to state 37
+
+
+State 12
+
+   39 efact: '{' • nslit_entries '}'
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 39
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    $default  reduce using rule 45 (nslit_entries)
+
+    nslit_entries  go to state 45
+    nslit_entry    go to state 46
+    pat            go to state 47
+    pcons          go to state 48
+    pat1           go to state 49
+    pat2           go to state 50
+    palge          go to state 51
+    pat3           go to state 52
+    pref           go to state 53
+    ptuple         go to state 54
+    plist          go to state 55
+
+
+State 13
+
+   56 closure: '(' • expr bind ')'
+   57 etuple: '(' • ')'
+   58       | '(' • earray ')'
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    ')'                shift, and go to state 56
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr     go to state 57
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    earray   go to state 58
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 14
+
+   61 elist: '[' • ']'
+   62      | '[' • earray ']'
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    ']'                shift, and go to state 59
+    '\\'               shift, and go to state 15
+
+    expr     go to state 60
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    earray   go to state 61
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 15
+
+   63 elambda: '\\' • lamparams LSTARROW expr3
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 62
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 63
+    '['          shift, and go to state 44
+
+    lamparam   go to state 64
+    lamparam2  go to state 65
+    lamparams  go to state 66
+    pat3       go to state 67
+    pref       go to state 53
+    ptuple     go to state 54
+    plist      go to state 55
+
+
+State 16
+
+    0 $accept: prog • $end
+
+    $end  shift, and go to state 68
+
+
+State 17
+
+    1 prog: expr • ';'
+
+    ';'  shift, and go to state 69
+
+
+State 18
+
+    8 expr: expr1 •
+   13 econs: expr1 • ':' expr3
+
+    ':'  shift, and go to state 70
+
+    $default  reduce using rule 8 (expr)
+
+
+State 19
+
+    9 expr1: expr2 •
+   10      | expr2 • '|' expr1
+
+    '|'  shift, and go to state 71
+
+    $default  reduce using rule 9 (expr1)
+
+
+State 20
+
+   12 expr2: econs •
+
+    $default  reduce using rule 12 (expr2)
+
+
+State 21
+
+   11 expr2: expr3 •
+
+    $default  reduce using rule 11 (expr2)
+
+
+State 22
+
+   15 expr3: eappl •
+   17 eappl: eappl • expr5
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 31
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    LSTINT             [reduce using rule 15 (expr3)]
+    LSTSYMBOL          [reduce using rule 15 (expr3)]
+    LSTPRELUDE_CONSTR  [reduce using rule 15 (expr3)]
+    LSTPRELUDE_SYMBOL  [reduce using rule 15 (expr3)]
+    LSTPRELUDE_STR     [reduce using rule 15 (expr3)]
+    LSTPRELUDE_INT     [reduce using rule 15 (expr3)]
+    LSTNSDEF           [reduce using rule 15 (expr3)]
+    LSTNSDEFV          [reduce using rule 15 (expr3)]
+    LSTREFSYM          [reduce using rule 15 (expr3)]
+    LSTSTR             [reduce using rule 15 (expr3)]
+    '!'                [reduce using rule 15 (expr3)]
+    '{'                [reduce using rule 15 (expr3)]
+    '('                [reduce using rule 15 (expr3)]
+    '['                [reduce using rule 15 (expr3)]
+    '\\'               [reduce using rule 15 (expr3)]
+    $default           reduce using rule 15 (expr3)
+
+    expr5    go to state 72
+    efact    go to state 33
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 23
+
+   14 expr3: expr4 •
+
+    $default  reduce using rule 14 (expr3)
+
+
+State 24
+
+   19 expr4: ealge •
+   21 ealge: ealge • expr5
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 31
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    LSTINT             [reduce using rule 19 (expr4)]
+    LSTSYMBOL          [reduce using rule 19 (expr4)]
+    LSTPRELUDE_CONSTR  [reduce using rule 19 (expr4)]
+    LSTPRELUDE_SYMBOL  [reduce using rule 19 (expr4)]
+    LSTPRELUDE_STR     [reduce using rule 19 (expr4)]
+    LSTPRELUDE_INT     [reduce using rule 19 (expr4)]
+    LSTNSDEF           [reduce using rule 19 (expr4)]
+    LSTNSDEFV          [reduce using rule 19 (expr4)]
+    LSTREFSYM          [reduce using rule 19 (expr4)]
+    LSTSTR             [reduce using rule 19 (expr4)]
+    '!'                [reduce using rule 19 (expr4)]
+    '{'                [reduce using rule 19 (expr4)]
+    '('                [reduce using rule 19 (expr4)]
+    '['                [reduce using rule 19 (expr4)]
+    '\\'               [reduce using rule 19 (expr4)]
+    $default           reduce using rule 19 (expr4)
+
+    expr5    go to state 73
+    efact    go to state 33
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 25
+
+   18 expr4: expr5 •
+
+    $default  reduce using rule 18 (expr4)
+
+
+State 26
+
+   16 eappl: efact • expr5
+   22 expr5: efact •
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 31
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    LSTINT             [reduce using rule 22 (expr5)]
+    LSTSYMBOL          [reduce using rule 22 (expr5)]
+    LSTPRELUDE_CONSTR  [reduce using rule 22 (expr5)]
+    LSTPRELUDE_SYMBOL  [reduce using rule 22 (expr5)]
+    LSTPRELUDE_STR     [reduce using rule 22 (expr5)]
+    LSTPRELUDE_INT     [reduce using rule 22 (expr5)]
+    LSTNSDEF           [reduce using rule 22 (expr5)]
+    LSTNSDEFV          [reduce using rule 22 (expr5)]
+    LSTREFSYM          [reduce using rule 22 (expr5)]
+    LSTSTR             [reduce using rule 22 (expr5)]
+    '!'                [reduce using rule 22 (expr5)]
+    '{'                [reduce using rule 22 (expr5)]
+    '('                [reduce using rule 22 (expr5)]
+    '['                [reduce using rule 22 (expr5)]
+    '\\'               [reduce using rule 22 (expr5)]
+    $default           reduce using rule 22 (expr5)
+
+    expr5    go to state 74
+    efact    go to state 33
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 27
+
+   35 efact: closure •
+
+    $default  reduce using rule 35 (efact)
+
+
+State 28
+
+   33 efact: etuple •
+
+    $default  reduce using rule 33 (efact)
+
+
+State 29
+
+   34 efact: elist •
+
+    $default  reduce using rule 34 (efact)
+
+
+State 30
+
+   36 efact: elambda •
+
+    $default  reduce using rule 36 (efact)
+
+
+State 31
+
+   23 expr5: LSTSYMBOL •
+
+    $default  reduce using rule 23 (expr5)
+
+
+State 32
+
+   20 ealge: LSTSYMBOL expr5 •
+
+    $default  reduce using rule 20 (ealge)
+
+
+State 33
+
+   22 expr5: efact •
+
+    $default  reduce using rule 22 (expr5)
+
+
+State 34
+
+   28 efact: LSTNSDEF LSTSYMBOL • LSTSYMBOL expr5
+
+    LSTSYMBOL  shift, and go to state 75
+
+
+State 35
+
+   27 efact: LSTNSDEFV expr5 • LSTSYMBOL expr5
+
+    LSTSYMBOL  shift, and go to state 76
+
+
+State 36
+
+   38 efact: '!' '!' • '{' nsentries '}'
+
+    '{'  shift, and go to state 77
+
+
+State 37
+
+   37 efact: '!' '{' • dostmts '}'
+
+    LSTINT             shift, and go to state 78
+    LSTSYMBOL          shift, and go to state 79
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 80
+    LSTSTR             shift, and go to state 81
+    LSTWILDCARD        shift, and go to state 42
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 82
+    '['                shift, and go to state 83
+    '\\'               shift, and go to state 15
+
+    $default  reduce using rule 51 (dostmts)
+
+    expr     go to state 84
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    dostmts  go to state 85
+    dostmt   go to state 86
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+    pat      go to state 87
+    pcons    go to state 48
+    pat1     go to state 49
+    pat2     go to state 50
+    palge    go to state 51
+    pat3     go to state 52
+    pref     go to state 53
+    ptuple   go to state 54
+    plist    go to state 55
+
+
+State 38
+
+   82 pat3: LSTINT •
+
+    $default  reduce using rule 82 (pat3)
+
+
+State 39
+
+   49 nslit_entry: LSTSYMBOL • '=' expr
+   78 palge: LSTSYMBOL •
+
+    '='  shift, and go to state 88
+
+    $default  reduce using rule 78 (palge)
+
+
+State 40
+
+   87 pref: LSTREFSYM •
+
+    $default  reduce using rule 87 (pref)
+
+
+State 41
+
+   83 pat3: LSTSTR •
+
+    $default  reduce using rule 83 (pat3)
+
+
+State 42
+
+   85 pat3: LSTWILDCARD •
+
+    $default  reduce using rule 85 (pat3)
+
+
+State 43
+
+   88 ptuple: '(' • ')'
+   89       | '(' • parray ')'
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 89
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    ')'          shift, and go to state 90
+    '['          shift, and go to state 44
+
+    pat     go to state 91
+    pcons   go to state 48
+    pat1    go to state 49
+    pat2    go to state 50
+    palge   go to state 51
+    pat3    go to state 52
+    pref    go to state 53
+    ptuple  go to state 54
+    parray  go to state 92
+    plist   go to state 55
+
+
+State 44
+
+   92 plist: '[' • ']'
+   93      | '[' • parray ']'
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 89
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+    ']'          shift, and go to state 93
+
+    pat     go to state 91
+    pcons   go to state 48
+    pat1    go to state 49
+    pat2    go to state 50
+    palge   go to state 51
+    pat3    go to state 52
+    pref    go to state 53
+    ptuple  go to state 54
+    parray  go to state 94
+    plist   go to state 55
+
+
+State 45
+
+   39 efact: '{' nslit_entries • '}'
+   47 nslit_entries: nslit_entries • ';' nslit_entry
+   48              | nslit_entries • ';'
+
+    ';'  shift, and go to state 95
+    '}'  shift, and go to state 96
+
+
+State 46
+
+   46 nslit_entries: nslit_entry •
+
+    $default  reduce using rule 46 (nslit_entries)
+
+
+State 47
+
+   50 nslit_entry: pat • LSTLEFTARROW expr
+   73 pcons: pat • ':' pat
+
+    LSTLEFTARROW  shift, and go to state 97
+    ':'           shift, and go to state 98
+
+
+State 48
+
+   72 pat: pcons •
+
+    $default  reduce using rule 72 (pat)
+
+
+State 49
+
+   71 pat: pat1 •
+
+    $default  reduce using rule 71 (pat)
+
+
+State 50
+
+   74 pat1: pat2 •
+   75     | pat2 • '|' pat1
+
+    '|'  shift, and go to state 99
+
+    $default  reduce using rule 74 (pat1)
+
+
+State 51
+
+   77 pat2: palge •
+   79 palge: palge • pat3
+
+    LSTINT       shift, and go to state 38
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    $default  reduce using rule 77 (pat2)
+
+    pat3    go to state 100
+    pref    go to state 53
+    ptuple  go to state 54
+    plist   go to state 55
+
+
+State 52
+
+   76 pat2: pat3 •
+
+    $default  reduce using rule 76 (pat2)
+
+
+State 53
+
+   84 pat3: pref •
+   86     | pref • '@' pat3
+
+    '@'  shift, and go to state 101
+
+    $default  reduce using rule 84 (pat3)
+
+
+State 54
+
+   80 pat3: ptuple •
+
+    $default  reduce using rule 80 (pat3)
+
+
+State 55
+
+   81 pat3: plist •
+
+    $default  reduce using rule 81 (pat3)
+
+
+State 56
+
+   57 etuple: '(' ')' •
+
+    $default  reduce using rule 57 (etuple)
+
+
+State 57
+
+   56 closure: '(' expr • bind ')'
+   59 earray: expr •
+
+    ';'  shift, and go to state 102
+
+    $default  reduce using rule 59 (earray)
+
+    bind       go to state 103
+    bind_list  go to state 104
+
+
+State 58
+
+   58 etuple: '(' earray • ')'
+   60 earray: earray • ',' expr
+
+    ')'  shift, and go to state 105
+    ','  shift, and go to state 106
+
+
+State 59
+
+   61 elist: '[' ']' •
+
+    $default  reduce using rule 61 (elist)
+
+
+State 60
+
+   59 earray: expr •
+
+    $default  reduce using rule 59 (earray)
+
+
+State 61
+
+   60 earray: earray • ',' expr
+   62 elist: '[' earray • ']'
+
+    ','  shift, and go to state 106
+    ']'  shift, and go to state 107
+
+
+State 62
+
+   66 lamparam2: LSTSYMBOL •
+
+    $default  reduce using rule 66 (lamparam2)
+
+
+State 63
+
+   68 lamparam2: '(' • palge ')'
+   88 ptuple: '(' • ')'
+   89       | '(' • parray ')'
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 89
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    ')'          shift, and go to state 90
+    '['          shift, and go to state 44
+
+    pat     go to state 91
+    pcons   go to state 48
+    pat1    go to state 49
+    pat2    go to state 50
+    palge   go to state 108
+    pat3    go to state 52
+    pref    go to state 53
+    ptuple  go to state 54
+    parray  go to state 92
+    plist   go to state 55
+
+
+State 64
+
+   69 lamparams: lamparam •
+
+    $default  reduce using rule 69 (lamparams)
+
+
+State 65
+
+   64 lamparam: lamparam2 •
+   65         | lamparam2 • '|' lamparam
+
+    '|'  shift, and go to state 109
+
+    $default  reduce using rule 64 (lamparam)
+
+
+State 66
+
+   63 elambda: '\\' lamparams • LSTARROW expr3
+   70 lamparams: lamparams • lamparam
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 62
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTARROW     shift, and go to state 110
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 63
+    '['          shift, and go to state 44
+
+    lamparam   go to state 111
+    lamparam2  go to state 65
+    pat3       go to state 67
+    pref       go to state 53
+    ptuple     go to state 54
+    plist      go to state 55
+
+
+State 67
+
+   67 lamparam2: pat3 •
+
+    $default  reduce using rule 67 (lamparam2)
+
+
+State 68
+
+    0 $accept: prog $end •
+
+    $default  accept
+
+
+State 69
+
+    1 prog: expr ';' •
+
+    $default  reduce using rule 1 (prog)
+
+
+State 70
+
+   13 econs: expr1 ':' • expr3
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr3    go to state 112
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 71
+
+   10 expr1: expr2 '|' • expr1
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr1    go to state 113
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 72
+
+   17 eappl: eappl expr5 •
+
+    $default  reduce using rule 17 (eappl)
+
+
+State 73
+
+   21 ealge: ealge expr5 •
+
+    $default  reduce using rule 21 (ealge)
+
+
+State 74
+
+   16 eappl: efact expr5 •
+
+    $default  reduce using rule 16 (eappl)
+
+
+State 75
+
+   28 efact: LSTNSDEF LSTSYMBOL LSTSYMBOL • expr5
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 31
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr5    go to state 114
+    efact    go to state 33
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 76
+
+   27 efact: LSTNSDEFV expr5 LSTSYMBOL • expr5
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 31
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr5    go to state 115
+    efact    go to state 33
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 77
+
+   38 efact: '!' '!' '{' • nsentries '}'
+
+    LSTSYMBOL  shift, and go to state 116
+
+    $default  reduce using rule 40 (nsentries)
+
+    nsentries  go to state 117
+    nsentry    go to state 118
+
+
+State 78
+
+   24 efact: LSTINT •
+   82 pat3: LSTINT •
+
+    LSTLEFTARROW  reduce using rule 82 (pat3)
+    '|'           reduce using rule 24 (efact)
+    '|'           [reduce using rule 82 (pat3)]
+    ':'           reduce using rule 24 (efact)
+    ':'           [reduce using rule 82 (pat3)]
+    ')'           reduce using rule 24 (efact)
+    ')'           [reduce using rule 82 (pat3)]
+    ','           reduce using rule 24 (efact)
+    ','           [reduce using rule 82 (pat3)]
+    ']'           reduce using rule 24 (efact)
+    ']'           [reduce using rule 82 (pat3)]
+    $default      reduce using rule 24 (efact)
+
+
+State 79
+
+   20 ealge: LSTSYMBOL • expr5
+   23 expr5: LSTSYMBOL •
+   78 palge: LSTSYMBOL •
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 31
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    LSTINT        [reduce using rule 78 (palge)]
+    LSTREFSYM     [reduce using rule 78 (palge)]
+    LSTSTR        [reduce using rule 78 (palge)]
+    LSTLEFTARROW  reduce using rule 78 (palge)
+    LSTWILDCARD   reduce using rule 78 (palge)
+    '|'           reduce using rule 23 (expr5)
+    '|'           [reduce using rule 78 (palge)]
+    ':'           reduce using rule 23 (expr5)
+    ':'           [reduce using rule 78 (palge)]
+    '('           [reduce using rule 78 (palge)]
+    ')'           reduce using rule 23 (expr5)
+    ')'           [reduce using rule 78 (palge)]
+    ','           reduce using rule 23 (expr5)
+    ','           [reduce using rule 78 (palge)]
+    '['           [reduce using rule 78 (palge)]
+    ']'           reduce using rule 23 (expr5)
+    ']'           [reduce using rule 78 (palge)]
+    $default      reduce using rule 23 (expr5)
+
+    expr5    go to state 32
+    efact    go to state 33
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 80
+
+   26 efact: LSTREFSYM •
+   87 pref: LSTREFSYM •
+
+    LSTLEFTARROW  reduce using rule 87 (pref)
+    '|'           reduce using rule 26 (efact)
+    '|'           [reduce using rule 87 (pref)]
+    ':'           reduce using rule 26 (efact)
+    ':'           [reduce using rule 87 (pref)]
+    ')'           reduce using rule 26 (efact)
+    ')'           [reduce using rule 87 (pref)]
+    ','           reduce using rule 26 (efact)
+    ','           [reduce using rule 87 (pref)]
+    ']'           reduce using rule 26 (efact)
+    ']'           [reduce using rule 87 (pref)]
+    '@'           reduce using rule 87 (pref)
+    $default      reduce using rule 26 (efact)
+
+
+State 81
+
+   25 efact: LSTSTR •
+   83 pat3: LSTSTR •
+
+    LSTLEFTARROW  reduce using rule 83 (pat3)
+    '|'           reduce using rule 25 (efact)
+    '|'           [reduce using rule 83 (pat3)]
+    ':'           reduce using rule 25 (efact)
+    ':'           [reduce using rule 83 (pat3)]
+    ')'           reduce using rule 25 (efact)
+    ')'           [reduce using rule 83 (pat3)]
+    ','           reduce using rule 25 (efact)
+    ','           [reduce using rule 83 (pat3)]
+    ']'           reduce using rule 25 (efact)
+    ']'           [reduce using rule 83 (pat3)]
+    $default      reduce using rule 25 (efact)
+
+
+State 82
+
+   56 closure: '(' • expr bind ')'
+   57 etuple: '(' • ')'
+   58       | '(' • earray ')'
+   88 ptuple: '(' • ')'
+   89       | '(' • parray ')'
+
+    LSTINT             shift, and go to state 78
+    LSTSYMBOL          shift, and go to state 79
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 80
+    LSTSTR             shift, and go to state 81
+    LSTWILDCARD        shift, and go to state 42
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 82
+    ')'                shift, and go to state 119
+    '['                shift, and go to state 83
+    '\\'               shift, and go to state 15
+
+    expr     go to state 57
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    earray   go to state 58
+    elist    go to state 29
+    elambda  go to state 30
+    pat      go to state 91
+    pcons    go to state 48
+    pat1     go to state 49
+    pat2     go to state 50
+    palge    go to state 51
+    pat3     go to state 52
+    pref     go to state 53
+    ptuple   go to state 54
+    parray   go to state 92
+    plist    go to state 55
+
+
+State 83
+
+   61 elist: '[' • ']'
+   62      | '[' • earray ']'
+   92 plist: '[' • ']'
+   93      | '[' • parray ']'
+
+    LSTINT             shift, and go to state 78
+    LSTSYMBOL          shift, and go to state 79
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 80
+    LSTSTR             shift, and go to state 81
+    LSTWILDCARD        shift, and go to state 42
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 82
+    '['                shift, and go to state 83
+    ']'                shift, and go to state 120
+    '\\'               shift, and go to state 15
+
+    expr     go to state 60
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    earray   go to state 61
+    elist    go to state 29
+    elambda  go to state 30
+    pat      go to state 91
+    pcons    go to state 48
+    pat1     go to state 49
+    pat2     go to state 50
+    palge    go to state 51
+    pat3     go to state 52
+    pref     go to state 53
+    ptuple   go to state 54
+    parray   go to state 94
+    plist    go to state 55
+
+
+State 84
+
+   55 dostmt: expr •
+
+    $default  reduce using rule 55 (dostmt)
+
+
+State 85
+
+   37 efact: '!' '{' dostmts • '}'
+
+    '}'  shift, and go to state 121
+
+
+State 86
+
+   52 dostmts: dostmt •
+   53        | dostmt • ';' dostmts
+
+    ';'  shift, and go to state 122
+
+    $default  reduce using rule 52 (dostmts)
+
+
+State 87
+
+   54 dostmt: pat • LSTLEFTARROW expr
+   73 pcons: pat • ':' pat
+
+    LSTLEFTARROW  shift, and go to state 123
+    ':'           shift, and go to state 98
+
+
+State 88
+
+   49 nslit_entry: LSTSYMBOL '=' • expr
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr     go to state 124
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 89
+
+   78 palge: LSTSYMBOL •
+
+    $default  reduce using rule 78 (palge)
+
+
+State 90
+
+   88 ptuple: '(' ')' •
+
+    $default  reduce using rule 88 (ptuple)
+
+
+State 91
+
+   73 pcons: pat • ':' pat
+   90 parray: pat •
+
+    ':'  shift, and go to state 98
+
+    $default  reduce using rule 90 (parray)
+
+
+State 92
+
+   89 ptuple: '(' parray • ')'
+   91 parray: parray • ',' pat
+
+    ')'  shift, and go to state 125
+    ','  shift, and go to state 126
+
+
+State 93
+
+   92 plist: '[' ']' •
+
+    $default  reduce using rule 92 (plist)
+
+
+State 94
+
+   91 parray: parray • ',' pat
+   93 plist: '[' parray • ']'
+
+    ','  shift, and go to state 126
+    ']'  shift, and go to state 127
+
+
+State 95
+
+   47 nslit_entries: nslit_entries ';' • nslit_entry
+   48              | nslit_entries ';' •
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 39
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    $default  reduce using rule 48 (nslit_entries)
+
+    nslit_entry  go to state 128
+    pat          go to state 47
+    pcons        go to state 48
+    pat1         go to state 49
+    pat2         go to state 50
+    palge        go to state 51
+    pat3         go to state 52
+    pref         go to state 53
+    ptuple       go to state 54
+    plist        go to state 55
+
+
+State 96
+
+   39 efact: '{' nslit_entries '}' •
+
+    $default  reduce using rule 39 (efact)
+
+
+State 97
+
+   50 nslit_entry: pat LSTLEFTARROW • expr
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr     go to state 129
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 98
+
+   73 pcons: pat ':' • pat
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 89
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    pat     go to state 130
+    pcons   go to state 48
+    pat1    go to state 49
+    pat2    go to state 50
+    palge   go to state 51
+    pat3    go to state 52
+    pref    go to state 53
+    ptuple  go to state 54
+    plist   go to state 55
+
+
+State 99
+
+   75 pat1: pat2 '|' • pat1
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 89
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    pat1    go to state 131
+    pat2    go to state 50
+    palge   go to state 51
+    pat3    go to state 52
+    pref    go to state 53
+    ptuple  go to state 54
+    plist   go to state 55
+
+
+State 100
+
+   79 palge: palge pat3 •
+
+    $default  reduce using rule 79 (palge)
+
+
+State 101
+
+   86 pat3: pref '@' • pat3
+
+    LSTINT       shift, and go to state 38
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    pat3    go to state 132
+    pref    go to state 53
+    ptuple  go to state 54
+    plist   go to state 55
+
+
+State 102
+
+    6 bind_list: ';' • bind_single
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 89
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    funlhs       go to state 133
+    bind_single  go to state 134
+    pat          go to state 135
+    pcons        go to state 48
+    pat1         go to state 49
+    pat2         go to state 50
+    palge        go to state 51
+    pat3         go to state 52
+    pref         go to state 136
+    ptuple       go to state 54
+    plist        go to state 55
+
+
+State 103
+
+   56 closure: '(' expr bind • ')'
+
+    ')'  shift, and go to state 137
+
+
+State 104
+
+    2 bind: bind_list •
+    7 bind_list: bind_list • ';' bind_single
+
+    ';'  shift, and go to state 138
+
+    $default  reduce using rule 2 (bind)
+
+
+State 105
+
+   58 etuple: '(' earray ')' •
+
+    $default  reduce using rule 58 (etuple)
+
+
+State 106
+
+   60 earray: earray ',' • expr
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr     go to state 139
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 107
+
+   62 elist: '[' earray ']' •
+
+    $default  reduce using rule 62 (elist)
+
+
+State 108
+
+   68 lamparam2: '(' palge • ')'
+   77 pat2: palge •
+   79 palge: palge • pat3
+
+    LSTINT       shift, and go to state 38
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    ')'          shift, and go to state 140
+    '['          shift, and go to state 44
+
+    ')'       [reduce using rule 77 (pat2)]
+    $default  reduce using rule 77 (pat2)
+
+    pat3    go to state 100
+    pref    go to state 53
+    ptuple  go to state 54
+    plist   go to state 55
+
+
+State 109
+
+   65 lamparam: lamparam2 '|' • lamparam
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 62
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 63
+    '['          shift, and go to state 44
+
+    lamparam   go to state 141
+    lamparam2  go to state 65
+    pat3       go to state 67
+    pref       go to state 53
+    ptuple     go to state 54
+    plist      go to state 55
+
+
+State 110
+
+   63 elambda: '\\' lamparams LSTARROW • expr3
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr3    go to state 142
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 111
+
+   70 lamparams: lamparams lamparam •
+
+    $default  reduce using rule 70 (lamparams)
+
+
+State 112
+
+   13 econs: expr1 ':' expr3 •
+
+    $default  reduce using rule 13 (econs)
+
+
+State 113
+
+   10 expr1: expr2 '|' expr1 •
+   13 econs: expr1 • ':' expr3
+
+    ':'  shift, and go to state 70
+
+    $default  reduce using rule 10 (expr1)
+
+
+State 114
+
+   28 efact: LSTNSDEF LSTSYMBOL LSTSYMBOL expr5 •
+
+    $default  reduce using rule 28 (efact)
+
+
+State 115
+
+   27 efact: LSTNSDEFV expr5 LSTSYMBOL expr5 •
+
+    $default  reduce using rule 27 (efact)
+
+
+State 116
+
+   44 nsentry: LSTSYMBOL • '=' expr
+
+    '='  shift, and go to state 143
+
+
+State 117
+
+   38 efact: '!' '!' '{' nsentries • '}'
+   42 nsentries: nsentries • ';' nsentry
+   43          | nsentries • ';'
+
+    ';'  shift, and go to state 144
+    '}'  shift, and go to state 145
+
+
+State 118
+
+   41 nsentries: nsentry •
+
+    $default  reduce using rule 41 (nsentries)
+
+
+State 119
+
+   57 etuple: '(' ')' •
+   88 ptuple: '(' ')' •
+
+    LSTLEFTARROW  reduce using rule 88 (ptuple)
+    '|'           reduce using rule 57 (etuple)
+    '|'           [reduce using rule 88 (ptuple)]
+    ':'           reduce using rule 57 (etuple)
+    ':'           [reduce using rule 88 (ptuple)]
+    ')'           reduce using rule 57 (etuple)
+    ')'           [reduce using rule 88 (ptuple)]
+    ','           reduce using rule 57 (etuple)
+    ','           [reduce using rule 88 (ptuple)]
+    ']'           reduce using rule 57 (etuple)
+    ']'           [reduce using rule 88 (ptuple)]
+    $default      reduce using rule 57 (etuple)
+
+
+State 120
+
+   61 elist: '[' ']' •
+   92 plist: '[' ']' •
+
+    LSTLEFTARROW  reduce using rule 92 (plist)
+    '|'           reduce using rule 61 (elist)
+    '|'           [reduce using rule 92 (plist)]
+    ':'           reduce using rule 61 (elist)
+    ':'           [reduce using rule 92 (plist)]
+    ')'           reduce using rule 61 (elist)
+    ')'           [reduce using rule 92 (plist)]
+    ','           reduce using rule 61 (elist)
+    ','           [reduce using rule 92 (plist)]
+    ']'           reduce using rule 61 (elist)
+    ']'           [reduce using rule 92 (plist)]
+    $default      reduce using rule 61 (elist)
+
+
+State 121
+
+   37 efact: '!' '{' dostmts '}' •
+
+    $default  reduce using rule 37 (efact)
+
+
+State 122
+
+   53 dostmts: dostmt ';' • dostmts
+
+    LSTINT             shift, and go to state 78
+    LSTSYMBOL          shift, and go to state 79
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 80
+    LSTSTR             shift, and go to state 81
+    LSTWILDCARD        shift, and go to state 42
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 82
+    '['                shift, and go to state 83
+    '\\'               shift, and go to state 15
+
+    $default  reduce using rule 51 (dostmts)
+
+    expr     go to state 84
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    dostmts  go to state 146
+    dostmt   go to state 86
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+    pat      go to state 87
+    pcons    go to state 48
+    pat1     go to state 49
+    pat2     go to state 50
+    palge    go to state 51
+    pat3     go to state 52
+    pref     go to state 53
+    ptuple   go to state 54
+    plist    go to state 55
+
+
+State 123
+
+   54 dostmt: pat LSTLEFTARROW • expr
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr     go to state 147
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 124
+
+   49 nslit_entry: LSTSYMBOL '=' expr •
+
+    $default  reduce using rule 49 (nslit_entry)
+
+
+State 125
+
+   89 ptuple: '(' parray ')' •
+
+    $default  reduce using rule 89 (ptuple)
+
+
+State 126
+
+   91 parray: parray ',' • pat
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 89
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    pat     go to state 148
+    pcons   go to state 48
+    pat1    go to state 49
+    pat2    go to state 50
+    palge   go to state 51
+    pat3    go to state 52
+    pref    go to state 53
+    ptuple  go to state 54
+    plist   go to state 55
+
+
+State 127
+
+   93 plist: '[' parray ']' •
+
+    $default  reduce using rule 93 (plist)
+
+
+State 128
+
+   47 nslit_entries: nslit_entries ';' nslit_entry •
+
+    $default  reduce using rule 47 (nslit_entries)
+
+
+State 129
+
+   50 nslit_entry: pat LSTLEFTARROW expr •
+
+    $default  reduce using rule 50 (nslit_entry)
+
+
+State 130
+
+   73 pcons: pat • ':' pat
+   73      | pat ':' pat •
+
+    ':'  shift, and go to state 98
+
+    $default  reduce using rule 73 (pcons)
+
+
+State 131
+
+   75 pat1: pat2 '|' pat1 •
+
+    $default  reduce using rule 75 (pat1)
+
+
+State 132
+
+   86 pat3: pref '@' pat3 •
+
+    $default  reduce using rule 86 (pat3)
+
+
+State 133
+
+    4 bind_single: funlhs • lamparams '=' expr
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 62
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 63
+    '['          shift, and go to state 44
+
+    lamparam   go to state 64
+    lamparam2  go to state 65
+    lamparams  go to state 149
+    pat3       go to state 67
+    pref       go to state 53
+    ptuple     go to state 54
+    plist      go to state 55
+
+
+State 134
+
+    6 bind_list: ';' bind_single •
+
+    $default  reduce using rule 6 (bind_list)
+
+
+State 135
+
+    5 bind_single: pat • '=' expr
+   73 pcons: pat • ':' pat
+
+    ':'  shift, and go to state 98
+    '='  shift, and go to state 150
+
+
+State 136
+
+    3 funlhs: pref •
+   84 pat3: pref •
+   86     | pref • '@' pat3
+
+    '@'  shift, and go to state 101
+
+    '|'       reduce using rule 84 (pat3)
+    ':'       reduce using rule 84 (pat3)
+    '='       reduce using rule 84 (pat3)
+    $default  reduce using rule 3 (funlhs)
+
+
+State 137
+
+   56 closure: '(' expr bind ')' •
+
+    $default  reduce using rule 56 (closure)
+
+
+State 138
+
+    7 bind_list: bind_list ';' • bind_single
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 89
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '('          shift, and go to state 43
+    '['          shift, and go to state 44
+
+    funlhs       go to state 133
+    bind_single  go to state 151
+    pat          go to state 135
+    pcons        go to state 48
+    pat1         go to state 49
+    pat2         go to state 50
+    palge        go to state 51
+    pat3         go to state 52
+    pref         go to state 136
+    ptuple       go to state 54
+    plist        go to state 55
+
+
+State 139
+
+   60 earray: earray ',' expr •
+
+    $default  reduce using rule 60 (earray)
+
+
+State 140
+
+   68 lamparam2: '(' palge ')' •
+
+    $default  reduce using rule 68 (lamparam2)
+
+
+State 141
+
+   65 lamparam: lamparam2 '|' lamparam •
+
+    $default  reduce using rule 65 (lamparam)
+
+
+State 142
+
+   63 elambda: '\\' lamparams LSTARROW expr3 •
+
+    $default  reduce using rule 63 (elambda)
+
+
+State 143
+
+   44 nsentry: LSTSYMBOL '=' • expr
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr     go to state 152
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 144
+
+   42 nsentries: nsentries ';' • nsentry
+   43          | nsentries ';' •
+
+    LSTSYMBOL  shift, and go to state 116
+
+    $default  reduce using rule 43 (nsentries)
+
+    nsentry  go to state 153
+
+
+State 145
+
+   38 efact: '!' '!' '{' nsentries '}' •
+
+    $default  reduce using rule 38 (efact)
+
+
+State 146
+
+   53 dostmts: dostmt ';' dostmts •
+
+    $default  reduce using rule 53 (dostmts)
+
+
+State 147
+
+   54 dostmt: pat LSTLEFTARROW expr •
+
+    $default  reduce using rule 54 (dostmt)
+
+
+State 148
+
+   73 pcons: pat • ':' pat
+   91 parray: parray ',' pat •
+
+    ':'  shift, and go to state 98
+
+    $default  reduce using rule 91 (parray)
+
+
+State 149
+
+    4 bind_single: funlhs lamparams • '=' expr
+   70 lamparams: lamparams • lamparam
+
+    LSTINT       shift, and go to state 38
+    LSTSYMBOL    shift, and go to state 62
+    LSTREFSYM    shift, and go to state 40
+    LSTSTR       shift, and go to state 41
+    LSTWILDCARD  shift, and go to state 42
+    '='          shift, and go to state 154
+    '('          shift, and go to state 63
+    '['          shift, and go to state 44
+
+    lamparam   go to state 111
+    lamparam2  go to state 65
+    pat3       go to state 67
+    pref       go to state 53
+    ptuple     go to state 54
+    plist      go to state 55
+
+
+State 150
+
+    5 bind_single: pat '=' • expr
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr     go to state 155
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 151
+
+    7 bind_list: bind_list ';' bind_single •
+
+    $default  reduce using rule 7 (bind_list)
+
+
+State 152
+
+   44 nsentry: LSTSYMBOL '=' expr •
+
+    $default  reduce using rule 44 (nsentry)
+
+
+State 153
+
+   42 nsentries: nsentries ';' nsentry •
+
+    $default  reduce using rule 42 (nsentries)
+
+
+State 154
+
+    4 bind_single: funlhs lamparams '=' • expr
+
+    LSTINT             shift, and go to state 1
+    LSTSYMBOL          shift, and go to state 2
+    LSTPRELUDE_CONSTR  shift, and go to state 3
+    LSTPRELUDE_SYMBOL  shift, and go to state 4
+    LSTPRELUDE_STR     shift, and go to state 5
+    LSTPRELUDE_INT     shift, and go to state 6
+    LSTNSDEF           shift, and go to state 7
+    LSTNSDEFV          shift, and go to state 8
+    LSTREFSYM          shift, and go to state 9
+    LSTSTR             shift, and go to state 10
+    '!'                shift, and go to state 11
+    '{'                shift, and go to state 12
+    '('                shift, and go to state 13
+    '['                shift, and go to state 14
+    '\\'               shift, and go to state 15
+
+    expr     go to state 156
+    expr1    go to state 18
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
+    eappl    go to state 22
+    expr4    go to state 23
+    ealge    go to state 24
+    expr5    go to state 25
+    efact    go to state 26
+    closure  go to state 27
+    etuple   go to state 28
+    elist    go to state 29
+    elambda  go to state 30
+
+
+State 155
+
+    5 bind_single: pat '=' expr •
+
+    $default  reduce using rule 5 (bind_single)
+
+
+State 156
+
+    4 bind_single: funlhs lamparams '=' expr •
+
+    $default  reduce using rule 4 (bind_single)

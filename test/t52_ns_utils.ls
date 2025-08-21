@@ -1,6 +1,6 @@
 !{
-  ~N <- ((~prelude requirePure) "lib/Ns.ls");
-  ~ns <- ((~prelude nsnew0));
+  ~N <- ((~prelude .requirePure) "lib/Ns.ls");
+  ~ns <- ((~prelude .nsnew0));
   ~~nsdefv ~ns .a 1;
   ~~nsdefv ~ns .b 2;
   ~~println (~to_str ((((~N .nsHas) ~ns) .a)));
