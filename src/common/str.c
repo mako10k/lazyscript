@@ -106,7 +106,7 @@ static const lsstr_t* lsstr_ht_del_raw(lsstr_ht_t* str_ht, const char* buf, lssi
   *pstr                = NULL;
   while (1) {
     if (++i >= str_ht->lsth_cap)
-      i = str_ht->lsth_cap;
+      i = 0; // wrap to start when probing past end
     const lsstr_t* ent = ents[i];
     if (ent == NULL)
       break;

@@ -278,4 +278,6 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
 // Registration helper used by host
 void ls_register_builtin_prelude(lstenv_t* tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, tenv);
+  // Alias: expose the raw builtin dispatcher also as (~builtin ...)
+  lstenv_put_builtin(tenv, lsstr_cstr("builtin"), 1, lsbuiltin_prelude_dispatch, tenv);
 }

@@ -247,6 +247,10 @@ static int ls_try_load_prelude_plugin(lstenv_t* tenv, const char* path) {
 }
 
 int main(int argc, char** argv) {
+  // Ensure Boehm GC is initialized early, before any allocations in flex/bison
+  // scanner/parser (yylex_init may allocate and trigger GC lazy init otherwise).
+  // Explicit init avoids observed crashes in GC_init on some inputs.
+  GC_init();
   const char*   prelude_so       = NULL;
   int           dump_coreir      = 0;
   int           eval_coreir      = 0;

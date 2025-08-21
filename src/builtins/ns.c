@@ -18,6 +18,15 @@ typedef struct lsns {
   int       is_mutable; // 1: mutable (nsnew/nsnew0), 0: immutable (nslit)
 } lsns_t;
 
+// Debug logging toggle for nslit; enabled when LS_NS_LOG_NSLIT is set and non-empty
+static int nslog_enabled(void) {
+  static int cached = -1;
+  if (cached >= 0) return cached;
+  const char* v = getenv("LS_NS_LOG_NSLIT");
+  cached = (v && v[0] && v[0] != '0') ? 1 : 0;
+  return cached;
+}
+
 // Debug logging: define LS_NS_DEBUG=1 at compile time to enable
 #ifndef LS_NS_DEBUG
 #define LS_NS_DEBUG 0
@@ -415,20 +424,40 @@ lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data) {
   if (argc % 2 != 0) {
     return ls_make_err("nslit: expected even number of arguments");
   }
+  if (nslog_enabled()) {
+    lsprintf(stderr, 0, "DBG nslit begin argc=%ld\n", (long)argc);
+  }
   lsns_t* ns = lsmalloc(sizeof(lsns_t));
   ns->map = lshash_new(16);
   ns->is_mutable = 0; // immutable literal namespace
   // Enable (~prelude nsSelf) inside values while building
   lsns_t* prev_self = g_nslit_self; g_nslit_self = ns;
   for (lssize_t i = 0; i < argc; i += 2) {
+    if (nslog_enabled()) {
+      lsprintf(stderr, 0, "DBG nslit key[%ld] eval\n", (long)i/2);
+    }
     lsthunk_t* symv = ls_eval_arg(args[i], "nslit: key");
     if (lsthunk_is_err(symv)) { g_nslit_self = prev_self; return symv; }
     const lsstr_t* symname = ns_encode_key_from_thunk(symv);
     if (!symname) { g_nslit_self = prev_self; return ls_make_err("nslit: symbol expected"); }
+    if (nslog_enabled()) {
+      lsprintf(stderr, 0, "DBG nslit key=");
+      lsstr_print_bare(stderr, LSPREC_LOWEST, 0, symname);
+      lsprintf(stderr, 0, "\n");
+    }
+    if (nslog_enabled()) {
+      lsprintf(stderr, 0, "DBG nslit val[%ld] eval\n", (long)i/2);
+    }
     lsthunk_t* val = ls_eval_arg(args[i + 1], "nslit: value");
     if (lsthunk_is_err(val)) { g_nslit_self = prev_self; return val; }
+    if (nslog_enabled()) {
+      lsprintf(stderr, 0, "DBG nslit put type=%d\n", (int)lsthunk_get_type(val));
+    }
     lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
   }
   g_nslit_self = prev_self;
+  if (nslog_enabled()) {
+    lsprintf(stderr, 0, "DBG nslit end ns=%p map=%p\n", (void*)ns, (void*)ns->map);
+  }
   return lsthunk_new_builtin(lsstr_cstr("namespace"), 1, lsbuiltin_ns_value, (void*)ns);
 }

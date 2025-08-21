@@ -239,12 +239,15 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
   lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
   lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
   lsprintf(stderr, 0, "\n");
-  return NULL;
+  // Return an error thunk instead of NULL to avoid downstream segfaults
+  return ls_make_err("prelude: unknown symbol");
 }
 
 int ls_prelude_register(lstenv_t* tenv) {
   if (!tenv)
     return -1;
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, pl_dispatch, tenv);
+  // Alias for builtins
+  lstenv_put_builtin(tenv, lsstr_cstr("builtin"), 1, pl_dispatch, tenv);
   return 0;
 }
