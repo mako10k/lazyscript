@@ -16,3 +16,9 @@ lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data)
 lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* data);
 // Expose prelude.nsSelf (available only within nslit evaluation)
 lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void* data);
+
+// Internal helper: iterate members of a namespace (value or named symbol)
+// For each member, callback receives the symbol name (without internal tag, may start with '.')
+// and the bound value thunk.
+typedef void (*lsns_iter_cb)(const lsstr_t* symbol, lsthunk_t* value, void* data);
+int lsns_foreach_member(lsthunk_t* ns_thunk, lsns_iter_cb cb, void* data);

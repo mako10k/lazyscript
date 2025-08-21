@@ -11,6 +11,7 @@
 #include <gc.h>
 #include <assert.h>
 #include "runtime/error.h"
+#include "builtins/ns.h"
 
 static lsthunk_t* ls_make_unit(void) {
   const lsealge_t* eunit = lsealge_new(lsstr_cstr("()"), 0, NULL);
@@ -141,6 +142,38 @@ static lsthunk_t* pl_return(lssize_t argc, lsthunk_t* const* args, void* data) {
   return args[0];
 }
 
+// import/withImport for plugin prelude
+static void pl_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data) {
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return;
+  lstenv_put_builtin(tenv, sym, 0, pl_getter0, value);
+}
+
+static lsthunk_t* pl_import(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; lstenv_t* tenv = (lstenv_t*)data;
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: import: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
+  if (!tenv) return NULL;
+  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (nsv == NULL) return NULL;
+  if (!lsns_foreach_member(nsv, pl_import_cb, tenv)) return ls_make_err("import: invalid namespace");
+  return ls_make_unit();
+}
+
+static lsthunk_t* pl_withImport(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; lstenv_t* tenv = (lstenv_t*)data;
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: withImport: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
+  if (!tenv) return NULL;
+  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (nsv == NULL) return NULL;
+  if (!lsns_foreach_member(nsv, pl_import_cb, tenv)) return ls_make_err("withImport: invalid namespace");
+  lsthunk_t* unit = ls_make_unit();
+  lsthunk_t* cont = args[1];
+  return lsthunk_eval(cont, 1, &unit);
+}
+
 static lsthunk_t* pl_plugin_hello(void) {
   return lsthunk_new_str(lsstr_cstr("plugin"));
 }
@@ -167,8 +200,12 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, pl_require, tenv);
   if (lsstrcmp(name, lsstr_cstr("requirePure")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, pl_require_pure, tenv);
+  if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, pl_import, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsSelf"), 0, lsbuiltin_prelude_ns_self, NULL);
+  if (lsstrcmp(name, lsstr_cstr("withImport")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, pl_withImport, tenv);
   if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, pl_chain, NULL);
   if (lsstrcmp(name, lsstr_cstr("bind")) == 0)

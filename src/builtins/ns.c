@@ -165,6 +165,40 @@ lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* dat
   return list;
 }
 
+// Public iteration helper used by prelude.import and others
+typedef struct {
+  lsns_iter_cb cb;
+  void*        data;
+} ns_iter_user_cb_t;
+
+static void ns_iter_cb_adapter(const lsstr_t* key, lshash_data_t value, void* data) {
+  ns_iter_user_cb_t* u = (ns_iter_user_cb_t*)data;
+  if (!u || !u->cb || !key) return;
+  const char* bytes = lsstr_get_buf(key);
+  lssize_t    len   = lsstr_get_len(key);
+  if (!bytes || len <= 0) return;
+  if (bytes[0] != 'S') return; // only symbol keys
+  const lsstr_t* sym = lsstr_new(bytes + 1, len - 1);
+  u->cb(sym, (lsthunk_t*)value, u->data);
+}
+
+int lsns_foreach_member(lsthunk_t* ns_thunk, lsns_iter_cb cb, void* data) {
+  if (!ns_thunk || !cb) return 0;
+  // Accept either namespace value or named symbol (0-arity constructor)
+  lsns_t* ns = NULL;
+  if (lsthunk_is_builtin(ns_thunk)) {
+    lstbuiltin_func_t fn = lsthunk_get_builtin_func(ns_thunk);
+    if (fn == lsbuiltin_ns_value) ns = (lsns_t*)lsthunk_get_builtin_data(ns_thunk);
+  } else if (lsthunk_get_type(ns_thunk) == LSTTYPE_ALGE && lsthunk_get_argc(ns_thunk) == 0) {
+    const lsstr_t* nsname = lsthunk_get_constr(ns_thunk);
+    if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
+  }
+  if (!ns || !ns->map) return 0;
+  ns_iter_user_cb_t u = { cb, data };
+  lshash_foreach(ns->map, ns_iter_cb_adapter, &u);
+  return 1;
+}
+
 static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
   lsns_t* ns = (lsns_t*)data;
@@ -179,17 +213,10 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
       return ls_make_err("namespace: use (~ns __set) or (~ns .__set) for setter");
     }
   }
-  // Backward-compat: allow symbol .__set as setter as well
+  // Setter: allow only symbol .__set
   if (lsthunk_get_type(keyv) == LSTTYPE_SYMBOL) {
     const lsstr_t* s = lsthunk_get_symbol(keyv);
     if (lsstrcmp(s, lsstr_cstr(".__set")) == 0) {
-      return lsthunk_new_builtin(lsstr_cstr("namespace.__set"), 2, lsbuiltin_ns_set, ns);
-    }
-  }
-  // Special setter remains constructor-based: (~NS __set)
-  if (lsthunk_get_type(keyv) == LSTTYPE_ALGE && lsthunk_get_argc(keyv) == 0) {
-    const lsstr_t* cname = lsthunk_get_constr(keyv);
-    if (lsstrcmp(cname, lsstr_cstr("__set")) == 0) {
       return lsthunk_new_builtin(lsstr_cstr("namespace.__set"), 2, lsbuiltin_ns_set, ns);
     }
   }

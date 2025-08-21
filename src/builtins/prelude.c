@@ -148,6 +148,64 @@ lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void
 lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data);
 lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void* data);
 
+// prelude.import: import members of a namespace value into current env
+static void ls_import_bind_cb(const lsstr_t* key, lshash_data_t value, void* data) {
+  if (!key) return;
+  // Keys are encoded as 'S' + ".name"; strip tag and leading '.'
+  const char* bytes = lsstr_get_buf(key);
+  lssize_t    len   = lsstr_get_len(key);
+  if (!bytes || len <= 1) return;
+  const char* sym   = bytes + 1; // drop 'S'
+  lssize_t    slen  = len - 1;
+  if (slen > 0 && sym[0] == '.') { sym++; slen--; }
+  if (slen <= 0) return;
+  struct { lstenv_t* tenv; } *ctx = (void*)data;
+  const lsstr_t* vname = lsstr_new(sym, slen);
+  lsthunk_t*     val   = (lsthunk_t*)value;
+  // define as 0-arity getter bound to the value thunk
+  extern lsthunk_t* lsbuiltin_getter0(lssize_t, lsthunk_t* const*, void*);
+  lstenv_put_builtin(ctx->tenv, vname, 0, lsbuiltin_getter0, val);
+}
+
+static void prelude_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data) {
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return;
+  // sym comes without tag; may start with '.'
+  const char* s = lsstr_get_buf(sym); lssize_t n = lsstr_get_len(sym);
+  if (!s || n <= 0) return;
+  const lsstr_t* vname = lsstr_new(s, n);
+  lstenv_put_builtin(tenv, vname, 0, lsbuiltin_getter0, value);
+}
+
+static lsthunk_t* lsbuiltin_prelude_import(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc;
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: import: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return ls_make_err("import: no env");
+  lsthunk_t* nsv = ls_eval_arg(args[0], "import: ns");
+  if (lsthunk_is_err(nsv)) return nsv;
+  if (!nsv) return ls_make_err("import: ns eval");
+  if (!lsns_foreach_member(nsv, prelude_import_cb, tenv)) return ls_make_err("import: invalid namespace");
+  return ls_make_unit();
+}
+
+static lsthunk_t* lsbuiltin_prelude_with_import(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc;
+  if (!ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: withImport: effect used in pure context (enable seq/chain)\n");
+    return NULL;
+  }
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return ls_make_err("withImport: no env");
+  lsthunk_t* nsv = ls_eval_arg(args[0], "withImport: ns");
+  if (lsthunk_is_err(nsv)) return nsv;
+  if (!nsv) return ls_make_err("withImport: ns eval");
+  if (!lsns_foreach_member(nsv, prelude_import_cb, tenv)) return ls_make_err("withImport: invalid namespace");
+  lsthunk_t* unit = ls_make_unit();
+  lsthunk_t* cont = args[1];
+  return lsthunk_eval(cont, 1, &unit);
+}
+
 static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   lstenv_t* tenv = (lstenv_t*)data;
   (void)argc;
@@ -166,8 +224,12 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
   if (lsstrcmp(name, lsstr_cstr("requirePure")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
+  if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsSelf"), 0, lsbuiltin_prelude_ns_self, NULL);
+  if (lsstrcmp(name, lsstr_cstr("withImport")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, lsbuiltin_prelude_with_import, tenv);
   if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, lsbuiltin_prelude_chain, NULL);
   if (lsstrcmp(name, lsstr_cstr("bind")) == 0)
