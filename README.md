@@ -64,6 +64,7 @@ sudo make install   # 任意
   - `LAZYSCRIPT_USE_LIBC_ALLOC=1`: ランタイムのアロケータを Boehm GC から libc に切替えます。
     - デバッグ用途。長時間プロセスでの GC 動作検証とは別に、メモリまわりの問題切り分けに役立ちます。
     - この変数が真の場合、起動時の `GC_init()` もスキップされます。
+  - `LS_NS_LOG_NSLIT`: 名前空間リテラル（nslit）の評価をデバッグ出力します。非空かつ `0` 以外の値で有効。詳細は `docs/10_namespaces.md` を参照。
 
 ### 実行セマンティクスの要点
 
