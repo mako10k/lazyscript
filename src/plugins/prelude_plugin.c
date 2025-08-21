@@ -10,6 +10,7 @@
 #include <string.h>
 #include <gc.h>
 #include <assert.h>
+#include "runtime/error.h"
 
 static lsthunk_t* ls_make_unit(void) {
   const lsealge_t* eunit = lsealge_new(lsstr_cstr("()"), 0, NULL);
@@ -107,10 +108,12 @@ static lsthunk_t* pl_chain(lssize_t argc, lsthunk_t* const* args, void* data) {
   assert(argc == 2);
   assert(args != NULL);
   ls_effects_begin();
-  lsthunk_t* action = lsthunk_eval0(args[0]);
+  lsthunk_t* action = ls_eval_arg(args[0], "chain: action");
   ls_effects_end();
-  if (action == NULL)
-    return NULL;
+  if (lsthunk_is_err(action))
+    return action;
+  if (!action)
+    return ls_make_err("chain: action eval");
   lsthunk_t* unit = ls_make_unit();
   lsthunk_t* cont = args[1];
   return lsthunk_eval(cont, 1, &unit);
@@ -121,10 +124,12 @@ static lsthunk_t* pl_bind(lssize_t argc, lsthunk_t* const* args, void* data) {
   assert(argc == 2);
   assert(args != NULL);
   ls_effects_begin();
-  lsthunk_t* val = lsthunk_eval0(args[0]);
+  lsthunk_t* val = ls_eval_arg(args[0], "bind: value");
   ls_effects_end();
-  if (val == NULL)
-    return NULL;
+  if (lsthunk_is_err(val))
+    return val;
+  if (!val)
+    return ls_make_err("bind: value eval");
   lsthunk_t* cont = args[1];
   return lsthunk_eval(cont, 1, &val);
 }

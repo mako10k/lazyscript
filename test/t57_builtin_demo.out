@@ -1,2 +1,3 @@
 ~builtin:demo#hello{-builtin/0-}
 42
+()
