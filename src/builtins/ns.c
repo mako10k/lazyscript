@@ -148,6 +148,10 @@ lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* dat
     lstbuiltin_func_t fn = lsthunk_get_builtin_func(nsv);
     if (fn == lsbuiltin_ns_value) ns = (lsns_t*)lsthunk_get_builtin_data(nsv);
   } else if (lsthunk_get_type(nsv) == LSTTYPE_ALGE && lsthunk_get_argc(nsv) == 0) {
+    const char* warn = getenv("LAZYSCRIPT_WARN_DEPRECATIONS");
+    if (warn && warn[0] && warn[0] != '0') {
+      lsprintf(stderr, 0, "W: nsMembers: passing named namespace (~NS) is deprecated; pass namespace value instead\n");
+    }
     const lsstr_t* nsname = lsthunk_get_constr(nsv);
     if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
   }
@@ -190,6 +194,10 @@ int lsns_foreach_member(lsthunk_t* ns_thunk, lsns_iter_cb cb, void* data) {
     lstbuiltin_func_t fn = lsthunk_get_builtin_func(ns_thunk);
     if (fn == lsbuiltin_ns_value) ns = (lsns_t*)lsthunk_get_builtin_data(ns_thunk);
   } else if (lsthunk_get_type(ns_thunk) == LSTTYPE_ALGE && lsthunk_get_argc(ns_thunk) == 0) {
+    const char* warn = getenv("LAZYSCRIPT_WARN_DEPRECATIONS");
+    if (warn && warn[0] && warn[0] != '0') {
+      lsprintf(stderr, 0, "W: ns: passing named namespace (~NS) is deprecated; pass namespace value instead\n");
+    }
     const lsstr_t* nsname = lsthunk_get_constr(ns_thunk);
     if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
   }
@@ -365,6 +373,10 @@ lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
       ns = (lsns_t*)lsthunk_get_builtin_data(nsv);
     }
   } else if (lsthunk_get_type(nsv) == LSTTYPE_ALGE && lsthunk_get_argc(nsv) == 0) {
+    const char* warn = getenv("LAZYSCRIPT_WARN_DEPRECATIONS");
+    if (warn && warn[0] && warn[0] != '0') {
+      lsprintf(stderr, 0, "W: nsdefv: passing named namespace (~NS) is deprecated; pass namespace value instead\n");
+    }
     const lsstr_t* nsname = lsthunk_get_constr(nsv);
     if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
   }
