@@ -14,24 +14,19 @@ fi
 
 # Extract line numbers for key patterns
 get_line() {
-  local pattern="$1"
-  # Use grep -n with fixed regex; print the first match line number only
+  local literal="$1"
   local line
-  line=$(grep -n -E "${pattern}" "$LEXER_FILE" | head -n1 | cut -d: -f1 || true)
-  if [[ -z "$line" ]]; then
-    echo 0
-  else
-    echo "$line"
-  fi
+  line=$(grep -n -F "$literal" "$LEXER_FILE" | head -n1 | cut -d: -f1 || true)
+  [[ -n "$line" ]] && echo "$line" || echo 0
 }
 
-# Patterns (keep in sync with lexer.l rules)
-DOT_QUOTED="^\\[\.\\]\\[\\'\\]\\([^\\\\\\'\\]|\\\\\\.\\)*\\[\\'\\] \\{"
-DOT_IDENT="^\\[\.\\]\\[a-zA-Z_\\]\\[a-zA-Z0-9_\\]\\* \\{"
-TILDE_QUOTED="^\\[~\\]\\[\\'\\]\\([^\\\\\\'\\]|\\\\\\.\\)*\\[\\'\\] \\{"
-TILDE_IDENT="^\\[~\\]\\[a-zA-Z_\\]\\[a-zA-Z0-9_\\]\\* \\{"
-PLAIN_QUOTED="^\\[\\'\\]\\([^\\\\\\'\\]|\\\\\\.\\)*\\[\\'\\] \\{"
-BARE_IDENT="^\\[a-zA-Z_\\]\\[a-zA-Z0-9_\\]\\* \\{"
+# Patterns: rely on unique line prefixes in lexer.l (extended regex)
+DOT_QUOTED="[.][\\']("
+DOT_IDENT="[.][a-zA-Z_]"
+TILDE_QUOTED="[~][\\']("
+TILDE_IDENT="[~][a-zA-Z_]"
+PLAIN_QUOTED="[\\']("
+BARE_IDENT="[a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext); return LSTSYMBOL; }"
 
 # Fetch first matching line numbers
 read -r dot_quoted_ln < <(get_line "$DOT_QUOTED")
