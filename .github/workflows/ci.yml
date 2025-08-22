@@ -52,6 +52,14 @@ jobs:
           echo "Using SAN_FLAGS='$SAN_FLAGS' OPTLVL='$OPTLVL'"
           ./configure CFLAGS="-g $OPTLVL $SAN_FLAGS" LDFLAGS="$SAN_FLAGS" --disable-silent-rules
 
+      - name: Select allocator env
+        run: |
+          if [ "${{ matrix.alloc }}" = "libc" ]; then
+            echo "LAZYSCRIPT_USE_LIBC_ALLOC=1" >> $GITHUB_ENV
+          else
+            echo "LAZYSCRIPT_USE_LIBC_ALLOC=0" >> $GITHUB_ENV
+          fi
+
       - name: Build
         run: |
           make -j2
@@ -66,7 +74,7 @@ jobs:
           LAZYSCRIPT_BUILTIN_PATH: ${{ github.workspace }}/src/plugins/.libs
           LAZYSCRIPT_PRELUDE_PATH: ${{ github.workspace }}/src/plugins/.libs
           LAZYSCRIPT_PRELUDE_SO: ${{ github.workspace }}/src/plugins/.libs/liblazyscript_prelude.so
-          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ matrix.alloc == 'libc' && '1' || '0' }}
+          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
           # Propagate sanitizer runtime options when present
           ASAN_OPTIONS: ${{ env.ASAN_OPTIONS }}
         run: |
@@ -78,7 +86,7 @@ jobs:
           LAZYSCRIPT_BUILTIN_PATH: ${{ github.workspace }}/src/plugins/.libs
           LAZYSCRIPT_PRELUDE_PATH: ${{ github.workspace }}/src/plugins/.libs
           LAZYSCRIPT_PRELUDE_SO: ${{ github.workspace }}/src/plugins/.libs/liblazyscript_prelude.so
-          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ matrix.alloc == 'libc' && '1' || '0' }}
+          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends gdb
           set -x
