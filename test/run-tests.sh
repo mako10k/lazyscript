@@ -18,6 +18,22 @@ export LAZYSCRIPT_PATH="${LAZYSCRIPT_PATH:-$DIR:$ROOT}"
 
 pass=0; fail=0
 
+# Normalize absolute paths in outputs so CI and local paths compare stably
+normalize_stream() {
+  # Prefer GITHUB_WORKSPACE when available (e.g., CI: /home/runner/work/<repo>/<repo>)
+  local gw="${GITHUB_WORKSPACE:-}"
+  if [[ -n "$gw" ]]; then
+    sed -E \
+      -e "s|$ROOT|<ROOT>|g" \
+      -e "s|$gw|<ROOT>|g" \
+      -e 's|/home/runner/work/[^/]+/[^/]+|<ROOT>|g'
+  else
+    sed -E \
+      -e "s|$ROOT|<ROOT>|g" \
+      -e 's|/home/runner/work/[^/]+/[^/]+|<ROOT>|g'
+  fi
+}
+
 # Discover interpreter tests automatically: any test/*.ls that has a matching .out
 shopt -s nullglob
 cases=()
@@ -68,12 +84,12 @@ for name in "${cases[@]}"; do
     add_args=($LAZYSCRIPT_ARGS)
   fi
   out="$("$BIN" "${add_args[@]}" "$src" 2>&1)"
-  if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
+  if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
     echo "ok - $name"
     ((pass++))
   else
     echo "not ok - $name"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$exp"; echo "---";
+    echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
     ((fail++))
   fi
 done
@@ -105,12 +121,12 @@ for name in "${eval_cases[@]}"; do
     add_args=($LAZYSCRIPT_ARGS)
   fi
   out="$("$BIN" "${add_args[@]}" -e "$(cat "$src")" 2>&1)"
-  if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
+  if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
     echo "ok - eval $name"
     ((pass++))
   else
     echo "not ok - eval $name"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$exp"; echo "---";
+    echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
     ((fail++))
   fi
 done
@@ -138,12 +154,12 @@ for name in "${cir_cases[@]}"; do
     add_args=($LAZYSCRIPT_ARGS)
   fi
   out="$("$BIN" "${add_args[@]}" --dump-coreir "$src" 2>&1)"
-  if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
+  if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
     echo "ok - coreir $name"
     ((pass++))
   else
     echo "not ok - coreir $name"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$exp"; echo "---";
+    echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
     ((fail++))
   fi
 done
@@ -154,12 +170,12 @@ if [[ -x "$FMT_BIN" ]]; then
   fmt_exp="$DIR/t04_lambda_id.fmt.out"
   if [[ -f "$fmt_src" && -f "$fmt_exp" ]]; then
     fmt_out="$("$FMT_BIN" "$fmt_src" 2>&1)"
-    if diff -u <(printf "%s\n" "$fmt_out") "$fmt_exp" >/dev/null; then
+    if diff -u <(printf "%s\n" "$fmt_out" | normalize_stream) <(normalize_stream < "$fmt_exp") >/dev/null; then
       echo "ok - format t04_lambda_id"
       ((pass++))
     else
       echo "not ok - format t04_lambda_id"
-      echo "--- got"; printf "%s\n" "$fmt_out"; echo "--- exp"; cat "$fmt_exp"; echo "---";
+      echo "--- got"; printf "%s\n" "$fmt_out" | normalize_stream; echo "--- exp"; normalize_stream < "$fmt_exp"; echo "---";
       ((fail++))
     fi
   fi
@@ -219,12 +235,12 @@ if "$BIN" --help 2>&1 | grep -q -- "--typecheck"; then
     src="$DIR/$name.ls"
     exp="$DIR/$name.type.out"
     out="$("$BIN" --typecheck "$src" 2>&1)"
-    if diff -u <(printf "%s\n" "$out") "$exp" >/dev/null; then
+    if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
       echo "ok - typecheck $name"
       ((pass++))
     else
       echo "not ok - typecheck $name"
-      echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$exp"; echo "---";
+      echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
       ((fail++))
     fi
   done
