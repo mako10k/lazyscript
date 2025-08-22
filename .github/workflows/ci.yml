@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main, feature/** ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Baseline (both allocators, no sanitizer)
+          - { alloc: gc,   sanitizer: none }
+          - { alloc: libc, sanitizer: none }
+          # Sanitizers: run with libc allocator only (GC + ASan/UBSan may conflict)
+          - { alloc: libc, sanitizer: asan }
+          - { alloc: libc, sanitizer: ubsan }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool pkg-config \
+            flex bison libgc-dev
+
+      - name: Bootstrap (autotools)
+        run: |
+          ./autogen.sh || true
+          test -x configure || autoreconf -fi
+
+      - name: Configure
+        run: |
+          # Select sanitizer flags per matrix
+          SAN_FLAGS=""
+          if [ "${{ matrix.sanitizer }}" = "asan" ]; then
+            SAN_FLAGS="-fsanitize=address -fno-omit-frame-pointer"
+            # Friendly defaults; tweak if needed
+            echo "ASAN_OPTIONS=detect_leaks=1" >> $GITHUB_ENV
+          elif [ "${{ matrix.sanitizer }}" = "ubsan" ]; then
+            SAN_FLAGS="-fsanitize=undefined -fno-sanitize-recover=all"
+          fi
+          # Use -O1 with sanitizers for better diagnostics
+          OPTLVL="-O2"
+          if [ -n "$SAN_FLAGS" ]; then OPTLVL="-O1"; fi
+          echo "Using SAN_FLAGS='$SAN_FLAGS' OPTLVL='$OPTLVL'"
+          ./configure CFLAGS="-g $OPTLVL $SAN_FLAGS" LDFLAGS="$SAN_FLAGS" --disable-silent-rules
+
+      - name: Build
+        run: |
+          make -j2
+
+      - name: Check lexer token order
+        run: |
+          bash scripts/check_lexer_token_order.sh
+
+      - name: Run tests
+        env:
+          # Ensure plugin .so discoverable by tests (t57/t58/t59)
+          LAZYSCRIPT_BUILTIN_PATH: ${{ github.workspace }}/src/plugins/.libs
+          LAZYSCRIPT_PRELUDE_PATH: ${{ github.workspace }}/src/plugins/.libs
+          LAZYSCRIPT_PRELUDE_SO: ${{ github.workspace }}/src/plugins/.libs/liblazyscript_prelude.so
+          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ matrix.alloc == 'libc' && '1' || '0' }}
+          # Propagate sanitizer runtime options when present
+          ASAN_OPTIONS: ${{ env.ASAN_OPTIONS }}
+        run: |
+          test/run-tests.sh
+
+      - name: If failed, rerun under gdb to capture backtrace
+        if: failure()
+        env:
+          LAZYSCRIPT_BUILTIN_PATH: ${{ github.workspace }}/src/plugins/.libs
+          LAZYSCRIPT_PRELUDE_PATH: ${{ github.workspace }}/src/plugins/.libs
+          LAZYSCRIPT_PRELUDE_SO: ${{ github.workspace }}/src/plugins/.libs/liblazyscript_prelude.so
+          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ matrix.alloc == 'libc' && '1' || '0' }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends gdb
+          set -x
+          # Try to find a minimal repro from tests by executing each under gdb until a crash
+          CRASH_LOG="logs/ci_gdb_backtrace_${{ matrix.alloc }}.log"
+          mkdir -p logs
+          for f in test/*.ls; do
+            base="${f%.ls}"
+            echo "==== Test: $f ====" > "$CRASH_LOG"
+            gdb -q -batch \
+              -ex "set pagination off" \
+              -ex "run $f" \
+              -ex "bt full" \
+              -ex "info threads" \
+              -ex "quit" \
+              --args src/lazyscript "$f" >> "$CRASH_LOG" 2>&1 || true
+            if grep -qE "Program received signal SIG|#0" "$CRASH_LOG"; then
+              echo "Captured backtrace for $f" >> "$CRASH_LOG"
+              # Preserve the failing test case and expected output for offline analysis
+              cp -f "$f" "logs/crash_case_${{ matrix.alloc }}.ls" || true
+              if [[ -f "$base.out" ]]; then cp -f "$base.out" "logs/crash_case_${{ matrix.alloc }}.out" || true; fi
+              break
+            fi
+          done
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.alloc }}-san-${{ matrix.sanitizer }}
+          if-no-files-found: ignore
+          path: |
+            logs/
+            test/*.log
+            test/*.trs
+            src/parser/parser.output
+
+      - name: Upload debug artifacts (failure only)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-${{ matrix.alloc }}-san-${{ matrix.sanitizer }}
+          if-no-files-found: ignore
+          path: |
+            src/lazyscript
+            src/lazyscript_format
+            src/plugins/.libs/*.so

@@ -54,7 +54,10 @@ null.d
 conftest.l
 
 /.vscode/
-/.github/
+# Ignore most of GitHub metadata, but allow workflows to be tracked
+/.github/*
+!/.github/workflows/
+!/.github/workflows/**
 
 
 
