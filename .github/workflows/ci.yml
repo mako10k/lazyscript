@@ -70,7 +70,7 @@ jobs:
           echo "LAZYSCRIPT_USE_LIBC_ALLOC=$LAZYSCRIPT_USE_LIBC_ALLOC"
           echo "ASAN_OPTIONS=${ASAN_OPTIONS:-}"
 
-  - name: Smoke: binary version
+      - name: Smoke: binary version
         env:
           LAZYSCRIPT_BUILTIN_PATH: ${{ github.workspace }}/src/plugins/.libs
           LAZYSCRIPT_PRELUDE_PATH: ${{ github.workspace }}/src/plugins/.libs
