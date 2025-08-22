@@ -78,7 +78,7 @@ jobs:
           LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
         run: |
           # Expect a single line output; this validates prelude loading and runtime wiring
-          src/lazyscript -e '((~prelude .println) "CI-smoke-ok")'
+          src/lazyscript -e '((~prelude println) "CI-smoke-ok")'
 
       - name: Check lexer token order
         run: |
@@ -97,7 +97,7 @@ jobs:
           test/run-tests.sh
 
       - name: If failed, rerun under gdb to capture backtrace (GC only)
-        if: failure() && matrix.alloc == 'gc'
+        if: ${{ failure() && matrix.alloc == 'gc' }}
         env:
           LAZYSCRIPT_BUILTIN_PATH: ${{ github.workspace }}/src/plugins/.libs
           LAZYSCRIPT_PRELUDE_PATH: ${{ github.workspace }}/src/plugins/.libs
