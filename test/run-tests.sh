@@ -16,6 +16,10 @@ fi
 # The search order allows tests to override by pre-setting LAZYSCRIPT_PATH.
 export LAZYSCRIPT_PATH="${LAZYSCRIPT_PATH:-$DIR:$ROOT}"
 
+# Default allocator: prefer libc for stable tests unless the caller/CI explicitly sets it.
+# CI matrix can set LAZYSCRIPT_USE_LIBC_ALLOC=0 to enable GC jobs.
+export LAZYSCRIPT_USE_LIBC_ALLOC="${LAZYSCRIPT_USE_LIBC_ALLOC:-1}"
+
 pass=0; fail=0
 
 # Normalize absolute paths in outputs so CI and local paths compare stably

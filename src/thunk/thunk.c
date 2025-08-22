@@ -641,35 +641,37 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
 }
 
 static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t* const* args) {
-  // eval (l | r) x y ... = eval l x y ... | <differed> eval r x y ...
+  // eval (l | r) x y ...
+  //   = let v = eval l x y ... in
+  //       if v is lambda match failure then eval r x y ...
+  //       else v
+  // This makes '|' behave like pattern-lambda alternatives rather than
+  // producing a residual choice value.
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_CHOICE);
   assert(argc == 0 || args != NULL);
   lsthunk_t* left = lsthunk_eval(thunk->lt_choice.ltc_left, argc, args);
   if (left == NULL)
     return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
-  if (lsthunk_is_err(left))
+  if (lsthunk_is_err(left)) {
+    // Only treat lambda match failure as a fallback trigger; propagate others.
+    int is_lam_match_fail = 0;
+    if (left->lt_type == LSTTYPE_ALGE &&
+        lsstrcmp(left->lt_alge.lta_constr, lsstr_cstr("#err")) == 0 &&
+        left->lt_alge.lta_argc == 1) {
+      lsthunk_t* msgt = lsthunk_eval0(left->lt_alge.lta_args[0]);
+      if (msgt && lsthunk_get_type(msgt) == LSTTYPE_STR) {
+        const lsstr_t* s = lsthunk_get_str(msgt);
+        if (lsstrcmp(s, lsstr_cstr("lambda match failure")) == 0)
+          is_lam_match_fail = 1;
+      }
+    }
+    if (is_lam_match_fail)
+      return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
     return left;
-  // TODO: if left is fixed type, then we can skip right???
-  lsthunk_t* right = lsmalloc(lssizeof(lsthunk_t, lt_appl) + (argc + 1) * sizeof(lsthunk_t*));
-  right->lt_type   = LSTTYPE_APPL;
-  right->lt_whnf   = NULL;
-  right->lt_trace_id = thunk->lt_trace_id;
-  right->lt_appl.lta_func = thunk->lt_choice.ltc_right;
-  if (right->lt_appl.lta_func == NULL) {
-    // Propagate evaluation failure
-    return NULL;
   }
-  right->lt_appl.lta_argc = argc;
-  for (lssize_t i = 0; i < argc; i++)
-    right->lt_appl.lta_args[i] = args[i];
-  lsthunk_t* choice           = lsmalloc(sizeof(lsthunk_t));
-  choice->lt_type             = LSTTYPE_CHOICE;
-  choice->lt_whnf             = choice;
-  choice->lt_trace_id         = thunk->lt_trace_id;
-  choice->lt_choice.ltc_left  = left;
-  choice->lt_choice.ltc_right = right;
-  return choice;
+  // Success on left: commit left-biased result.
+  return left;
 }
 
 lsthunk_t* lsthunk_eval(lsthunk_t* func, lssize_t argc, lsthunk_t* const* args) {
@@ -1092,6 +1094,12 @@ void lsthunk_dprint(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk) {
   lsthunk_print_internal(fp, prec, indent, thunk, 0, colle, LSPM_ASIS, 0);
 }
 
+void lsthunk_deep_print(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk) {
+  lssize_t         id    = 0;
+  lsthunk_colle_t* colle = lsthunk_colle_new(thunk, NULL, &id, 0, 2);
+  lsthunk_print_internal(fp, prec, indent, thunk, 0, colle, LSPM_DEEP, 0);
+}
+
 lsthunk_t* lsthunk_clone(lsthunk_t* thunk) {
   // Thunks are treated as immutable graph nodes managed by GC.
   // Returning the same pointer is sufficient for now.
@@ -1124,10 +1132,15 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
   switch (t->lt_type) {
   case LSTTYPE_REF: {
     lstref_target_t* target = t->lt_ref.ltr_target;
-    if (target && target->lrt_pat == param) {
-      // Replace with the currently bound thunk
-      lsthunk_t* bound = lstpat_get_refbound(param);
-      return bound ? bound : t;
+    if (target) {
+      // If this reference belongs to the same lambda parameter (including any subpattern
+      // inside the parameter), capture the currently bound thunk for that specific ref.
+      lstref_target_origin_t* org = target->lrt_origin;
+      if (org && org->lrto_type == LSTRTYPE_LAMBDA && org->lrto_lambda.ltl_param == param) {
+        lstpat_t* pref = target->lrt_pat; // the concrete ref node within the param pattern
+        lsthunk_t* bound = pref ? lstpat_get_refbound(pref) : NULL;
+        if (bound) return bound;
+      }
     }
     return t;
   }
