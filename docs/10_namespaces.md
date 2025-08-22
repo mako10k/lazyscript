@@ -10,14 +10,17 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 - 参照（共通）: `(~NS sym)` で NS から値を取得（関数でも可）。
 - シュガー: `~~sym` は `(~prelude sym)` の短縮。`LAZYSCRIPT_SUGAR_NS` で切替可能（デフォルト prelude）。
 
-キーは `.name` 形式のシンボルのみです。シンボルはインターンされ `==` 比較できます。文字列など他の型を指定すると構文エラーになります。
+キーは必ず `.name` 形式のシンボルです（ドット付きシンボル）。
+シンボルはインターンされ `==` 比較できます。文字列など他の型を指定するとエラーになります。
+
+注意: `'Name` のような単引用記法は字句としては存在しますが、名前空間キーには使いません。必ず `.Name` を使ってください。
 
 ## 名前付き名前空間（Named）
 
 - 作成: `~~nsnew NS` は `NS` という名前の名前空間を作り、`(~NS sym)` で参照可能にします。
 - 定義: `~~nsdef NS sym value` で `NS` に定義（副作用）。
 
-例:
+例（基本参照）:
 
 ```
 !{ ~~nsnew NS;
@@ -26,18 +29,27 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
  };
 ```
 
+ドット連鎖アクセス（構文の自然な結合規則）:
+
+```
+!{
+  ~ns <- { .A = { .B = 1 } };
+  ~~println (~to_str (~ns.A.B));   # 糖衣ではなく、字句/構文の結合規則で (~ns .A) の結果に .B を適用 → 1
+};
+```
+
 ## 無名（匿名）名前空間（Namespace value）
 
 - 作成: `~~nsnew0` は新しい「名前空間値」を返します。これは 1 引数のビルトインで、`(~NS sym)` と同様に動作します。
 - 定義: `~~nsdefv ns sym value` で、`ns` が「名前空間値」の場合に直接定義できます。
 - セッター（代替）: `(~ns .__set)` は `(sym val) -> ()` なセッタービルトインを返します。
 
-例:
+例（匿名 Namespace の列挙の順序）:
 
 ```
 !{
-  ~ns <- (~~nsnew0);
-  (~~nsdefv ~ns .Foo 42);
+  ns <- (~~nsnew0);
+  (~~nsdefv ns .Foo 42);
   ~~println (~to_str ((~ns .Foo)))  # => 42
 };
 ```
@@ -46,7 +58,7 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 
 ```
 !{
-  ~ns <- (~~nsnew0);
+  ns <- (~~nsnew0);
   ((~ns .__set) .Foo 42);
   ~~println (~to_str ((~ns .Foo)))  # => 42
 };
@@ -64,11 +76,11 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 
 ```
 !{
-  ~ns <- { .Foo = 42; .Bar = ~Foo; };
+  ns <- { .Foo = 42; .Bar = ~Foo; };
   ~~println (~to_str ((~ns .Foo)));        # => 42
   ~~println (~to_str ((~ns .Bar)));        # => 42
   # 次のような更新はエラー（不変のため）:
-  # (~~nsdefv ~ns .Foo 1)
+  # (~~nsdefv ns .Foo 1)
   # ((~ns .__set) .Foo 1)
 };
 ```
@@ -91,7 +103,7 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 
   ```
   !{
-    ~ns <- ((~prelude nsnew0));
+    ns <- ((~prelude nsnew0));
     ~~nsdefv ~ns .a 1;
     ~~nsdefv ~ns .b 2;
     ~~nsdefv ~ns .aa 3;
@@ -105,31 +117,9 @@ strict-effects 有効時の例（トークンが必要）:
 
 ```
 !{
-  ~ns <- ((~prelude chain) ((~prelude nsnew0)) (\~x -> ~x));
+  ns <- ((~prelude chain) ((~prelude nsnew0)) (\~x -> ~x));
   ((~prelude chain) (~~nsdefv ~ns .x 1) (\~_ -> ()));
   ((~prelude nsMembers) ~ns)
 };
 -- 出力: [.x]
 ```
-
-## nslit デバッグログ
-
-環境変数 `LS_NS_LOG_NSLIT` を設定すると、名前空間リテラル（nslit）の評価過程を stderr にログ出力します。値が空文字列または `0` 以外であれば有効になります（既定はオフ）。
-
-### 例
-
-```bash
-LS_NS_LOG_NSLIT=1 ./src/lazyscript -e '!{ ~ns <- { .Foo = 1; }; (~ns .Foo); };'
-```
-
-出力例:
-
-```
-DBG nslit begin argc=2
-DBG nslit key[0] eval
-DBG nslit key=S.Foo
-DBG nslit val[0] eval
-DBG nslit put type=3
-DBG nslit end ns=0x... map=0x...
-```
-

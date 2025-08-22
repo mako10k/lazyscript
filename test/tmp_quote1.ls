@@ -1,1 +1,1 @@
-((~prelude .println) ((~to_str) 'Ok));
+((~prelude println) ((~to_str) 'Ok));

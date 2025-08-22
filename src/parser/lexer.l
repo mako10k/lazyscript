@@ -97,7 +97,6 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 [ \t\n]+    { /* ignore whitespace */ }
 [0-9]+      { yylval->intval = lsint_new(atoi(yytext)); return LSTINT; }
 [_]         { return LSTWILDCARD; }
-[|][|]      { return LSTCHOICE; }
 [.][\']([^\\\']|\\.)*[\'] {
 	/* dot-quoted symbol: .'Sym  => LSTSYMBOL with leading '.' */
 	const lsstr_t* inner = lslex_parse_squoted(yytext + 1, yyleng - 1);

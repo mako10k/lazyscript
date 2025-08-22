@@ -1,4 +1,5 @@
 State 2 conflicts: 15 shift/reduce
+State 19 conflicts: 1 shift/reduce
 State 22 conflicts: 15 shift/reduce
 State 24 conflicts: 15 shift/reduce
 State 26 conflicts: 15 shift/reduce
@@ -9,6 +10,7 @@ State 81 conflicts: 4 reduce/reduce
 State 108 conflicts: 1 shift/reduce
 State 119 conflicts: 4 reduce/reduce
 State 120 conflicts: 4 reduce/reduce
+State 142 conflicts: 1 shift/reduce
 
 
 Grammar
@@ -102,7 +104,7 @@ Grammar
    61 elist: '[' ']'
    62      | '[' earray ']'
 
-   63 elambda: '\\' lamparams LSTARROW expr3
+   63 elambda: '\\' lamparams LSTARROW expr1
 
    64 lamparam: lamparam2
    65         | lamparam2 '|' lamparam
@@ -206,7 +208,7 @@ Nonterminals, with rules where they appear
         on right: 1 4 5 44 49 50 54 55 56 59 60
     expr1 <expr> (38)
         on left: 9 10
-        on right: 8 10 13
+        on right: 8 10 13 63
     expr2 <expr> (39)
         on left: 11 12
         on right: 9 10
@@ -215,7 +217,7 @@ Nonterminals, with rules where they appear
         on right: 12
     expr3 <expr> (41)
         on left: 14 15
-        on right: 11 13 63
+        on right: 11 13
     eappl <eappl> (42)
         on left: 16 17
         on right: 15 17
@@ -589,7 +591,7 @@ State 14
 
 State 15
 
-   63 elambda: '\\' • lamparams LSTARROW expr3
+   63 elambda: '\\' • lamparams LSTARROW expr1
 
     LSTINT       shift, and go to state 38
     LSTSYMBOL    shift, and go to state 62
@@ -639,7 +641,8 @@ State 19
 
     LSTCHOICE  shift, and go to state 71
 
-    $default  reduce using rule 9 (expr1)
+    LSTCHOICE  [reduce using rule 9 (expr1)]
+    $default   reduce using rule 9 (expr1)
 
 
 State 20
@@ -1224,7 +1227,7 @@ State 65
 
 State 66
 
-   63 elambda: '\\' lamparams • LSTARROW expr3
+   63 elambda: '\\' lamparams • LSTARROW expr1
    70 lamparams: lamparams • lamparam
 
     LSTINT       shift, and go to state 38
@@ -2022,7 +2025,7 @@ State 109
 
 State 110
 
-   63 elambda: '\\' lamparams LSTARROW • expr3
+   63 elambda: '\\' lamparams LSTARROW • expr1
 
     LSTINT             shift, and go to state 1
     LSTSYMBOL          shift, and go to state 2
@@ -2040,7 +2043,10 @@ State 110
     '['                shift, and go to state 14
     '\\'               shift, and go to state 15
 
-    expr3    go to state 142
+    expr1    go to state 142
+    expr2    go to state 19
+    econs    go to state 20
+    expr3    go to state 21
     eappl    go to state 22
     expr4    go to state 23
     ealge    go to state 24
@@ -2431,8 +2437,12 @@ State 141
 
 State 142
 
-   63 elambda: '\\' lamparams LSTARROW expr3 •
+   13 econs: expr1 • ':' expr3
+   63 elambda: '\\' lamparams LSTARROW expr1 •
 
+    ':'  shift, and go to state 70
+
+    ':'       [reduce using rule 63 (elambda)]
     $default  reduce using rule 63 (elambda)
 
 

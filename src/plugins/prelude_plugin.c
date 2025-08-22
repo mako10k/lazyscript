@@ -185,67 +185,61 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
   lsthunk_t* key = lsthunk_eval0(args[0]);
   if (key == NULL)
     return NULL;
-  // Special-case: allow bare nslit$N for parser sugar
-  if (lsthunk_get_type(key) == LSTTYPE_ALGE && lsthunk_get_argc(key) == 0) {
-    const lsstr_t* name = lsthunk_get_constr(key);
-    const char* cname = lsstr_get_buf(name);
-    if (strncmp(cname, "nslit$", 6) == 0) {
-      long n = strtol(cname + 6, NULL, 10);
-      return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), n, lsbuiltin_nslit, NULL);
-    }
-    lsprintf(stderr, 0, "E: prelude: expected .symbol; bare is only allowed for nslit$N\n");
-    return ls_make_err("prelude: expected .symbol");
+  if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
+    lsprintf(stderr, 0, "E: prelude: expected a bare symbol (exit/println/chain/bind/return)\n");
+    return NULL;
   }
-  if (lsthunk_get_type(key) != LSTTYPE_SYMBOL) {
-    lsprintf(stderr, 0, "E: prelude: expected .symbol (e.g., .println/.requirePure)\n");
-    return ls_make_err("prelude: expected .symbol");
-  }
-  const lsstr_t* sym = lsthunk_get_symbol(key);
-  // Dispatch on .name
-  if (lsstrcmp(sym, lsstr_cstr(".exit")) == 0)
+  const lsstr_t* name = lsthunk_get_constr(key);
+  if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1, pl_exit, NULL);
-  if (lsstrcmp(sym, lsstr_cstr(".println")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("println")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.println"), 1, pl_println, NULL);
-  if (lsstrcmp(sym, lsstr_cstr(".def")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("def")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, pl_def, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".require")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, pl_require, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".requirePure")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("requirePure")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, pl_require_pure, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".import")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, pl_import, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".nsSelf")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsSelf"), 0, lsbuiltin_prelude_ns_self, NULL);
-  if (lsstrcmp(sym, lsstr_cstr(".withImport")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("withImport")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, pl_withImport, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".chain")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, pl_chain, NULL);
-  if (lsstrcmp(sym, lsstr_cstr(".bind")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("bind")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.bind"), 2, pl_bind, NULL);
-  if (lsstrcmp(sym, lsstr_cstr(".return")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("return")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1, pl_return, NULL);
-  if (lsstrcmp(sym, lsstr_cstr(".nsnew")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("nsnew")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".nsdef")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("nsdef")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".nsnew0")) == 0) {
+  if (lsstrcmp(name, lsstr_cstr("nsnew0")) == 0) {
     if (!ls_effects_allowed()) {
       lsprintf(stderr, 0, "E: nsnew0: effect used in pure context (enable seq/chain)\n");
       return NULL;
     }
     return lsbuiltin_nsnew0(0, NULL, tenv);
   }
-  if (lsstrcmp(sym, lsstr_cstr(".nsdefv")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("nsdefv")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".nsMembers")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("nsMembers")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
-  if (lsstrcmp(sym, lsstr_cstr(".builtin")) == 0)
+  if (lsstrcmp(name, lsstr_cstr("builtin")) == 0 || lsstrcmp(name, lsstr_cstr(".builtin")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin, tenv);
-  if (lsstrcmp(sym, lsstr_cstr(".pluginHello")) == 0)
+  const char* cname = lsstr_get_buf(name);
+  if (strncmp(cname, "nslit$", 6) == 0) {
+    long n = strtol(cname + 6, NULL, 10);
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), n, lsbuiltin_nslit, NULL);
+  }
+  if (lsstrcmp(name, lsstr_cstr("pluginHello")) == 0)
     return pl_plugin_hello();
   lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
-  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, sym);
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
   lsprintf(stderr, 0, "\n");
+  // Return an error thunk instead of NULL to avoid downstream segfaults
   return ls_make_err("prelude: unknown symbol");
 }
 

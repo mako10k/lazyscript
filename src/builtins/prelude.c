@@ -11,8 +11,8 @@
 #include "runtime/error.h"
 #include <string.h>
 #include <stdlib.h>
-// forward for namespace value constructor
-lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data);
+// forward for namespace value constructor (not used now)
+// lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data);
 
 // from to_string.c
 lsthunk_t* lsbuiltin_to_string(lssize_t argc, lsthunk_t* const* args, void* data);
@@ -206,88 +206,78 @@ static lsthunk_t* lsbuiltin_prelude_with_import(lssize_t argc, lsthunk_t* const*
   return lsthunk_eval(cont, 1, &unit);
 }
 
-// ----------------------------------------
-// Immutable prelude namespace backing
-static lsthunk_t* g_prelude_ns = NULL; // namespace value: (~NS .sym) -> value
-
-static lsthunk_t* make_symbol_key(const char* name) {
-  // Build .name as symbol thunk
-  char buf[256];
-  size_t n = strlen(name);
-  if (n + 2 >= sizeof(buf)) n = sizeof(buf) - 2;
-  buf[0] = '.';
-  memcpy(buf + 1, name, n);
-  buf[1 + n] = '\0';
-  return lsthunk_new_symbol(lsstr_cstr(buf));
-}
-
-static lsthunk_t* build_prelude_ns(lstenv_t* tenv) {
-  // List of entries: key, builtin(value)
-  // Keep small and explicit for clarity
-  const int pairs = 18;
-  lsthunk_t* argv[pairs * 2];
-  int i = 0;
-  argv[i++] = make_symbol_key("exit");        argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1, lsbuiltin_prelude_exit, NULL);
-  argv[i++] = make_symbol_key("println");     argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.println"), 1, lsbuiltin_prelude_println, NULL);
-  argv[i++] = make_symbol_key("def");         argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, lsbuiltin_prelude_def, tenv);
-  argv[i++] = make_symbol_key("require");     argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
-  argv[i++] = make_symbol_key("requirePure"); argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
-  argv[i++] = make_symbol_key("import");      argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
-  argv[i++] = make_symbol_key("nsSelf");      argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.nsSelf"), 0, lsbuiltin_prelude_ns_self, NULL);
-  argv[i++] = make_symbol_key("withImport");  argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, lsbuiltin_prelude_with_import, tenv);
-  argv[i++] = make_symbol_key("chain");       argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, lsbuiltin_prelude_chain, NULL);
-  argv[i++] = make_symbol_key("bind");        argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.bind"), 2, lsbuiltin_prelude_bind, NULL);
-  argv[i++] = make_symbol_key("return");      argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1, lsbuiltin_prelude_return, NULL);
-  argv[i++] = make_symbol_key("nsnew");       argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
-  argv[i++] = make_symbol_key("nsdef");       argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
-  // nsnew0 is effectful but provided for sugar expansion paths
-  argv[i++] = make_symbol_key("nsnew0");      argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.nsnew0"), 0, lsbuiltin_nsnew0, tenv);
-  argv[i++] = make_symbol_key("nsdefv");      argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
-  argv[i++] = make_symbol_key("nsMembers");   argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
-  // Builtin module loader
-  extern lsthunk_t* lsbuiltin_prelude_builtin(lssize_t, lsthunk_t* const*, void*);
-  argv[i++] = make_symbol_key("builtin");     argv[i++] = lsthunk_new_builtin(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin, tenv);
-  // If we add more entries, increase pairs accordingly
-  lsthunk_t* ns = lsbuiltin_nslit(i, argv, NULL);
-  return ns;
-}
-
 static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
-  // .symbol-only external API; keep a special-case for parser sugar nslit$N
-  lstenv_t* tenv = (lstenv_t*)data; (void)tenv;
+  lstenv_t* tenv = (lstenv_t*)data;
   (void)argc;
   lsthunk_t* key = ls_eval_arg(args[0], "prelude: key"); if (lsthunk_is_err(key)) return key; if (!key) return ls_make_err("prelude: key eval");
-  // Special sugar: bare constructor nslit$N
-  if (lsthunk_get_type(key) == LSTTYPE_ALGE && lsthunk_get_argc(key) == 0) {
-    const lsstr_t* name0 = lsthunk_get_constr(key);
-    const char* cname = lsstr_get_buf(name0);
-    if (strncmp(cname, "nslit$", 6) == 0) {
-      long n = strtol(cname + 6, NULL, 10);
-      return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), n, lsbuiltin_nslit, NULL);
+  if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
+    return ls_make_err("prelude: expected bare symbol");
+  }
+  const lsstr_t* name = lsthunk_get_constr(key);
+  if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1, lsbuiltin_prelude_exit, NULL);
+  if (lsstrcmp(name, lsstr_cstr("println")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.println"), 1, lsbuiltin_prelude_println, NULL);
+  if (lsstrcmp(name, lsstr_cstr("def")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, lsbuiltin_prelude_def, tenv);
+  if (lsstrcmp(name, lsstr_cstr("require")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
+  if (lsstrcmp(name, lsstr_cstr("requirePure")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
+  if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsSelf"), 0, lsbuiltin_prelude_ns_self, NULL);
+  if (lsstrcmp(name, lsstr_cstr("withImport")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, lsbuiltin_prelude_with_import, tenv);
+  if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, lsbuiltin_prelude_chain, NULL);
+  if (lsstrcmp(name, lsstr_cstr("bind")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.bind"), 2, lsbuiltin_prelude_bind, NULL);
+  if (lsstrcmp(name, lsstr_cstr("return")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1, lsbuiltin_prelude_return, NULL);
+  if (lsstrcmp(name, lsstr_cstr("nsnew")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsdef")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsnew0")) == 0) {
+    // Direct creation is effectful; guard under strict-effects
+    if (!ls_effects_allowed()) {
+      lsprintf(stderr, 0, "E: nsnew0: effect used in pure context (enable seq/chain)\n");
+      return NULL;
     }
-    lsprintf(stderr, 0, "E: prelude: expected .symbol; bare is only allowed for nslit$N\n");
-    return ls_make_err("prelude: expected .symbol");
+    // Return the anonymous namespace value directly (0-arity application is awkward)
+    return lsbuiltin_nsnew0(0, NULL, tenv);
   }
-  if (lsthunk_get_type(key) != LSTTYPE_SYMBOL) {
-    lsprintf(stderr, 0, "E: prelude: expected .symbol (e.g., .println/.requirePure)\n");
-    return ls_make_err("prelude: expected .symbol");
+  if (lsstrcmp(name, lsstr_cstr("nsdefv")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  if (lsstrcmp(name, lsstr_cstr("nsMembers")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
+  // builtin loader (supports both builtin and .builtin keys)
+  if (lsstrcmp(name, lsstr_cstr("builtin")) == 0 || lsstrcmp(name, lsstr_cstr(".builtin")) == 0) {
+    extern lsthunk_t* lsbuiltin_prelude_builtin(lssize_t, lsthunk_t* const*, void*);
+    return lsthunk_new_builtin(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin, tenv);
   }
-  if (!g_prelude_ns) {
-    // Build once lazily in case registration order matters
-    g_prelude_ns = build_prelude_ns((lstenv_t*)data);
+  // nslit$N dispatch for pure namespace literal
+  const char* cname = lsstr_get_buf(name);
+  if (strncmp(cname, "nslit$", 6) == 0) {
+    long n = strtol(cname + 6, NULL, 10);
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), n, lsbuiltin_nslit, NULL);
   }
-  // Delegate to namespace dispatch (~NS .sym)
-  lsthunk_t* argv1[1] = { key };
-  return lsthunk_eval(g_prelude_ns, 1, argv1);
+  lsprintf(stderr, 0, "E: prelude: unknown symbol: ");
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
+  lsprintf(stderr, 0, "\n");
+  // Returning NULL here would lead to segmentation faults when callers
+  // attempt to use the missing value.  Instead propagate a runtime
+  // error so evaluation can fail gracefully.
+  return ls_make_err("prelude: unknown symbol");
 }
 
 // implemented in host (lazyscript.c)
 
 // Registration helper used by host
 void ls_register_builtin_prelude(lstenv_t* tenv) {
-  // Build immutable namespace backing and register dispatcher that enforces .symbol-only
-  g_prelude_ns = build_prelude_ns(tenv);
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, tenv);
-  // Alias for direct access to same behavior
+  // Alias: expose the raw builtin dispatcher also as (~builtin ...)
   lstenv_put_builtin(tenv, lsstr_cstr("builtin"), 1, lsbuiltin_prelude_dispatch, tenv);
 }

@@ -1,1 +1,1 @@
-((~prelude .chain) (()) (\ _ -> ((~prelude .println) "X")));
+((~prelude chain) (()) (\ _ -> ((~prelude println) "X")));

@@ -10,9 +10,8 @@
 
 演算子優先順位は下に行くほど強くなります。
 
-1. `expr1`: 右結合の選択 `||`（式レベル）
-   - `expr2 '||' expr1` → `lsexpr_new_choice(lsechoice_new(lhs, rhs))`
-   - 注意: パターン内のオルタナティブは従来通り `|` を使用（`\p1 | \p2` など）
+1. `expr1`: 右結合の選択 `|`
+   - `expr2 '|' expr1` → `lsexpr_new_choice(lsechoice_new(lhs, rhs))`
 2. `expr2`: 右結合の `:`（cons 構築子）を `econs` で扱う
    - `expr1 ':' expr3` → 代数データ `":"` コンストラクタ (引数2)
 3. `expr3`: 関数適用 `eappl`

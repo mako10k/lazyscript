@@ -67,6 +67,7 @@ lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void
 // error via stderr.
 static const lsstr_t* ns_encode_key_from_thunk(lsthunk_t* keyv) {
   if (!keyv) return NULL;
+  // Case 1: explicit symbol (e.g., .name)
   if (lsthunk_get_type(keyv) == LSTTYPE_SYMBOL) {
     const lsstr_t* s = lsthunk_get_symbol(keyv);
     lssize_t n = lsstr_get_len(s);
@@ -75,6 +76,20 @@ static const lsstr_t* ns_encode_key_from_thunk(lsthunk_t* keyv) {
     buf[0] = 'S';
     for (lssize_t i = 0; i < n; ++i) buf[1 + i] = p[i];
     const lsstr_t* k = lsstr_new(buf, n + 1);
+    lsfree(buf);
+    return k;
+  }
+  // Case 2: bare constructor (e.g., Some) — accept as symbol by prefixing '.'
+  if (lsthunk_get_type(keyv) == LSTTYPE_ALGE && lsthunk_get_argc(keyv) == 0) {
+    const lsstr_t* c = lsthunk_get_constr(keyv);
+    lssize_t n = lsstr_get_len(c);
+    const char* p = lsstr_get_buf(c);
+    // Encode as 'S' + '.' + name
+    char* buf = lsmalloc((size_t)n + 2);
+    buf[0] = 'S';
+    buf[1] = '.';
+    for (lssize_t i = 0; i < n; ++i) buf[2 + i] = p[i];
+    const lsstr_t* k = lsstr_new(buf, n + 2);
     lsfree(buf);
     return k;
   }
