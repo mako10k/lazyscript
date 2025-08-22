@@ -26,10 +26,12 @@ normalize_stream() {
     sed -E \
       -e "s|$ROOT|<ROOT>|g" \
       -e "s|$gw|<ROOT>|g" \
+  -e 's|/workspaces/lazyscript|<ROOT>|g' \
       -e 's|/home/runner/work/[^/]+/[^/]+|<ROOT>|g'
   else
     sed -E \
       -e "s|$ROOT|<ROOT>|g" \
+  -e 's|/workspaces/lazyscript|<ROOT>|g' \
       -e 's|/home/runner/work/[^/]+/[^/]+|<ROOT>|g'
   fi
 }
