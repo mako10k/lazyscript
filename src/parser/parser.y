@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 61
+%expect 63
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -557,11 +557,11 @@ elist:
     ;
 
 elambda:
-      '\\' lamparams LSTARROW expr3 {
+      '\\' lamparams LSTARROW expr1 {
         // \\p1 p2 ... -> body  ==>  \\p1 -> (\\p2 -> ... -> body)
         lssize_t argc = lsarray_get_size($2);
         const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
-        const lsexpr_t *b = $4;
+        const lsexpr_t *b = $4; // allow choice ('|') inside lambda body
         for (lssize_t i = argc; i > 1; i--) {
           b = lsexpr_new_lambda(lselambda_new(ps[i - 1], b));
         }
