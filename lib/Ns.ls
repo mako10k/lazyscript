@@ -4,11 +4,11 @@
     (
       (\~self -> \~xs -> (
         \[] -> false |
-        \(~h : ~t) -> ((~eq ~h ~k) | ((~self ~self) ~t))
+  \(~h : ~t) -> ((((~prelude eq)) ~h ~k) | ((~self ~self) ~t))
       ))
       (\~self -> \~xs -> (
         \[] -> false |
-        \(~h : ~t) -> ((~eq ~h ~k) | ((~self ~self) ~t))
+  \(~h : ~t) -> ((((~prelude eq)) ~h ~k) | ((~self ~self) ~t))
       ))
       (((~prelude nsMembers)) ~ns)
     )
