@@ -122,6 +122,8 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %token LSTARROW
 %token LSTLEFTARROW
 %token LSTWILDCARD
+%token LSTCHOICE
+%right LSTCHOICE
 %right '|'
 %right ':'
 
@@ -167,7 +169,7 @@ expr:
 
 expr1:
       expr2 { $$ = $1; }
-  | expr2 '|' expr1 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new($1, $3)), @$); }
+  | expr2 LSTCHOICE expr1 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new($1, $3)), @$); }
     ;
 
 expr2:

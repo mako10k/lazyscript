@@ -2,13 +2,13 @@ State 2 conflicts: 15 shift/reduce
 State 22 conflicts: 15 shift/reduce
 State 24 conflicts: 15 shift/reduce
 State 26 conflicts: 15 shift/reduce
-State 78 conflicts: 5 reduce/reduce
-State 79 conflicts: 5 shift/reduce, 5 reduce/reduce
-State 80 conflicts: 5 reduce/reduce
-State 81 conflicts: 5 reduce/reduce
+State 78 conflicts: 4 reduce/reduce
+State 79 conflicts: 5 shift/reduce, 4 reduce/reduce
+State 80 conflicts: 4 reduce/reduce
+State 81 conflicts: 4 reduce/reduce
 State 108 conflicts: 1 shift/reduce
-State 119 conflicts: 5 reduce/reduce
-State 120 conflicts: 5 reduce/reduce
+State 119 conflicts: 4 reduce/reduce
+State 120 conflicts: 4 reduce/reduce
 
 
 Grammar
@@ -30,7 +30,7 @@ Grammar
     8 expr: expr1
 
     9 expr1: expr2
-   10      | expr2 '|' expr1
+   10      | expr2 LSTCHOICE expr1
 
    11 expr2: expr3
    12      | econs
@@ -163,7 +163,7 @@ Terminals, with rules where they appear
     '\\' (92) 63
     ']' (93) 61 62 92 93
     '{' (123) 37 38 39
-    '|' (124) 10 65 75
+    '|' (124) 65 75
     '}' (125) 37 38 39
     error (256)
     LSTINT <intval> (258) 24 82
@@ -179,127 +179,128 @@ Terminals, with rules where they appear
     LSTARROW (268) 63
     LSTLEFTARROW (269) 50 54
     LSTWILDCARD (270) 85
+    LSTCHOICE (271) 10
 
 
 Nonterminals, with rules where they appear
 
-    $accept (30)
+    $accept (31)
         on left: 0
-    prog <prog> (31)
+    prog <prog> (32)
         on left: 1
         on right: 0
-    bind <array> (32)
+    bind <array> (33)
         on left: 2
         on right: 56
-    funlhs <ref> (33)
+    funlhs <ref> (34)
         on left: 3
         on right: 4
-    bind_single <bind> (34)
+    bind_single <bind> (35)
         on left: 4 5
         on right: 6 7
-    bind_list <array> (35)
+    bind_list <array> (36)
         on left: 6 7
         on right: 2 7
-    expr <expr> (36)
+    expr <expr> (37)
         on left: 8
         on right: 1 4 5 44 49 50 54 55 56 59 60
-    expr1 <expr> (37)
+    expr1 <expr> (38)
         on left: 9 10
         on right: 8 10 13
-    expr2 <expr> (38)
+    expr2 <expr> (39)
         on left: 11 12
         on right: 9 10
-    econs <ealge> (39)
+    econs <ealge> (40)
         on left: 13
         on right: 12
-    expr3 <expr> (40)
+    expr3 <expr> (41)
         on left: 14 15
         on right: 11 13 63
-    eappl <eappl> (41)
+    eappl <eappl> (42)
         on left: 16 17
         on right: 15 17
-    expr4 <expr> (42)
+    expr4 <expr> (43)
         on left: 18 19
         on right: 14
-    ealge <ealge> (43)
+    ealge <ealge> (44)
         on left: 20 21
         on right: 19 21
-    expr5 <expr> (44)
+    expr5 <expr> (45)
         on left: 22 23
         on right: 16 17 18 20 21 27 28
-    efact <expr> (45)
+    efact <expr> (46)
         on left: 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
         on right: 16 22
-    nsentries <array> (46)
+    nsentries <array> (47)
         on left: 40 41 42 43
         on right: 38 42 43
-    nsentry <array> (47)
+    nsentry <array> (48)
         on left: 44
         on right: 41 42
-    nslit_entries <array> (48)
+    nslit_entries <array> (49)
         on left: 45 46 47 48
         on right: 39 47 48
-    nslit_entry <array> (49)
+    nslit_entry <array> (50)
         on left: 49 50
         on right: 46 47
-    dostmts <expr> (50)
+    dostmts <expr> (51)
         on left: 51 52 53
         on right: 37 53
-    dostmt <array> (51)
+    dostmt <array> (52)
         on left: 54 55
         on right: 52 53
-    closure <eclosure> (52)
+    closure <eclosure> (53)
         on left: 56
         on right: 35
-    etuple <ealge> (53)
+    etuple <ealge> (54)
         on left: 57 58
         on right: 33
-    earray <array> (54)
+    earray <array> (55)
         on left: 59 60
         on right: 58 60 62
-    elist <ealge> (55)
+    elist <ealge> (56)
         on left: 61 62
         on right: 34
-    elambda <elambda> (56)
+    elambda <elambda> (57)
         on left: 63
         on right: 36
-    lamparam <pat> (57)
+    lamparam <pat> (58)
         on left: 64 65
         on right: 65 69 70
-    lamparam2 <pat> (58)
+    lamparam2 <pat> (59)
         on left: 66 67 68
         on right: 64 65
-    lamparams <array> (59)
+    lamparams <array> (60)
         on left: 69 70
         on right: 4 63 70
-    pat <pat> (60)
+    pat <pat> (61)
         on left: 71 72
         on right: 5 50 54 73 90 91
-    pcons <palge> (61)
+    pcons <palge> (62)
         on left: 73
         on right: 72
-    pat1 <pat> (62)
+    pat1 <pat> (63)
         on left: 74 75
         on right: 71 75
-    pat2 <pat> (63)
+    pat2 <pat> (64)
         on left: 76 77
         on right: 74 75
-    palge <palge> (64)
+    palge <palge> (65)
         on left: 78 79
         on right: 68 77 79
-    pat3 <pat> (65)
+    pat3 <pat> (66)
         on left: 80 81 82 83 84 85 86
         on right: 67 76 79 86
-    pref <ref> (66)
+    pref <ref> (67)
         on left: 87
         on right: 3 84 86
-    ptuple <palge> (67)
+    ptuple <palge> (68)
         on left: 88 89
         on right: 80
-    parray <array> (68)
+    parray <array> (69)
         on left: 90 91
         on right: 89 91 93
-    plist <palge> (69)
+    plist <palge> (70)
         on left: 92 93
         on right: 81
 
@@ -634,9 +635,9 @@ State 18
 State 19
 
     9 expr1: expr2 •
-   10      | expr2 • '|' expr1
+   10      | expr2 • LSTCHOICE expr1
 
-    '|'  shift, and go to state 71
+    LSTCHOICE  shift, and go to state 71
 
     $default  reduce using rule 9 (expr1)
 
@@ -1298,7 +1299,7 @@ State 70
 
 State 71
 
-   10 expr1: expr2 '|' • expr1
+   10 expr1: expr2 LSTCHOICE • expr1
 
     LSTINT             shift, and go to state 1
     LSTSYMBOL          shift, and go to state 2
@@ -1426,8 +1427,7 @@ State 78
    82 pat3: LSTINT •
 
     LSTLEFTARROW  reduce using rule 82 (pat3)
-    '|'           reduce using rule 24 (efact)
-    '|'           [reduce using rule 82 (pat3)]
+    '|'           reduce using rule 82 (pat3)
     ':'           reduce using rule 24 (efact)
     ':'           [reduce using rule 82 (pat3)]
     ')'           reduce using rule 24 (efact)
@@ -1466,8 +1466,7 @@ State 79
     LSTSTR        [reduce using rule 78 (palge)]
     LSTLEFTARROW  reduce using rule 78 (palge)
     LSTWILDCARD   reduce using rule 78 (palge)
-    '|'           reduce using rule 23 (expr5)
-    '|'           [reduce using rule 78 (palge)]
+    '|'           reduce using rule 78 (palge)
     ':'           reduce using rule 23 (expr5)
     ':'           [reduce using rule 78 (palge)]
     '('           [reduce using rule 78 (palge)]
@@ -1494,8 +1493,7 @@ State 80
    87 pref: LSTREFSYM •
 
     LSTLEFTARROW  reduce using rule 87 (pref)
-    '|'           reduce using rule 26 (efact)
-    '|'           [reduce using rule 87 (pref)]
+    '|'           reduce using rule 87 (pref)
     ':'           reduce using rule 26 (efact)
     ':'           [reduce using rule 87 (pref)]
     ')'           reduce using rule 26 (efact)
@@ -1514,8 +1512,7 @@ State 81
    83 pat3: LSTSTR •
 
     LSTLEFTARROW  reduce using rule 83 (pat3)
-    '|'           reduce using rule 25 (efact)
-    '|'           [reduce using rule 83 (pat3)]
+    '|'           reduce using rule 83 (pat3)
     ':'           reduce using rule 25 (efact)
     ':'           [reduce using rule 83 (pat3)]
     ')'           reduce using rule 25 (efact)
@@ -2071,7 +2068,7 @@ State 112
 
 State 113
 
-   10 expr1: expr2 '|' expr1 •
+   10 expr1: expr2 LSTCHOICE expr1 •
    13 econs: expr1 • ':' expr3
 
     ':'  shift, and go to state 70
@@ -2123,8 +2120,7 @@ State 119
    88 ptuple: '(' ')' •
 
     LSTLEFTARROW  reduce using rule 88 (ptuple)
-    '|'           reduce using rule 57 (etuple)
-    '|'           [reduce using rule 88 (ptuple)]
+    '|'           reduce using rule 88 (ptuple)
     ':'           reduce using rule 57 (etuple)
     ':'           [reduce using rule 88 (ptuple)]
     ')'           reduce using rule 57 (etuple)
@@ -2142,8 +2138,7 @@ State 120
    92 plist: '[' ']' •
 
     LSTLEFTARROW  reduce using rule 92 (plist)
-    '|'           reduce using rule 61 (elist)
-    '|'           [reduce using rule 92 (plist)]
+    '|'           reduce using rule 92 (plist)
     ':'           reduce using rule 61 (elist)
     ':'           [reduce using rule 92 (plist)]
     ')'           reduce using rule 61 (elist)
