@@ -4,7 +4,9 @@
     (
       (\~self -> \~xs -> (
         \[] -> false |
-  \(~h : ~t) -> ((((~prelude eq)) ~h ~k) | ((~self ~self) ~t))
+  \(~h : ~t) -> (
+    (\true -> true) | (\false -> ((~self ~self) ~t))
+  ) ((((~prelude eq)) ~h ~k))
       ))
       (\~self -> \~xs -> (
         \[] -> false |
