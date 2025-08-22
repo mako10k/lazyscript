@@ -64,6 +64,22 @@ jobs:
         run: |
           make -j2
 
+      - name: Show allocator/env
+        run: |
+          echo "matrix.alloc=${{ matrix.alloc }} matrix.sanitizer=${{ matrix.sanitizer }}"
+          echo "LAZYSCRIPT_USE_LIBC_ALLOC=$LAZYSCRIPT_USE_LIBC_ALLOC"
+          echo "ASAN_OPTIONS=${ASAN_OPTIONS:-}"
+
+      - name: Smoke: prelude println
+        env:
+          LAZYSCRIPT_BUILTIN_PATH: ${{ github.workspace }}/src/plugins/.libs
+          LAZYSCRIPT_PRELUDE_PATH: ${{ github.workspace }}/src/plugins/.libs
+          LAZYSCRIPT_PRELUDE_SO: ${{ github.workspace }}/src/plugins/.libs/liblazyscript_prelude.so
+          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
+        run: |
+          # Expect a single line output; this validates prelude loading and runtime wiring
+          src/lazyscript -e '((~prelude .println) "CI-smoke-ok")'
+
       - name: Check lexer token order
         run: |
           bash scripts/check_lexer_token_order.sh
@@ -80,8 +96,8 @@ jobs:
         run: |
           test/run-tests.sh
 
-      - name: If failed, rerun under gdb to capture backtrace
-        if: failure()
+      - name: If failed, rerun under gdb to capture backtrace (GC only)
+        if: failure() && matrix.alloc == 'gc'
         env:
           LAZYSCRIPT_BUILTIN_PATH: ${{ github.workspace }}/src/plugins/.libs
           LAZYSCRIPT_PRELUDE_PATH: ${{ github.workspace }}/src/plugins/.libs
