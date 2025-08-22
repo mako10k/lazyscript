@@ -1,13 +1,14 @@
 # Tests to skip due to known issues (tracked in TODO)
- t63_gc_repro_ns_pm
- # Note: Temporarily skipped while stabilizing parser/namespace literal interactions and GC repro. See docs/91_sprint_backlog.md.
-+# Temporarily skip GC repro candidates until stabilized
-+t66_gc_repro_ns_access
-+t67_gc_repro_intern_burst
-+t68_lambda_choice_standalone
-+t69_lambda_choice_in_ns_value
-+t70_lambda_choice_in_nslit
-+t73_chain_nsdefv_choice_in_map
-+t74_lambda_choice_nested_closure_in_ns
-+t75_double_map_in_nslit
-+t76_mixed_large_ns_then_apply
+t63_gc_repro_ns_pm
+# Note: Temporarily skipped while stabilizing parser/namespace literal interactions and GC repro. See docs/91_sprint_backlog.md.
+
+# Temporarily skip GC repro candidates until stabilized
+t66_gc_repro_ns_access
+t67_gc_repro_intern_burst
+t68_lambda_choice_standalone
+t69_lambda_choice_in_ns_value
+t70_lambda_choice_in_nslit
+t73_chain_nsdefv_choice_in_map
+t74_lambda_choice_nested_closure_in_ns
+t75_double_map_in_nslit
+t76_mixed_large_ns_then_apply
