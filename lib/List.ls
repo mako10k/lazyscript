@@ -1,58 +1,33 @@
 {
-  .nil   = [];
-  .cons  = \~x -> \~xs -> (~x : ~xs);
+  .nil = [];
+  .cons = \~x -> \~xs -> (~x : ~xs);
 
-  .foldl = (
-    (\~self -> \~f -> \~acc -> \~xs -> (
-      \[] -> ~acc |
-      \(~h : ~t) -> (((~self ~self) ~f ((~f ~acc) ~h) ~t))
-    ) ~xs)
-    (\~self -> \~f -> \~acc -> \~xs -> (
-      \[] -> ~acc |
-      \(~h : ~t) -> (((~self ~self) ~f ((~f ~acc) ~h) ~t))
-    ) ~xs)
-  );
+  {- fixed point combinator -}
+  ~fix <- \~f -> (\~x -> ~f (~x ~x)) (\~x -> ~f (~x ~x));
 
-  .foldr = (
-    (\~self -> \~f -> \~xs -> \~z -> (
-      \[] -> ~z |
-      \(~h : ~t) -> ((~f ~h) (((~self ~self) ~f ~t ~z)))
-    ) ~xs)
-    (\~self -> \~f -> \~xs -> \~z -> (
-      \[] -> ~z |
-      \(~h : ~t) -> ((~f ~h) (((~self ~self) ~f ~t ~z)))
-    ) ~xs)
-  );
+  .map = ~fix (\~rec ~f -> (\[] -> []) | (~h : ~t) -> ((~f ~h) : (~rec ~t)));
 
-  .map = (\~f -> ((.foldr) (\~x -> \~acc -> ((~f ~x) : ~acc)) []));
+  .filter = (\~fix -> (\~p -> (
+    ((~fix (\~rec -> \~xs -> (
+      (((\[] -> []) | (\(~h : ~t) -> ((((\true -> (~h : ((~rec) ~t))) | (\false -> ((~rec) ~t))) ((~p ~h))))) ~xs)
+    )))
+  ))) (((~prelude nsSelf) .fix));
 
-  .filter = (
-    (\~self -> \~p -> \~xs -> (
-      \[] -> [] |
-      \(~h : ~t) -> (
-        ((~p ~h) : (((~self ~self) ~p ~t))) | (((~self ~self) ~p ~t))
-      )
-    ) ~xs)
-    (\~self -> \~p -> \~xs -> (
-      \[] -> [] |
-      \(~h : ~t) -> (
-        ((~p ~h) : (((~self ~self) ~p ~t))) | (((~self ~self) ~p ~t))
-      )
-    ) ~xs)
-  );
+  .append = (\~fix -> (\~xs -> \~ys -> (
+    (((~fix (\~rec -> \~xs2 -> (
+      (((\[] -> ~ys) | (\(~h : ~t) -> (~h : ((~rec) ~t)))) ~xs2)
+    ))) ~xs)
+  ))) (((~prelude nsSelf) .fix));
 
-  .append = (
-    (\~self -> \~xs -> \~ys -> (
-      \[] -> ~ys |
-      \(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))
-    ) ~xs)
-    (\~self -> \~xs -> \~ys -> (
-      \[] -> ~ys |
-      \(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))
-    ) ~xs)
-  );
+  .reverse = (\~fix -> (\~xs -> (
+    ((((~fix (\~rec -> \~acc -> \~xs2 -> (
+      (((\[] -> ~acc) | (\(~h : ~t) -> ((~rec) (~h : ~acc) ~t))) ~xs2)
+    ))) []) ~xs)
+  ))) (((~prelude nsSelf) .fix));
 
-  .reverse = (((.foldl) (\~acc -> \~x -> (~x : ~acc)) []));
-
-  .flatMap = (\~f -> ((.foldr) (\~x -> \~acc -> ((.append) (~f ~x) ~acc)) []));
+  .flatMap = (\~append -> \~fix -> (\~f -> (
+    ((~fix (\~rec -> \~xs -> (
+      (((\[] -> []) | (\(~h : ~t) -> ((~append (~f ~h)) ((~rec) ~t)))) ~xs)
+    )))
+  ))) (((~prelude nsSelf) .append)) (((~prelude nsSelf) .fix));
 };

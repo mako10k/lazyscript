@@ -580,7 +580,7 @@ lamparam:
 lamparam2:
       LSTSYMBOL { $$ = lspat_new_alge(lspalge_new($1, 0, NULL)); }
     | pat3 { $$ = $1; }
-    | '(' palge ')' { $$ = lspat_new_alge($2); }
+    | '(' pat ')' { $$ = $2; }
     ;
 
 lamparams:
