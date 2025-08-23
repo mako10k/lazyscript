@@ -9,6 +9,9 @@
 #include "builtins/ns.h"
 #include "runtime/builtin.h"
 #include "runtime/error.h"
+
+// forward decls
+lsthunk_t* lsbuiltin_prelude_eq(lssize_t argc, lsthunk_t* const* args, void* data);
 #include <string.h>
 #include <stdlib.h>
 // forward for namespace value constructor (not used now)
@@ -214,6 +217,11 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return ls_make_err("prelude: expected bare symbol");
   }
   const lsstr_t* name = lsthunk_get_constr(key);
+  // eq: simple equality for common types (int, symbol/algebraic 0-arity)
+  if (lsstrcmp(name, lsstr_cstr("eq")) == 0) {
+    extern lsthunk_t* lsbuiltin_prelude_eq(lssize_t argc, lsthunk_t* const* args, void* data);
+    return lsthunk_new_builtin(lsstr_cstr("prelude.eq"), 2, lsbuiltin_prelude_eq, NULL);
+  }
   if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1, lsbuiltin_prelude_exit, NULL);
   if (lsstrcmp(name, lsstr_cstr("println")) == 0)
@@ -280,4 +288,32 @@ void ls_register_builtin_prelude(lstenv_t* tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, tenv);
   // Alias: expose the raw builtin dispatcher also as (~builtin ...)
   lstenv_put_builtin(tenv, lsstr_cstr("builtin"), 1, lsbuiltin_prelude_dispatch, tenv);
+}
+
+// Implementation of prelude.eq (2-arity)
+lsthunk_t* lsbuiltin_prelude_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; (void)data;
+  lsthunk_t* a = ls_eval_arg(args[0], "eq: arg1"); if (lsthunk_is_err(a)) return a; if (!a) return ls_make_err("eq: arg1 eval");
+  lsthunk_t* b = ls_eval_arg(args[1], "eq: arg2"); if (lsthunk_is_err(b)) return b; if (!b) return ls_make_err("eq: arg2 eval");
+  // int equality
+  if (lsthunk_get_type(a) == LSTTYPE_INT && lsthunk_get_type(b) == LSTTYPE_INT) {
+    int eq = lsint_eq(lsthunk_get_int(a), lsthunk_get_int(b));
+    return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
+  }
+  // symbol equality (explicit symbol type)
+  if (lsthunk_get_type(a) == LSTTYPE_SYMBOL && lsthunk_get_type(b) == LSTTYPE_SYMBOL) {
+    const lsstr_t* sa = lsthunk_get_symbol(a);
+    const lsstr_t* sb = lsthunk_get_symbol(b);
+    int eq = (lsstrcmp(sa, sb) == 0);
+    return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
+  }
+  // algebraic 0-arity constructors (used for .a style symbols in lists)
+  if (lsthunk_get_type(a) == LSTTYPE_ALGE && lsthunk_get_argc(a) == 0 &&
+      lsthunk_get_type(b) == LSTTYPE_ALGE && lsthunk_get_argc(b) == 0) {
+    const lsstr_t* ca = lsthunk_get_constr(a);
+    const lsstr_t* cb = lsthunk_get_constr(b);
+    int eq = (lsstrcmp(ca, cb) == 0);
+    return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
+  }
+  return lsthunk_new_ealge(lsealge_new(lsstr_cstr("false"), 0, NULL), NULL);
 }
