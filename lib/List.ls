@@ -5,29 +5,33 @@
   {- fixed point combinator -}
   ~fix <- \~f -> (\~x -> ~f (~x ~x)) (\~x -> ~f (~x ~x));
 
-  .map = ~fix (\~rec ~f -> (\[] -> []) | (~h : ~t) -> ((~f ~h) : (~rec ~t)));
+  .map = ~fix (\~rec ~f ~xs -> (
+    \[] -> [] |
+    \(~h : ~t) -> (~f ~h) : (~rec ~f ~t)
+  ) ~xs);
 
-  .filter = (\~fix -> (\~p -> (
-    ((~fix (\~rec -> \~xs -> (
-      (((\[] -> []) | (\(~h : ~t) -> ((((\true -> (~h : ((~rec) ~t))) | (\false -> ((~rec) ~t))) ((~p ~h))))) ~xs)
-    )))
-  ))) (((~prelude nsSelf) .fix));
+  .filter = ~fix (\~rec ~p ~xs -> (
+    \[] -> [] |
+    \(~h : ~t) ->
+      (
+        (\true  -> ~h : ~rec ~p ~t) |
+        (\false ->      ~rec ~p ~t)
+      ) (~p ~h)
+  ) ~xs);
 
-  .append = (\~fix -> (\~xs -> \~ys -> (
-    (((~fix (\~rec -> \~xs2 -> (
-      (((\[] -> ~ys) | (\(~h : ~t) -> (~h : ((~rec) ~t)))) ~xs2)
-    ))) ~xs)
-  ))) (((~prelude nsSelf) .fix));
+  .append = ~fix (\~rec ~xs ~ys -> (
+    \[] -> ~ys |
+    \(~h : ~t) -> ~h : ~rec ~t ~ys
+  ) ~xs);
 
-  .reverse = (\~fix -> (\~xs -> (
-    ((((~fix (\~rec -> \~acc -> \~xs2 -> (
-      (((\[] -> ~acc) | (\(~h : ~t) -> ((~rec) (~h : ~acc) ~t))) ~xs2)
-    ))) []) ~xs)
-  ))) (((~prelude nsSelf) .fix));
+  .reverse = ~fix (\~rec ~acc ~xs -> (
+    \[] -> ~acc |
+    \(~h : ~t) -> ~rec (~h : ~acc) ~t
+  ) ~xs) [];
 
-  .flatMap = (\~append -> \~fix -> (\~f -> (
-    ((~fix (\~rec -> \~xs -> (
-      (((\[] -> []) | (\(~h : ~t) -> ((~append (~f ~h)) ((~rec) ~t)))) ~xs)
-    )))
-  ))) (((~prelude nsSelf) .append)) (((~prelude nsSelf) .fix));
+  .flatMap = ~fix (\~rec ~f ~xs -> (
+    \[] -> [] |
+    \(~h : ~t) -> ~append (~f ~h) (~rec ~f ~t)
+  ) ~xs);
+
 };

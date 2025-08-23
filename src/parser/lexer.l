@@ -142,5 +142,6 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 \"([^\\\"]|\\.)*\" { yylval->strval = lsstr_parse(yytext, yyleng); return LSTSTR; }
 "<-"       { return LSTLEFTARROW; }
 "->"       { return LSTARROW; }
+"||"       { return LSTOROR; }
 . { return yytext[0]; }
 %%

@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 61
+%expect 62
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -119,6 +119,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %token <strval> LSTREFSYM
 %token <strval> LSTSTR
 %token LSTARROW
+%token LSTOROR
 %token LSTLEFTARROW
 %token LSTWILDCARD
 %right '|'
@@ -182,8 +183,9 @@ econs:
     ;
 
 expr3:
-      expr4 { $$ = $1; }
+    expr4 { $$ = $1; }
   | eappl { $$ = lsexpr_with_loc(lsexpr_new_appl($1), @$); }
+  | expr3 LSTOROR expr4 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new($1, $3)), @$); }
     ;
 
 eappl:
@@ -557,7 +559,7 @@ elist:
     ;
 
 elambda:
-      '\\' lamparams LSTARROW expr3 {
+  '\\' lamparams LSTARROW expr3 {
         // \\p1 p2 ... -> body  ==>  \\p1 -> (\\p2 -> ... -> body)
         lssize_t argc = lsarray_get_size($2);
         const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
