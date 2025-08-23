@@ -120,6 +120,11 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 	yylval->strval = inner; return LSTSYMBOL;
 }
 [.][a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext); return LSTSYMBOL; }
+[!][a-zA-Z_][a-zA-Z0-9_]* {
+	/* !ident => LSTENVOP (used to access (~prelude .env).ident) */
+	yylval->strval = lsstr_cstr(yytext + 1);
+	return LSTENVOP;
+}
 "~~nsdefv"  { return LSTNSDEFV; }
 "~~nsdef"   { return LSTNSDEF; }
 [~]{2}[0-9]+      { yylval->intval = lsint_new(atoi(yytext + 2)); return LSTPRELUDE_INT; }

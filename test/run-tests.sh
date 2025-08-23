@@ -20,6 +20,18 @@ export LAZYSCRIPT_PATH="${LAZYSCRIPT_PATH:-$DIR:$ROOT}"
 # CI matrix can set LAZYSCRIPT_USE_LIBC_ALLOC=0 to enable GC jobs.
 export LAZYSCRIPT_USE_LIBC_ALLOC="${LAZYSCRIPT_USE_LIBC_ALLOC:-1}"
 
+# Per-test timeout (seconds). Default 10 if not provided.
+TEST_TIMEOUT="${LAZYSCRIPT_TEST_TIMEOUT:-10}"
+
+# Helper: run a command with timeout if available; capture stdout+stderr
+run_with_timeout_capture() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout -k 1 "${TEST_TIMEOUT}s" "$@" 2>&1
+  else
+    "$@" 2>&1
+  fi
+}
+
 pass=0; fail=0
 
 # Normalize absolute paths in outputs so CI and local paths compare stably
@@ -89,7 +101,7 @@ for name in "${cases[@]}"; do
     # shellcheck disable=SC2206
     add_args=($LAZYSCRIPT_ARGS)
   fi
-  out="$("$BIN" "${add_args[@]}" "$src" 2>&1)"
+  out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" "$src")"
   if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
     echo "ok - $name"
     ((pass++))
@@ -126,7 +138,7 @@ for name in "${eval_cases[@]}"; do
     # shellcheck disable=SC2206
     add_args=($LAZYSCRIPT_ARGS)
   fi
-  out="$("$BIN" "${add_args[@]}" -e "$(cat "$src")" 2>&1)"
+  out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" -e "$(cat "$src")")"
   if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
     echo "ok - eval $name"
     ((pass++))
@@ -159,7 +171,7 @@ for name in "${cir_cases[@]}"; do
     # shellcheck disable=SC2206
     add_args=($LAZYSCRIPT_ARGS)
   fi
-  out="$("$BIN" "${add_args[@]}" --dump-coreir "$src" 2>&1)"
+  out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" --dump-coreir "$src")"
   if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
     echo "ok - coreir $name"
     ((pass++))
@@ -190,7 +202,7 @@ fi
 # Optional: Core IR evaluator smoke tests (if available)
 if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
   # Reuse existing tests that are evaluator-friendly
-  out="$("$BIN" --eval-coreir "$DIR/t05_let_without_keyword.ls" 2>&1)"
+  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/t05_let_without_keyword.ls")"
   if [[ "$out" == "3"* ]]; then
     echo "ok - coreir-eval t05_let_without_keyword"
     ((pass++))
@@ -201,7 +213,7 @@ if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
   fi
 
   # Token-gated effect via chain: should print and return unit under evaluator
-  out="$("$BIN" --eval-coreir "$DIR/t08_coreir_chain.ls" 2>&1)"
+  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/t08_coreir_chain.ls")"
   if diff -u <(printf "%s\n" "$out") "$DIR/t08_coreir_chain.out" >/dev/null; then
     echo "ok - coreir-eval t08_coreir_chain"
     ((pass++))
@@ -212,7 +224,7 @@ if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
   fi
 
   # return should just pass through the value
-  out="$("$BIN" --eval-coreir "$DIR/t09_coreir_return.ls" 2>&1)"
+  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/t09_coreir_return.ls")"
   if diff -u <(printf "%s\n" "$out") "$DIR/t09_coreir_return.out" >/dev/null; then
     echo "ok - coreir-eval t09_coreir_return"
     ((pass++))
@@ -240,7 +252,7 @@ if "$BIN" --help 2>&1 | grep -q -- "--typecheck"; then
     [[ -z "$name" ]] && continue
     src="$DIR/$name.ls"
     exp="$DIR/$name.type.out"
-    out="$("$BIN" --typecheck "$src" 2>&1)"
+  out="$(run_with_timeout_capture "$BIN" --typecheck "$src")"
     if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
       echo "ok - typecheck $name"
       ((pass++))

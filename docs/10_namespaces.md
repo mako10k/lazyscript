@@ -1,56 +1,53 @@
 # Namespaces（仕様）
 
-LazyScript の名前空間は「シンボルキーから値への写像」を提供します。名前空間には2種類あります。
+LazyScript の名前空間は「シンボルキー → 値」の写像です。二つの形があります。
 
-- Named namespace（レジストリ登録型）: 名前でグローバル登録された名前空間。
-- Namespace value（無名/第一級値）: 値として渡せる名前空間。
+- 名前付き Namespace（登録型）
+- 名前空間値（第一級値）
 
-本書では両者の共通仕様と相違点、作成・定義・参照・列挙の各操作を示します。
+どちらも参照は関数適用で行います: `(~NS .Key)`。糖衣 `~~sym` は `(~prelude sym)` の短縮です。
 
-- 参照（共通）: `(~NS sym)` で NS から値を取得（関数でも可）。
-- シュガー: `~~sym` は `(~prelude sym)` の短縮。`LAZYSCRIPT_SUGAR_NS` で切替可能（デフォルト prelude）。
+キールール
+- キーは必ず `.Name` 形式のシンボル値です（文字列不可）。
+- シンボルはインターンされ、`==` 比較は O(1)。
+- 単引用 `'Name'` は字句としては存在しますが、キーには使わず `.Name` を使います。
 
-キーは必ず `.name` 形式のシンボルです（ドット付きシンボル）。
-シンボルはインターンされ `==` 比較できます。文字列など他の型を指定するとエラーになります。
+## 名前付き Namespace
 
-注意: `'Name` のような単引用記法は字句としては存在しますが、名前空間キーには使いません。必ず `.Name` を使ってください。
+- 作成: `~~nsnew NS`
+- 定義: `~~nsdef NS .Key value`
 
-## 名前付き名前空間（Named）
-
-- 作成: `~~nsnew NS` は `NS` という名前の名前空間を作り、`(~NS sym)` で参照可能にします。
-- 定義: `~~nsdef NS sym value` で `NS` に定義（副作用）。
-
-例（基本参照）:
+例:
 
 ```
 !{ ~~nsnew NS;
-   ~~nsdef NS .Foo 42;           # symbol キー
-   ~~println (~to_str ((~NS .Foo)))   # => 42
- };
-```
-
-ドット連鎖アクセス（構文の自然な結合規則）:
-
-```
-!{
-  ~ns <- { .A = { .B = 1 } };
-  ~~println (~to_str (~ns.A.B));   # 糖衣ではなく、字句/構文の結合規則で (~ns .A) の結果に .B を適用 → 1
+   ~~nsdef NS .Foo 42;
+   ~~println (~to_str ((~NS .Foo)))
 };
 ```
 
-## 無名（匿名）名前空間（Namespace value）
+ドット連鎖（構文の結合則）:
 
-- 作成: `~~nsnew0` は新しい「名前空間値」を返します。これは 1 引数のビルトインで、`(~NS sym)` と同様に動作します。
-- 定義: `~~nsdefv ns sym value` で、`ns` が「名前空間値」の場合に直接定義できます。
-- セッター（代替）: `(~ns .__set)` は `(sym val) -> ()` なセッタービルトインを返します。
+```
+!{
+  ns <- { .A = { .B = 1 } };
+  ~~println (~to_str ((~ns .A).B));
+};
+```
 
-例（匿名 Namespace の列挙の順序）:
+## 名前空間値（無名）
+
+- 作成: `~~nsnew0` → 新しい NS 値
+- 定義: `~~nsdefv ns .Key value`
+- セッター: `(~ns .__set)` は `(sym val) -> ()`
+
+例:
 
 ```
 !{
   ns <- (~~nsnew0);
   (~~nsdefv ns .Foo 42);
-  ~~println (~to_str ((~ns .Foo)))  # => 42
+  ~~println (~to_str ((~ns .Foo)))
 };
 ```
 
@@ -60,66 +57,46 @@ LazyScript の名前空間は「シンボルキーから値への写像」を提
 !{
   ns <- (~~nsnew0);
   ((~ns .__set) .Foo 42);
-  ~~println (~to_str ((~ns .Foo)))  # => 42
+  ~~println (~to_str ((~ns .Foo)))
 };
 ```
 
-## リテラル名前空間（不変な Namespace value）
+## リテラル Namespace（不変）と nsSelf
 
-- 構文: `{ sym = value; ... }` は「不変（イミュータブル）」な名前空間値を生成します。
-- 特徴: 作成時に決まったバインディングが固定され、後から変更できません。評価自体は遅延ですが、表（キー→値の対応）は不変です。
-  - 参照: 通常どおり `(~ns sym)` で取得できます。
-- メンバー定義 `.sym = expr` は同時に `~sym <- expr` を行い、同じ名前でローカル参照が利用できます。
-- 変更操作: `~~nsdefv` や `(~ns .__set)` による更新は許可されません（エラー）。
+- リテラル: `{ .A = 1; .B = ~A }` は不変な NS 値。
+- メンバーは定義順にローカル束縛され、相互参照が可能。
+- `~~nsSelf` を使うと自己参照経由の定義ができます。
 
 例:
 
 ```
 !{
-  ns <- { .Foo = 42; .Bar = ~Foo; };
-  ~~println (~to_str ((~ns .Foo)));        # => 42
-  ~~println (~to_str ((~ns .Bar)));        # => 42
-  # 次のような更新はエラー（不変のため）:
-  # (~~nsdefv ns .Foo 1)
-  # ((~ns .__set) .Foo 1)
+  ns <- { .A = ((~~nsSelf) .B); .B = 1 };
+  ~~println (~to_str ((~ns .A)))   # => 1
 };
 ```
 
-## 注意
-- ミューテーション（環境更新）は効果です。`strict-effects` 有効時は `seq/chain` でトークンが必要です。
-  - 対象: `nsnew`, `nsnew0`, `nsdef`, `nsdefv`, `(~ns .__set)`
-  - `(~NS sym)` の `sym` は `.name` 形式のシンボル。
-- 無名 NS は値として渡せるため、クロージャや局所スコープでの辞書用途に向きます。
-- リテラル名前空間（`{ ... }`）は非副作用です。現実装でもランタイムで更新操作をエラーにします（ソフトな不変）。将来的に型や検査での厳密化も検討します。
- - セッター互換: `(~ns .__set)` も許容され、`(~ns __set)` と同等です。
- - 誤用ヒント: `(~ns "__set")` や `(~ns ".__set")` は `#err "namespace: use (~ns __set) or (~ns .__set) for setter"` を返します。
+注意: リテラルは不変です。`~~nsdefv` や `(~ns .__set)` による変更はエラーになります。
 
-## 列挙（デバッグ）
-  - `~~nsMembers NS` / `~~nsMembers ns` は `list<symbol>` を返します（値は非評価）。
-  - 並び順（安定）: シンボル名の辞書順。
-- 表示上の注意: `to_str` でのリスト表示では、文字列はクォート無しで出力されます。
+## 列挙（nsMembers）
 
-例（列挙の順序）:
+- `~~nsMembers NS` / `~~nsMembers ns` → `list<symbol>`（値は非評価）
+- 並び順はシンボル名の辞書順（安定）
 
-  ```
-  !{
-    ns <- ((~prelude nsnew0));
-    ~~nsdefv ~ns .a 1;
-    ~~nsdefv ~ns .b 2;
-    ~~nsdefv ~ns .aa 3;
-    ~~nsdefv ~ns .ab 4;
-    ~~println (~to_str ((~prelude nsMembers) ~ns));
-  };
-  -- 出力: [.a, .aa, .ab, .b]
-  ```
-
-strict-effects 有効時の例（トークンが必要）:
+例:
 
 ```
 !{
-  ns <- ((~prelude chain) ((~prelude nsnew0)) (\~x -> ~x));
-  ((~prelude chain) (~~nsdefv ~ns .x 1) (\~_ -> ()));
-  ((~prelude nsMembers) ~ns)
+  ns <- (~~nsnew0);
+  ~~nsdefv ~ns .a 1;
+  ~~nsdefv ~ns .b 2;
+  ~~nsdefv ~ns .aa 3;
+  ~~nsdefv ~ns .ab 4;
+  ~~println (~to_str (~~nsMembers ~ns));
 };
--- 出力: [.x]
+-- 出力: [.a, .aa, .ab, .b]
 ```
+
+## 効果と安全
+
+- 環境更新（nsnew/nsdef/...）は効果です。厳格モードでは `chain/seq` 等で順序を示してください。

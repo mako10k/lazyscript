@@ -34,8 +34,11 @@
 - ブロック: `'{' expr '}'` → 式そのまま
 
 補足（シンタックスシュガー）:
-- `~~sym` は `(~<ns> sym)` に展開する（既定 ns は `prelude`）。
-- 名前空間は CLI `--sugar-namespace <ns>` または環境変数 `LAZYSCRIPT_SUGAR_NS` で上書き可能。
+- `~~sym` は `(~<ns> sym)` に展開（既定 ns は `prelude`）。
+- `!sym` は `(~<ns> .env .sym)` に展開（環境操作 API: `!require` など）。
+- `!{ ... }` は `(~<ns> chain/bind/return)` 連鎖に展開（予約語なしの do 記法）。
+- `<ns>` は CLI `--sugar-namespace <ns>` または環境変数 `LAZYSCRIPT_SUGAR_NS` で切替可能。
+詳しくは `docs/05_syntax_sugar.md` を参照。
 
 ### タプル・リスト
 - `etuple`:

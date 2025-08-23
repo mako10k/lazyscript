@@ -2,36 +2,101 @@
   .nil = [];
   .cons = \~x -> \~xs -> (~x : ~xs);
 
-  {- fixed point combinator -}
-  ~fix <- \~f -> (\~x -> ~f (~x ~x)) (\~x -> ~f (~x ~x));
+  .map = \~f -> \~xs -> (
+    (
+      (\~self -> \~f -> \~xs ->
+        (((\[] -> [])
+          || (\(~h : ~t) -> (~f ~h) : (((~self ~self) ~f ~t))))
+         ~xs))
+      (\~self -> \~f -> \~xs ->
+        (((\[] -> [])
+          || (\(~h : ~t) -> (~f ~h) : (((~self ~self) ~f ~t))))
+         ~xs))
+      ~f ~xs
+    )
+  );
 
-  .map = ~fix (\~rec ~f ~xs -> (
-    \[] -> [] |
-    \(~h : ~t) -> (~f ~h) : (~rec ~f ~t)
-  ) ~xs);
+  .filter = \~p -> \~xs -> (
+    (
+      (\~self -> \~p -> \~xs ->
+        (((\[] -> [])
+          || (\(~h : ~t) ->
+               (((\true  -> (~h : (((~self ~self) ~p ~t))))
+                 | (\false -> (((~self ~self) ~p ~t))))
+                ((~p ~h)))))
+         ~xs))
+      (\~self -> \~p -> \~xs ->
+        (((\[] -> [])
+          || (\(~h : ~t) ->
+               (((\true  -> (~h : (((~self ~self) ~p ~t))))
+                 | (\false -> (((~self ~self) ~p ~t))))
+                ((~p ~h)))))
+         ~xs))
+      ~p ~xs
+    )
+  );
 
-  .filter = ~fix (\~rec ~p ~xs -> (
-    \[] -> [] |
-    \(~h : ~t) ->
-      (
-        (\true  -> ~h : ~rec ~p ~t) |
-        (\false ->      ~rec ~p ~t)
-      ) (~p ~h)
-  ) ~xs);
+  .append = \~xs -> \~ys -> (
+    (
+      (\~self -> \~xs -> \~ys ->
+        (((\[] -> ~ys)
+          || (\(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))))
+         ~xs))
+      (\~self -> \~xs -> \~ys ->
+        (((\[] -> ~ys)
+          || (\(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))))
+         ~xs))
+      ~xs ~ys
+    )
+  );
 
-  .append = ~fix (\~rec ~xs ~ys -> (
-    \[] -> ~ys |
-    \(~h : ~t) -> ~h : ~rec ~t ~ys
-  ) ~xs);
+  .reverse = \~xs -> (
+    (
+      (\~self -> \~acc -> \~zs ->
+        (((\[] -> ~acc)
+          || (\(~h : ~t) -> (((~self ~self) (~h : ~acc) ~t))))
+         ~zs))
+      (\~self -> \~acc -> \~zs ->
+        (((\[] -> ~acc)
+          || (\(~h : ~t) -> (((~self ~self) (~h : ~acc) ~t))))
+         ~zs))
+      [] ~xs
+    )
+  );
 
-  .reverse = ~fix (\~rec ~acc ~xs -> (
-    \[] -> ~acc |
-    \(~h : ~t) -> ~rec (~h : ~acc) ~t
-  ) ~xs) [];
-
-  .flatMap = ~fix (\~rec ~f ~xs -> (
-    \[] -> [] |
-    \(~h : ~t) -> ~append (~f ~h) (~rec ~f ~t)
-  ) ~xs);
-
+  .flatMap = \~f -> \~xs -> (
+    (
+      (\~self -> \~f -> \~xs ->
+        (((\[] -> [])
+          | (\(~h : ~t) ->
+               (
+                 ( (\~apSelf -> \~as -> \~bs ->
+                       ((((\[] -> ~bs)
+                          || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
+                        ) ~as))
+                   (\~apSelf -> \~as -> \~bs ->
+                       ((((\[] -> ~bs)
+                          || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
+                        ) ~as))
+                 ) ((~f ~h)) (((~self ~self) ~f ~t))
+               )))
+         ~xs))
+      (\~self -> \~f -> \~xs ->
+        (((\[] -> [])
+          | (\(~h : ~t) ->
+               (
+                 ( (\~apSelf -> \~as -> \~bs ->
+                       ((((\[] -> ~bs)
+                          || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
+                        ) ~as))
+                   (\~apSelf -> \~as -> \~bs ->
+                       ((((\[] -> ~bs)
+                          || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
+                        ) ~as))
+                 ) ((~f ~h)) (((~self ~self) ~f ~t))
+               )))
+         ~xs))
+      ~f ~xs
+    )
+  )
 };

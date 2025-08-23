@@ -752,7 +752,10 @@ lsthunk_t* lsthunk_new_builtin(const lsstr_t* name, lssize_t arity, lstbuiltin_f
                                void* data) {
   lsthunk_t* thunk      = lsmalloc(sizeof(lsthunk_t));
   thunk->lt_type        = LSTTYPE_BUILTIN;
-  thunk->lt_whnf        = thunk;
+  // Do not mark builtins as WHNF at construction. This allows eval0 to
+  // execute zero-arity builtins and cache their resulting value, keeping
+  // wrappers (e.g., namespace member getters) transparent when printing.
+  thunk->lt_whnf        = NULL;
   thunk->lt_trace_id    = -1;
   thunk->lt_trace_id    = -1;
   lstbuiltin_t* builtin = lsmalloc(sizeof(lstbuiltin_t));
@@ -1132,6 +1135,13 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
   switch (t->lt_type) {
   case LSTTYPE_REF: {
     lstref_target_t* target = t->lt_ref.ltr_target;
+    // If the reference target hasn't been resolved yet, attempt a lazy
+    // resolution against the captured environment so we can identify whether
+    // this ref points to the current lambda parameter and capture it.
+    if (!target && t->lt_ref.ltr_env) {
+      target = lstenv_get(t->lt_ref.ltr_env, lsref_get_name(t->lt_ref.ltr_ref));
+      if (target) t->lt_ref.ltr_target = target;
+    }
     if (target) {
       // If this reference belongs to the same lambda parameter (including any subpattern
       // inside the parameter), capture the currently bound thunk for that specific ref.
@@ -1168,13 +1178,22 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
   }
   case LSTTYPE_CHOICE: {
     lsthunk_t* nt = lsmalloc(sizeof(lsthunk_t));
-    nt->lt_type = LSTTYPE_CHOICE; nt->lt_whnf = nt;
+  nt->lt_type = LSTTYPE_CHOICE; nt->lt_whnf = NULL;
     *pmemo = subst_bind(*pmemo, t, nt);
     nt->lt_choice.ltc_left = lsthunk_subst_param_rec(t->lt_choice.ltc_left, param, pmemo);
     nt->lt_choice.ltc_right = lsthunk_subst_param_rec(t->lt_choice.ltc_right, param, pmemo);
     return nt;
   }
-  case LSTTYPE_LAMBDA:
+  case LSTTYPE_LAMBDA: {
+    // Capture references to the outer parameter even across lambda boundaries by
+    // substituting inside the lambda body. Keep the parameter pattern as-is.
+    lsthunk_t* nt = lsmalloc(sizeof(lsthunk_t));
+    nt->lt_type = LSTTYPE_LAMBDA; nt->lt_whnf = nt;
+    nt->lt_lambda.ltl_param = t->lt_lambda.ltl_param;
+    *pmemo = subst_bind(*pmemo, t, nt);
+    nt->lt_lambda.ltl_body = lsthunk_subst_param_rec(t->lt_lambda.ltl_body, param, pmemo);
+    return nt;
+  }
   case LSTTYPE_INT:
   case LSTTYPE_STR:
   case LSTTYPE_BUILTIN:

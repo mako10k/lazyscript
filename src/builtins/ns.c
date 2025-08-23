@@ -61,6 +61,27 @@ lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void
   }
   return lsthunk_new_builtin(lsstr_cstr("namespace"), 1, lsbuiltin_ns_value, g_nslit_self);
 }
+
+// ----------------------------------------
+// nslit member wrapper: keep original thunk, but when evaluated/applied,
+// temporarily set g_nslit_self so that (~prelude nsSelf) works even outside
+// of the literal construction, and so that intra-namespace references resolve.
+typedef struct ns_member_data {
+  lsns_t*     ns;   // owning namespace
+  lsthunk_t*  val;  // original value thunk (unevaluated)
+} ns_member_data_t;
+
+
+static lsthunk_t* lsbuiltin_ns_member_wrap(lssize_t argc, lsthunk_t* const* args, void* data) {
+  ns_member_data_t* md = (ns_member_data_t*)data;
+  if (!md || !md->ns || !md->val) return ls_make_err("namespace: member invalid");
+  lsns_t* prev_self = g_nslit_self;
+  g_nslit_self      = md->ns;
+  // When applied, delegate application to original thunk; otherwise eval to WHNF
+  lsthunk_t* ret = (argc == 0) ? lsthunk_eval0(md->val) : lsthunk_eval(md->val, argc, args);
+  g_nslit_self = prev_self;
+  return ret;
+}
 // Key canonicalization
 // Supports keys of type: Symbol only. Encoded as a string with leading 'S'
 // to avoid collisions. Returns NULL on invalid type and reports a descriptive
@@ -447,29 +468,32 @@ lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data) {
   ns->is_mutable = 0; // immutable literal namespace
   // Enable (~prelude nsSelf) inside values while building
   lsns_t* prev_self = g_nslit_self; g_nslit_self = ns;
+  // First pass: resolve all keys and pre-register wrapped thunks for forward/self refs.
+  // We do NOT evaluate values here; we keep the original thunk and wrap it so that
+  // later evaluation happens with nsSelf bound.
   for (lssize_t i = 0; i < argc; i += 2) {
     if (nslog_enabled()) {
-      lsprintf(stderr, 0, "DBG nslit key[%ld] eval\n", (long)i/2);
+      lsprintf(stderr, 0, "DBG nslit key[%ld] eval (pass1)\n", (long)i/2);
     }
     lsthunk_t* symv = ls_eval_arg(args[i], "nslit: key");
     if (lsthunk_is_err(symv)) { g_nslit_self = prev_self; return symv; }
     const lsstr_t* symname = ns_encode_key_from_thunk(symv);
     if (!symname) { g_nslit_self = prev_self; return ls_make_err("nslit: symbol expected"); }
+    // Wrap original value thunk (unevaluated)
+    lsthunk_t*  val_orig = args[i + 1];
+    ns_member_data_t* md = lsmalloc(sizeof(ns_member_data_t));
+    md->ns  = ns;
+    md->val = val_orig;
+    lsthunk_t* wrapped = lsthunk_new_builtin(lsstr_cstr("namespace.member"), 0,
+                                             lsbuiltin_ns_member_wrap, md);
     if (nslog_enabled()) {
-      lsprintf(stderr, 0, "DBG nslit key=");
+      lsprintf(stderr, 0, "DBG nslit put wrapped member for key=");
       lsstr_print_bare(stderr, LSPREC_LOWEST, 0, symname);
-      lsprintf(stderr, 0, "\n");
+      lsprintf(stderr, 0, " (val type=%d)\n", (int)lsthunk_get_type(val_orig));
     }
-    if (nslog_enabled()) {
-      lsprintf(stderr, 0, "DBG nslit val[%ld] eval\n", (long)i/2);
-    }
-    lsthunk_t* val = ls_eval_arg(args[i + 1], "nslit: value");
-    if (lsthunk_is_err(val)) { g_nslit_self = prev_self; return val; }
-    if (nslog_enabled()) {
-      lsprintf(stderr, 0, "DBG nslit put type=%d\n", (int)lsthunk_get_type(val));
-    }
-    lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
+    lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)wrapped, &oldv);
   }
+  // No second pass needed; values will be evaluated lazily via wrappers.
   g_nslit_self = prev_self;
   if (nslog_enabled()) {
     lsprintf(stderr, 0, "DBG nslit end ns=%p map=%p\n", (void*)ns, (void*)ns->map);

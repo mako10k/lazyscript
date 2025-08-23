@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 62
+%expect 66
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -114,6 +114,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %token <strval> LSTPRELUDE_SYMBOL
 %token <strval> LSTPRELUDE_STR
 %token <intval> LSTPRELUDE_INT
+%token <strval> LSTENVOP
 %token LSTNSDEF
 %token LSTNSDEFV
 %token <strval> LSTREFSYM
@@ -131,6 +132,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 
 prog:
       expr ';' { $$ = lsprog_new($1); lsscan_set_prog(yyget_extra(yyscanner), $$); }
+    | expr     { $$ = lsprog_new($1); lsscan_set_prog(yyget_extra(yyscanner), $$); }
     ;
 
 bind:
@@ -272,6 +274,28 @@ efact:
   | elist { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
   | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
   | elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
+  | LSTENVOP {
+        // !ident => (~<ns> .env .ident)
+        const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
+        const lsexpr_t *prelude = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
+        const lsexpr_t *sym_env = lsexpr_new_alge(lsealge_new(lsstr_cstr(".env"), 0, NULL));
+        const lsexpr_t *call_env = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(prelude, 1, &sym_env)), @$);
+        // build .ident symbol
+        char buf[256];
+        const char* id = lsstr_get_buf($1);
+        size_t idlen = (size_t)lsstr_get_len($1);
+        if (idlen + 1 >= sizeof(buf)) {
+          // fallback without dot if too long (unlikely)
+          const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+          const lsexpr_t *args[] = { sym };
+          $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(call_env, 1, args)), @$);
+        } else {
+          buf[0] = '.'; for (size_t i = 0; i < idlen; ++i) buf[i+1] = id[i]; buf[idlen+1] = '\0';
+          const lsexpr_t *sym = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
+          const lsexpr_t *args[] = { sym };
+          $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(call_env, 1, args)), @$);
+        }
+      }
   | '!' '{' dostmts '}' { $$ = $3; }
     | '!' '!' '{' nsentries '}' {
         // Anonymous namespace literal sugar:

@@ -7,6 +7,7 @@
 #include "builtins/prelude.h"
 #include "common/hash.h"
 #include "builtins/ns.h"
+#include "builtins/builtin_loader.h"
 #include "runtime/builtin.h"
 #include "runtime/error.h"
 
@@ -150,6 +151,45 @@ static lsthunk_t* lsbuiltin_prelude_def(lssize_t argc, lsthunk_t* const* args, v
 lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void* data);
 lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data);
 lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void* data);
+static lsthunk_t* lsbuiltin_prelude_import(lssize_t argc, lsthunk_t* const* args, void* data);
+static lsthunk_t* lsbuiltin_prelude_with_import(lssize_t argc, lsthunk_t* const* args, void* data);
+
+// (~internal .key) dispatch for environment-affecting ops (Prelude evaluation scope only)
+lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
+  lstenv_t* tenv = (lstenv_t*)data; (void)argc;
+  lsthunk_t* keyv = ls_eval_arg(args[0], "internal: key"); if (lsthunk_is_err(keyv)) return keyv; if (!keyv) return ls_make_err("internal: key eval");
+  if (lsthunk_get_type(keyv) != LSTTYPE_SYMBOL) {
+    return ls_make_err("internal: expected symbol like .require");
+  }
+  const lsstr_t* s = lsthunk_get_symbol(keyv);
+  if (lsstrcmp(s, lsstr_cstr(".require")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".requirePure")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".import")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, lsbuiltin_prelude_with_import, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".def")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, lsbuiltin_prelude_def, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsnew")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsdef")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsnew0")) == 0) {
+    if (!ls_effects_allowed()) { lsprintf(stderr, 0, "E: nsnew0: effect used in pure context (enable seq/chain)\n"); return NULL; }
+    return lsbuiltin_nsnew0(0, NULL, tenv);
+  }
+  if (lsstrcmp(s, lsstr_cstr(".nsdefv")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsMembers")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
+  if (lsstrcmp(s, lsstr_cstr(".nsSelf")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsSelf"), 0, lsbuiltin_prelude_ns_self, NULL);
+  if (lsstrcmp(s, lsstr_cstr(".builtin")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin, tenv);
+  return ls_make_err("internal: unknown key");
+}
 
 // prelude.import: import members of a namespace value into current env
 static void ls_import_bind_cb(const lsstr_t* key, lshash_data_t value, void* data) {
@@ -217,10 +257,35 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return ls_make_err("prelude: expected bare symbol");
   }
   const lsstr_t* name = lsthunk_get_constr(key);
-  // eq: simple equality for common types (int, symbol/algebraic 0-arity)
+  // Special ephemeral binding: ~builtins is available while evaluating Prelude.ls
+  // It points to the loaded core builtins namespace via builtin loader.
+  // We install it lazily on first access to any prelude symbol.
+  static int prelude_builtins_bound = 0;
+  if (!prelude_builtins_bound && tenv) {
+    // (~prelude builtin) "core" -> namespace value
+    lsthunk_t* arg = lsthunk_new_str(lsstr_cstr("core"));
+    lsthunk_t* argv1[1] = { arg };
+    lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, argv1, tenv);
+    if (core_ns) {
+      // Bind as 0-arity getter under name "builtins" (source uses ~builtins)
+      extern lsthunk_t* lsbuiltin_getter0(lssize_t, lsthunk_t* const*, void*);
+      lstenv_put_builtin(tenv, lsstr_cstr("builtins"), 0, lsbuiltin_getter0, core_ns);
+  // Also bind ~internal namespace for env-affecting ops
+  lsthunk_t* internal_ns = lsthunk_new_builtin(lsstr_cstr("prelude.internal"), 1, lsbuiltin_prelude_internal_dispatch, tenv);
+  lstenv_put_builtin(tenv, lsstr_cstr("internal"), 0, lsbuiltin_getter0, internal_ns);
+  prelude_builtins_bound = 1;
+    }
+  }
+  // eq: forward to core builtins module's .eq
   if (lsstrcmp(name, lsstr_cstr("eq")) == 0) {
-    extern lsthunk_t* lsbuiltin_prelude_eq(lssize_t argc, lsthunk_t* const* args, void* data);
-    return lsthunk_new_builtin(lsstr_cstr("prelude.eq"), 2, lsbuiltin_prelude_eq, NULL);
+    // Load core namespace and return its .eq member
+    lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
+    lsthunk_t* cargv[1] = { carg };
+    lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
+    if (!core_ns) return ls_make_err("prelude.eq: no core builtins");
+    lsthunk_t* key = lsthunk_new_symbol(lsstr_cstr(".eq"));
+    lsthunk_t* argv1[1] = { key };
+    return lsthunk_eval(core_ns, 1, argv1);
   }
   if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1, lsbuiltin_prelude_exit, NULL);
@@ -244,6 +309,15 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return lsthunk_new_builtin(lsstr_cstr("prelude.bind"), 2, lsbuiltin_prelude_bind, NULL);
   if (lsstrcmp(name, lsstr_cstr("return")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.return"), 1, lsbuiltin_prelude_return, NULL);
+  if (lsstrcmp(name, lsstr_cstr("lt")) == 0) {
+    lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
+    lsthunk_t* cargv[1] = { carg };
+    lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
+    if (!core_ns) return ls_make_err("prelude.lt: no core builtins");
+    lsthunk_t* key = lsthunk_new_symbol(lsstr_cstr(".lt"));
+    lsthunk_t* argv1[1] = { key };
+    return lsthunk_eval(core_ns, 1, argv1);
+  }
   if (lsstrcmp(name, lsstr_cstr("nsnew")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsdef")) == 0)
@@ -261,6 +335,13 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsMembers")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
+  // builtins: deprecated facade; prefer ~builtins via Prelude.ls
+  if (lsstrcmp(name, lsstr_cstr("builtins")) == 0) {
+    extern lsthunk_t* lsbuiltin_prelude_builtin(lssize_t, lsthunk_t* const*, void*);
+    lsthunk_t* arg = lsthunk_new_str(lsstr_cstr("core"));
+    lsthunk_t* argv[1] = { arg };
+    return lsbuiltin_prelude_builtin(1, argv, tenv);
+  }
   // builtin loader (supports both builtin and .builtin keys)
   if (lsstrcmp(name, lsstr_cstr("builtin")) == 0 || lsstrcmp(name, lsstr_cstr(".builtin")) == 0) {
     extern lsthunk_t* lsbuiltin_prelude_builtin(lssize_t, lsthunk_t* const*, void*);
@@ -286,8 +367,6 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
 // Registration helper used by host
 void ls_register_builtin_prelude(lstenv_t* tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, tenv);
-  // Alias: expose the raw builtin dispatcher also as (~builtin ...)
-  lstenv_put_builtin(tenv, lsstr_cstr("builtin"), 1, lsbuiltin_prelude_dispatch, tenv);
 }
 
 // Implementation of prelude.eq (2-arity)

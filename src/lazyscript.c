@@ -142,19 +142,7 @@ static void ls_maybe_eval_init(lstenv_t* tenv) {
 // seq is implemented in builtins/seq.c
 
 // arithmetic builtins are in builtins/arith.c
-
-static void ls_register_core_builtins(lstenv_t* tenv) {
-  lstenv_put_builtin(tenv, lsstr_cstr("dump"), 1, lsbuiltin_dump, NULL);
-  lstenv_put_builtin(tenv, lsstr_cstr("to_str"), 1, lsbuiltin_to_string, NULL);
-  lstenv_put_builtin(tenv, lsstr_cstr("print"), 1, lsbuiltin_print, NULL);
-  lstenv_put_builtin(tenv, lsstr_cstr("seq"), 2, lsbuiltin_seq, (void*)0);
-  lstenv_put_builtin(tenv, lsstr_cstr("seqc"), 2, lsbuiltin_seq, (void*)1);
-  lstenv_put_builtin(tenv, lsstr_cstr("add"), 2, lsbuiltin_add, NULL);
-  lstenv_put_builtin(tenv, lsstr_cstr("sub"), 2, lsbuiltin_sub, NULL);
-  // namespaces
-  lstenv_put_builtin(tenv, lsstr_cstr("nsnew"), 1, lsbuiltin_nsnew, tenv);
-  lstenv_put_builtin(tenv, lsstr_cstr("nsdef"), 3, lsbuiltin_nsdef, tenv);
-}
+lsthunk_t* lsbuiltin_lt(lssize_t argc, lsthunk_t* const* args, void* data);
 
 // moved to builtins/prelude.c: ls_register_builtin_prelude
 
@@ -244,6 +232,51 @@ static int ls_try_load_prelude_plugin(lstenv_t* tenv, const char* path) {
   }
   // Keep handle open for the lifetime of process
   return 1;
+}
+
+// --- Prelude as value setup ---
+// local 0-arity getter: returns captured thunk value
+static lsthunk_t* lsbuiltin_getter0_local(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; (void)args; return (lsthunk_t*)data;
+}
+
+// local applier: delegates application to captured thunk (namespace/thunk value)
+static lsthunk_t* lsbuiltin_apply_thunk(lssize_t argc, lsthunk_t* const* args, void* data) {
+  lsthunk_t* val = (lsthunk_t*)data;
+  if (!val) return NULL;
+  if (argc == 0) return lsthunk_eval0(val);
+  return lsthunk_eval(val, argc, args);
+}
+
+// Forward decls from require/builtin loader
+lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void* data);
+lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data);
+// internal dispatch from built-in prelude (non-static)
+lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* const* args, void* data);
+
+static void ls_bind_prelude_value(lstenv_t* tenv) {
+  if (!tenv) return;
+  // 1) Inject ~builtins into this env (so child env in requirePure inherits it)
+  {
+    lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
+    lsthunk_t* cargv[1] = { carg };
+    lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
+    if (core_ns) {
+      lstenv_put_builtin(tenv, lsstr_cstr("builtins"), 0, lsbuiltin_getter0_local, core_ns);
+    }
+  }
+  // 1.5) Inject ~internal into this env for Prelude evaluation
+  {
+    lsthunk_t* internal_ns = lsthunk_new_builtin(lsstr_cstr("prelude.internal"), 1, lsbuiltin_prelude_internal_dispatch, tenv);
+    lstenv_put_builtin(tenv, lsstr_cstr("internal"), 0, lsbuiltin_getter0_local, internal_ns);
+  }
+  // 2) Evaluate Prelude.ls in a child env via requirePure and capture the returned namespace value
+  lsthunk_t* parg = lsthunk_new_str(lsstr_cstr("lib/Prelude.ls"));
+  lsthunk_t* pargv[1] = { parg };
+  lsthunk_t* pval = lsbuiltin_prelude_require_pure(1, pargv, tenv);
+  if (!pval) return;
+  // 3) Rebind name "prelude" to apply to that value (so (~prelude key) works)
+  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_apply_thunk, pval);
 }
 
 int main(int argc, char** argv) {
@@ -340,12 +373,13 @@ int main(int argc, char** argv) {
             exit(1);
           }
         }
-        lstenv_t* tenv = lstenv_new(NULL);
-        ls_register_core_builtins(tenv);
+  lstenv_t* tenv = lstenv_new(NULL);
         if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
           if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
           ls_register_builtin_prelude(tenv);
         }
+  // Override ~prelude to the value from requirePure("lib/Prelude.ls")
+  ls_bind_prelude_value(tenv);
         int saved_run_main = g_run_main;
         g_run_main         = 0; // -e は従来通り：最終値を出力
         // Optional: begin trace dump for this evaluation
@@ -537,12 +571,13 @@ int main(int argc, char** argv) {
           exit(1);
         }
       }
-      lstenv_t* tenv = lstenv_new(NULL);
-      ls_register_core_builtins(tenv);
+  lstenv_t* tenv = lstenv_new(NULL);
       if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
         if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
         ls_register_builtin_prelude(tenv);
       }
+  // Override ~prelude to the value from requirePure("lib/Prelude.ls")
+  ls_bind_prelude_value(tenv);
       // Evaluate init script (if any) into the same environment
       ls_maybe_eval_init(tenv);
   if (g_trace_dump_path && g_trace_dump_path[0]) lstrace_begin_dump(g_trace_dump_path);
