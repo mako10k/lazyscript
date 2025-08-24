@@ -24,7 +24,6 @@
 #include "runtime/unit.h"
 #include "runtime/error.h"
 // builtins modules
-#include "builtins/prelude.h"
 #include "builtins/ns.h"
 #include "runtime/builtin.h"
 #include "runtime/trace.h"
@@ -137,7 +136,7 @@ static void ls_maybe_eval_init(lstenv_t* tenv) {
 // Namespaces builtins are now provided by builtins/ns.c
 
 // prelude.require は builtins/require.c に移動
-// Prelude builtins are implemented in builtins/prelude.c
+// Prelude builtins are provided via the prelude plugin only
 
 // seq is implemented in builtins/seq.c
 
@@ -248,6 +247,48 @@ static lsthunk_t* lsbuiltin_apply_thunk(lssize_t argc, lsthunk_t* const* args, v
   return lsthunk_eval(val, argc, args);
 }
 
+// Prelude MUX: (~prelude key) ->
+//   if key starts with "nslit$": return builtin of arity N for lsbuiltin_nslit
+//   if key == nsnew0: execute lsbuiltin_nsnew0 and return ns value
+//   if key == nsdefv: return builtin of arity 3 for lsbuiltin_nsdefv
+//   else: delegate to the evaluated Prelude value (namespace literal)
+typedef struct {
+  lsthunk_t* pval;  // evaluated Prelude value (namespace)
+  lstenv_t*  tenv;  // current env for effectful ops
+} prelude_mux_t;
+
+extern lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data);
+extern lsthunk_t* lsbuiltin_nsnew0(lssize_t argc, lsthunk_t* const* args, void* data);
+extern lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data);
+
+static lsthunk_t* lsbuiltin_prelude_mux(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc;
+  prelude_mux_t* mux = (prelude_mux_t*)data;
+  if (!mux || !mux->pval) return ls_make_err("prelude: not bound");
+  // Expect a bare constructor key
+  lsthunk_t* key = lsthunk_eval0(args[0]);
+  if (key == NULL) return NULL;
+  if (lsthunk_get_type(key) != LSTTYPE_ALGE || lsthunk_get_argc(key) != 0) {
+    return ls_make_err("prelude: expected bare symbol");
+  }
+  const lsstr_t* name = lsthunk_get_constr(key);
+  const char* cname = lsstr_get_buf(name);
+  // Route special keys to built-in implementations
+  if (cname && strncmp(cname, "nslit$", 6) == 0) {
+    long n = strtol(cname + 6, NULL, 10);
+    if (n < 0) n = 0;
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), (int)n, lsbuiltin_nslit, NULL);
+  }
+  if (cname && strcmp(cname, "nsnew0") == 0) {
+    return lsbuiltin_nsnew0(0, NULL, mux->tenv);
+  }
+  if (cname && strcmp(cname, "nsdefv") == 0) {
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, mux->tenv);
+  }
+  // Default: delegate to prelude value (~pval name)
+  return lsthunk_eval(mux->pval, 1, &args[0]);
+}
+
 // Forward decls from require/builtin loader
 lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void* data);
 lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data);
@@ -275,8 +316,13 @@ static void ls_bind_prelude_value(lstenv_t* tenv) {
   lsthunk_t* pargv[1] = { parg };
   lsthunk_t* pval = lsbuiltin_prelude_require_pure(1, pargv, tenv);
   if (!pval) return;
-  // 3) Rebind name "prelude" to apply to that value (so (~prelude key) works)
-  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_apply_thunk, pval);
+  // 3) Rebind name "prelude" to a MUX that preserves special builtins
+  prelude_mux_t* data = (prelude_mux_t*)lsmalloc(sizeof(prelude_mux_t));
+  data->pval = pval; data->tenv = tenv;
+  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_mux, data);
+  // 3.5) Provide backdoor for sugar nslit$N to still hit the builtin dispatcher
+  // by exposing a child namespace that forwards only nslit$N to built-in prelude.
+  // We reuse the built-in prelude under name prelude$builtin registered earlier.
 }
 
 int main(int argc, char** argv) {
@@ -375,8 +421,8 @@ int main(int argc, char** argv) {
         }
   lstenv_t* tenv = lstenv_new(NULL);
         if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
-          if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
-          ls_register_builtin_prelude(tenv);
+          lsprintf(stderr, 0, "E: prelude: plugin not found or failed to load; set --prelude-so or install liblazyscript_prelude.so\n");
+          exit(1);
         }
   // Override ~prelude to the value from requirePure("lib/Prelude.ls")
   ls_bind_prelude_value(tenv);
@@ -476,7 +522,7 @@ int main(int argc, char** argv) {
   printf("      --trace-dump <file>  write JSONL sourcemap while evaluating (exp)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
-  printf("\nDefault prelude: plugin-preferred (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover), then fallback to built-in.\n");
+  printf("\nDefault prelude: plugin-only (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover).\n");
   printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
   printf("  LAZYSCRIPT_PRELUDE_PATH search paths (:) to find liblazyscript_prelude.so when SO not set\n");
       printf("  LAZYSCRIPT_SUGAR_NS     namespace used for ~~sym sugar (if -n not set)\n");
@@ -573,8 +619,8 @@ int main(int argc, char** argv) {
       }
   lstenv_t* tenv = lstenv_new(NULL);
       if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
-        if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
-        ls_register_builtin_prelude(tenv);
+        lsprintf(stderr, 0, "E: prelude: plugin not found or failed to load; set --prelude-so or install liblazyscript_prelude.so\n");
+        exit(1);
       }
   // Override ~prelude to the value from requirePure("lib/Prelude.ls")
   ls_bind_prelude_value(tenv);

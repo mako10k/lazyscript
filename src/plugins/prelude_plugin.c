@@ -346,5 +346,7 @@ int ls_prelude_register(lstenv_t* tenv) {
   if (!tenv)
     return -1;
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, pl_dispatch, tenv);
+  // Stable alias kept as builtin even after prelude is rebound to a value
+  lstenv_put_builtin(tenv, lsstr_cstr("prelude$builtin"), 1, pl_dispatch, tenv);
   return 0;
 }
