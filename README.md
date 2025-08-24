@@ -28,18 +28,18 @@ sudo make install   # 任意
 - 推奨の安全な呼び方の例:
   - 外側でヒストリ展開を無効化
     ```bash
-    ( set +H; ./src/lazyscript -e '!{ ~~println ("ok"); };' )
+  ( set +H; ./src/lazyscript -e '!{ !println ("ok"); };' )
     ```
   - ここでは一時ファイルに書いてから実行
     ```bash
     ( set +H; bash -lc 'cat > /tmp/prog.ls <<\LS
-    !{ ~~println ("ok"); };
+  !{ !println ("ok"); };
     LS
     ./src/lazyscript /tmp/prog.ls' )
     ```
   - どうしても二重引用符を使う場合は `\!` でエスケープ（場面により効かないことがあるため非推奨）
     ```bash
-    ./src/lazyscript -e "\!{ ~~println (\"ok\"); };"
+  ./src/lazyscript -e "\!{ !println (\"ok\"); };"
     ```
 
 ### 主なCLIオプションと環境変数
@@ -94,7 +94,7 @@ sudo make install   # 任意
 
 lazyscript には以下の2層があります:
 - コアビルトイン: `dump`, `to_str`, `print`, `seq`, `seqc`, `add`, `sub` など。常に組み込み登録されます。
-- プレリュード: `prelude` ディスパッチ関数で、`exit`, `println`, `chain`, `return` などを提供します。既定では組み込み版が登録されますが、外部 .so で差し替え可能です。
+- プレリュード: `prelude` はプラグインで提供される値です。純粋API（`chain`, `bind`, `return`, `eq`, `lt`, `to_str` など）はトップレベルで、効果を伴うAPI（`println`, `print`, `def`, `require` など）は `.env` 配下に公開されます（`!println`/`!print`/`!def`/`!require` の糖衣で利用）。
 
 ### プレリュードの差し替え
 

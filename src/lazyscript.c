@@ -137,6 +137,8 @@ static void ls_maybe_eval_init(lstenv_t* tenv) {
 
 // prelude.require は builtins/require.c に移動
 // Prelude builtins are provided via the prelude plugin only
+// include の実装も require.c にあるため、ここで使用宣言
+lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data);
 
 // seq is implemented in builtins/seq.c
 
@@ -322,7 +324,7 @@ static lsthunk_t* lsbuiltin_prelude_withImport(lssize_t argc, lsthunk_t* const* 
 }
 
 // Provide internal dispatch for Prelude evaluation (host-side), mapping symbol keys
-// to builtins implemented in the host (require/requirePure/import/withImport/def/ns*...)
+// to builtins implemented in the host (require/include/import/withImport/def/ns*...)
 static lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   lstenv_t* tenv = (lstenv_t*)data; (void)argc;
   lsthunk_t* keyv = lsthunk_eval0(args[0]); if (keyv == NULL) return NULL;
@@ -330,12 +332,12 @@ static lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* 
   const lsstr_t* s = lsthunk_get_symbol(keyv);
   if (lsstrcmp(s, lsstr_cstr(".require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".requirePure")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".include")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_require_pure, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".import")) == 0)
+  if (lsstrcmp(s, lsstr_cstr(".include")) == 0) {
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_include, tenv);
+  }
+  if (lsstrcmp(s, lsstr_cstr(".import")) == 0) {
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
+  }
   if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, lsbuiltin_prelude_withImport, tenv);
   if (lsstrcmp(s, lsstr_cstr(".def")) == 0)

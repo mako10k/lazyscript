@@ -267,14 +267,14 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
   const lsstr_t* name = lsthunk_get_constr(key);
   if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.exit"), 1, pl_exit, NULL);
-  if (lsstrcmp(name, lsstr_cstr("println")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.println"), 1, pl_println, NULL);
+  // println/print は .env 側から使う（!println/!print）
   if (lsstrcmp(name, lsstr_cstr("def")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, pl_def, tenv);
   if (lsstrcmp(name, lsstr_cstr("require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, pl_require, tenv);
-  if (lsstrcmp(name, lsstr_cstr("include")) == 0)
-  return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, pl_include, tenv);
+  if (lsstrcmp(name, lsstr_cstr("include")) == 0) {
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, pl_include, tenv);
+  }
   if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, pl_import, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)
