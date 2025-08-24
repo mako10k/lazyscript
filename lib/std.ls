@@ -1,8 +1,8 @@
-{
-  # 集約モジュール（純）: 主要 lib をまとめて参照提供
-  .List   = ((~builtin include) "lib/List.ls");
-  .Option = ((~builtin include) "lib/Option.ls");
-  .Result = ((~builtin include) "lib/Result.ls");
-  .Ns     = ((~builtin include) "lib/Ns.ls");
-  .String = ((~builtin include) "lib/String.ls")
+!!{
+  # 集約モジュール（純）: 主要 lib を include（pure）で提供
+  .List   = (~~include "lib/List.ls");
+  .Option = (~~include "lib/Option.ls");
+  .Result = (~~include "lib/Result.ls");
+  .Ns     = (~~include "lib/Ns.ls");
+  .String = (~~include "lib/String.ls")
 };

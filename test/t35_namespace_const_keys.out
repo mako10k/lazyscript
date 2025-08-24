@@ -1,1 +1,1 @@
-/workspaces/lazyscript/test/t35_namespace_const_keys.ls:4.16-19: syntax error, unexpected LSTSTR, expecting LSTSYMBOL
+E: #err "nsnew0: mutable namespaces are removed; use { ... } literal"

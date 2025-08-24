@@ -24,7 +24,6 @@
 #include "runtime/unit.h"
 #include "runtime/error.h"
 // builtins modules
-#include "builtins/prelude.h"
 #include "builtins/ns.h"
 #include "runtime/builtin.h"
 #include "runtime/trace.h"
@@ -137,7 +136,7 @@ static void ls_maybe_eval_init(lstenv_t* tenv) {
 // Namespaces builtins are now provided by builtins/ns.c
 
 // prelude.require は builtins/require.c に移動
-// Prelude builtins are implemented in builtins/prelude.c
+// Prelude builtins are provided via the prelude plugin only
 
 // seq is implemented in builtins/seq.c
 
@@ -158,9 +157,22 @@ static void get_exe_dir(char* out, size_t outsz) {
 
 static int file_exists(const char* path) { return access(path, R_OK) == 0; }
 
+// safe join helper to avoid -Wformat-truncation on snprintf
+static int join2(char* out, size_t outsz, const char* a, const char* b) {
+  if (!out || outsz == 0) return 0;
+  size_t al = a ? strnlen(a, outsz) : 0;
+  size_t bl = b ? strlen(b) : 0;
+  if (al + bl >= outsz) { out[0] = '\0'; return 0; }
+  if (a && al) memcpy(out, a, al);
+  if (b && bl) memcpy(out + al, b, bl);
+  out[al + bl] = '\0';
+  return 1;
+}
+
 static const char* ls_find_prelude_so(char* buf, size_t bufsz) {
   if (!buf || bufsz == 0) return NULL;
   buf[0] = '\0';
+  
   const char* envp = getenv("LAZYSCRIPT_PRELUDE_PATH");
   if (envp && envp[0]) {
     const char* p = envp;
@@ -168,17 +180,23 @@ static const char* ls_find_prelude_so(char* buf, size_t bufsz) {
       const char* colon = strchr(p, ':');
       size_t len = colon ? (size_t)(colon - p) : strlen(p);
       char dir[PATH_MAX]; if (len >= sizeof(dir)) len = sizeof(dir) - 1; memcpy(dir, p, len); dir[len] = '\0';
-      snprintf(buf, bufsz, "%s/liblazyscript_prelude.so", dir);
+      if (!join2(buf, bufsz, dir, "/liblazyscript_prelude.so")) { buf[0] = '\0'; }
       if (file_exists(buf)) return buf;
       p = colon ? colon + 1 : NULL;
     }
   }
   char exedir[PATH_MAX]; exedir[0] = '\0'; get_exe_dir(exedir, sizeof(exedir));
   if (exedir[0]) {
-    snprintf(buf, bufsz, "%s/plugins/liblazyscript_prelude.so", exedir);
+    if (!join2(buf, bufsz, exedir, "/plugins/liblazyscript_prelude.so")) { buf[0] = '\0'; }
     if (file_exists(buf)) return buf;
     // When running from build tree, plugin resides in .libs/
-    snprintf(buf, bufsz, "%s/plugins/.libs/liblazyscript_prelude.so", exedir);
+    if (!join2(buf, bufsz, exedir, "/plugins/.libs/liblazyscript_prelude.so")) { buf[0] = '\0'; }
+    if (file_exists(buf)) return buf;
+    // Also try parent dir (exedir is usually src/.libs, plugin is in src/plugins/.libs)
+    char parent[PATH_MAX];
+    memcpy(parent, exedir, sizeof(parent)); parent[sizeof(parent)-1] = '\0';
+    for (ssize_t i = (ssize_t)strlen(parent) - 1; i >= 0; --i) { if (parent[i] == '/') { parent[i] = '\0'; break; } }
+    if (!join2(buf, bufsz, parent, "/plugins/.libs/liblazyscript_prelude.so")) { buf[0] = '\0'; }
     if (file_exists(buf)) return buf;
   }
   snprintf(buf, bufsz, "/usr/local/lib/lazyscript/liblazyscript_prelude.so");
@@ -248,6 +266,134 @@ static lsthunk_t* lsbuiltin_apply_thunk(lssize_t argc, lsthunk_t* const* args, v
   return lsthunk_eval(val, argc, args);
 }
 
+// Prelude MUX: (~prelude key) ->
+//   if key starts with "nslit$": return builtin of arity N for lsbuiltin_nslit
+//   if key == nsnew0: execute lsbuiltin_nsnew0 and return ns value
+//   if key == nsdefv: return builtin of arity 3 for lsbuiltin_nsdefv
+//   else: delegate to the evaluated Prelude value (namespace literal)
+typedef struct {
+  lsthunk_t* pval;  // evaluated Prelude value (namespace)
+  lstenv_t*  tenv;  // current env for effectful ops
+} prelude_mux_t;
+
+extern lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data);
+extern lsthunk_t* lsbuiltin_nsnew0(lssize_t argc, lsthunk_t* const* args, void* data);
+extern lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data);
+
+// Host-side implementations of a few prelude internal ops (def/import/withImport)
+static lsthunk_t* lsbuiltin_prelude_def(lssize_t argc, lsthunk_t* const* args, void* data) {
+  lstenv_t* tenv = (lstenv_t*)data;
+  (void)argc;
+  if (!ls_effects_allowed()) { lsprintf(stderr, 0, "E: def: effect used in pure context (enable seq/chain)\n"); return NULL; }
+  if (!tenv) return ls_make_err("def: no env");
+  lsthunk_t* namev = lsthunk_eval0(args[0]); if (namev == NULL) return NULL;
+  if (lsthunk_get_type(namev) != LSTTYPE_ALGE || lsthunk_get_argc(namev) != 0) {
+    lsprintf(stderr, 0, "E: def: expected bare symbol\n"); return NULL;
+  }
+  const lsstr_t* name = lsthunk_get_constr(namev);
+  lsthunk_t* val = lsthunk_eval0(args[1]); if (val == NULL) return NULL;
+  lstenv_put_builtin(tenv, name, 0, lsbuiltin_getter0_local, val);
+  return ls_make_unit();
+}
+
+static void lsbuiltin_prelude_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data) {
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return;
+  lstenv_put_builtin(tenv, sym, 0, lsbuiltin_getter0_local, value);
+}
+
+static lsthunk_t* lsbuiltin_prelude_import(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; lstenv_t* tenv = (lstenv_t*)data;
+  if (!ls_effects_allowed()) { lsprintf(stderr, 0, "E: import: effect used in pure context (enable seq/chain)\n"); return NULL; }
+  if (!tenv) return NULL;
+  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (nsv == NULL) return NULL;
+  if (!lsns_foreach_member(nsv, lsbuiltin_prelude_import_cb, tenv)) return ls_make_err("import: invalid namespace");
+  return ls_make_unit();
+}
+
+static lsthunk_t* lsbuiltin_prelude_withImport(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; lstenv_t* tenv = (lstenv_t*)data;
+  if (!ls_effects_allowed()) { lsprintf(stderr, 0, "E: withImport: effect used in pure context (enable seq/chain)\n"); return NULL; }
+  if (!tenv) return NULL;
+  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (nsv == NULL) return NULL;
+  if (!lsns_foreach_member(nsv, lsbuiltin_prelude_import_cb, tenv)) return ls_make_err("withImport: invalid namespace");
+  lsthunk_t* unit = ls_make_unit();
+  lsthunk_t* cont = args[1];
+  return lsthunk_eval(cont, 1, &unit);
+}
+
+// Provide internal dispatch for Prelude evaluation (host-side), mapping symbol keys
+// to builtins implemented in the host (require/requirePure/import/withImport/def/ns*...)
+static lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
+  lstenv_t* tenv = (lstenv_t*)data; (void)argc;
+  lsthunk_t* keyv = lsthunk_eval0(args[0]); if (keyv == NULL) return NULL;
+  if (lsthunk_get_type(keyv) != LSTTYPE_SYMBOL) return ls_make_err("internal: expected symbol");
+  const lsstr_t* s = lsthunk_get_symbol(keyv);
+  if (lsstrcmp(s, lsstr_cstr(".require")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".requirePure")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".include")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_require_pure, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".import")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, lsbuiltin_prelude_withImport, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".def")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, lsbuiltin_prelude_def, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsnew")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsdef")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsnew0")) == 0) return lsbuiltin_nsnew0(0, NULL, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsdefv")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".nsMembers")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
+  if (lsstrcmp(s, lsstr_cstr(".nsSelf")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.nsSelf"), 0, lsbuiltin_prelude_ns_self, NULL);
+  if (lsstrcmp(s, lsstr_cstr(".builtin")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin, tenv);
+  return ls_make_err("internal: unknown key");
+}
+
+static lsthunk_t* lsbuiltin_prelude_mux(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc;
+  prelude_mux_t* mux = (prelude_mux_t*)data;
+  if (!mux || !mux->pval) return ls_make_err("prelude: not bound");
+  // Expect a bare constructor key
+  lsthunk_t* key = lsthunk_eval0(args[0]);
+  if (key == NULL) return NULL;
+  // Back-compat: if a dot-symbol is passed (e.g., .require), use internal dispatch
+  if (lsthunk_get_type(key) == LSTTYPE_SYMBOL) {
+    const lsstr_t* s = lsthunk_get_symbol(key);
+    if (lsstrcmp(s, lsstr_cstr(".env")) == 0) {
+      // Delegate .env to the evaluated Prelude value (lib/Prelude.ls)
+      return lsthunk_eval(mux->pval, 1, &args[0]);
+    }
+    return lsbuiltin_prelude_internal_dispatch(1, args, mux->tenv);
+  }
+  // Bare constructor symbol (e.g., println, nslit$N, nsnew0, nsdefv)
+  if (lsthunk_get_type(key) == LSTTYPE_ALGE && lsthunk_get_argc(key) == 0) {
+    const lsstr_t* name = lsthunk_get_constr(key);
+    const char* cname = lsstr_get_buf(name);
+    // Route special keys to built-in implementations
+    if (cname && strncmp(cname, "nslit$", 6) == 0) {
+      long n = strtol(cname + 6, NULL, 10);
+      if (n < 0) n = 0;
+      return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), (int)n, lsbuiltin_nslit, NULL);
+    }
+    if (cname && strcmp(cname, "nsnew0") == 0) {
+      return lsbuiltin_nsnew0(0, NULL, mux->tenv);
+    }
+    if (cname && strcmp(cname, "nsdefv") == 0) {
+      return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, mux->tenv);
+    }
+    // Default: delegate to prelude value (~pval name)
+    return lsthunk_eval(mux->pval, 1, &args[0]);
+  }
+  return ls_make_err("prelude: expected bare symbol");
+}
+
 // Forward decls from require/builtin loader
 lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void* data);
 lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data);
@@ -258,9 +404,12 @@ static void ls_bind_prelude_value(lstenv_t* tenv) {
   if (!tenv) return;
   // 1) Inject ~builtins into this env (so child env in include inherits it)
   {
-    lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
-    lsthunk_t* cargv[1] = { carg };
-    lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
+  lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
+  lsthunk_t* cargv[1] = { carg };
+  // Loading builtins (dlopen) is considered an effect; enable token in strict mode
+  if (ls_effects_get_strict()) ls_effects_begin();
+  lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
+  if (ls_effects_get_strict()) ls_effects_end();
     if (core_ns) {
       lstenv_put_builtin(tenv, lsstr_cstr("builtins"), 0, lsbuiltin_getter0_local, core_ns);
     }
@@ -275,8 +424,12 @@ static void ls_bind_prelude_value(lstenv_t* tenv) {
   lsthunk_t* pargv[1] = { parg };
   lsthunk_t* pval = lsbuiltin_prelude_include(1, pargv, tenv);
   if (!pval) return;
-  // 3) Rebind name "prelude" to apply to that value (so (~prelude key) works)
-  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_apply_thunk, pval);
+  // 3) Rebind name "prelude" to a MUX that preserves special builtins
+  prelude_mux_t* data = (prelude_mux_t*)lsmalloc(sizeof(prelude_mux_t));
+  data->pval = pval; data->tenv = tenv;
+  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_mux, data);
+  // 3.5) Sugar nslit$N continues to hit the builtin dispatcher via the plugin-registered
+  // prelude$builtin alias. The plugin registers both "prelude" and "prelude$builtin".
 }
 
 int main(int argc, char** argv) {
@@ -375,8 +528,8 @@ int main(int argc, char** argv) {
         }
   lstenv_t* tenv = lstenv_new(NULL);
         if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
-          if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
-          ls_register_builtin_prelude(tenv);
+          lsprintf(stderr, 0, "E: prelude: plugin not found or failed to load; set --prelude-so or install liblazyscript_prelude.so\n");
+          exit(1);
         }
   // Override ~prelude to the value from include("lib/Prelude.ls")
   ls_bind_prelude_value(tenv);
@@ -476,7 +629,7 @@ int main(int argc, char** argv) {
   printf("      --trace-dump <file>  write JSONL sourcemap while evaluating (exp)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
-  printf("\nDefault prelude: plugin-preferred (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover), then fallback to built-in.\n");
+  printf("\nDefault prelude: plugin-only (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover).\n");
   printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
   printf("  LAZYSCRIPT_PRELUDE_PATH search paths (:) to find liblazyscript_prelude.so when SO not set\n");
       printf("  LAZYSCRIPT_SUGAR_NS     namespace used for ~~sym sugar (if -n not set)\n");
@@ -573,8 +726,8 @@ int main(int argc, char** argv) {
       }
   lstenv_t* tenv = lstenv_new(NULL);
       if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
-        if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
-        ls_register_builtin_prelude(tenv);
+        lsprintf(stderr, 0, "E: prelude: plugin not found or failed to load; set --prelude-so or install liblazyscript_prelude.so\n");
+        exit(1);
       }
   // Override ~prelude to the value from include("lib/Prelude.ls")
   ls_bind_prelude_value(tenv);

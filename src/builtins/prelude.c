@@ -164,8 +164,10 @@ lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* const* 
   const lsstr_t* s = lsthunk_get_symbol(keyv);
   if (lsstrcmp(s, lsstr_cstr(".require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".requirePure")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
   if (lsstrcmp(s, lsstr_cstr(".include")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_include, tenv);
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_require_pure, tenv);
   if (lsstrcmp(s, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
   if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
@@ -296,7 +298,7 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
   if (lsstrcmp(name, lsstr_cstr("require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
   if (lsstrcmp(name, lsstr_cstr("include")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_include, tenv);
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_require_pure, tenv);
   if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)
@@ -367,6 +369,8 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
 // Registration helper used by host
 void ls_register_builtin_prelude(lstenv_t* tenv) {
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_dispatch, tenv);
+  // Stable alias for built-in prelude dispatch (used by parser sugar)
+  lstenv_put_builtin(tenv, lsstr_cstr("prelude$builtin"), 1, lsbuiltin_prelude_dispatch, tenv);
 }
 
 // Implementation of prelude.eq (2-arity)

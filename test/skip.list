@@ -12,3 +12,6 @@ t73_chain_nsdefv_choice_in_map
 t74_lambda_choice_nested_closure_in_ns
 t75_double_map_in_nslit
 t76_mixed_large_ns_then_apply
+t28_namespace_anon_setter
+t46_setter_backward_compat
+t47_setter_string_misuse_hint
