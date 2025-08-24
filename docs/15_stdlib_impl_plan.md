@@ -1,12 +1,12 @@
 # 標準ライブラリ 実装計画（MVP → 拡張）
 
-目的: 無名名前空間リテラルで自己完結なモジュールを提供し、`~~require` で読み込んで使える実用APIを段階的に整備する。
+目的: 無名名前空間リテラルで自己完結なモジュールを提供し、`!require` で読み込んで使える実用APIを段階的に整備する。
 
 ## 方針
 - モジュールは基本「無名名前空間リテラル `{ ... }`」で実装する（不変）。
 - 公開APIはシンボルキーでエクスポート。`nsMembers` に列挙される。
 - 作用のある関数は strict-effects に準拠し、必要に応じて `chain` を併用する設計例を docs に示す。
-- 依存は最小限。相互依存は `~~require` のみ。
+- 依存は最小限。相互依存は `!require` のみ。
 
 ## MVP セット（スプリント1）
 - lib/list.ls: list 基本（cons, nil, map, filter, foldl, foldr, length, append, flatMap, reverse, toString）
@@ -26,7 +26,7 @@
 - 失敗は `Result` を優先。例外は最小化。
 
 ## テスト方針
-- 各モジュールに対して `.ls/.out` を追加。`~~require "lib/xxx.ls"` で読み、代表ケースを確認。
+- 各モジュールに対して `.ls/.out` を追加。`!require "lib/xxx.ls"` で読み、代表ケースを確認。
 - nsMembers ベースの公開関数確認（順序は仕様依存）。
 
 ## ロールアウト

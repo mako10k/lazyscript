@@ -1,1 +1,1 @@
-((~prelude println) "hi");
+~~println "hi";
