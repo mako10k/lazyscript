@@ -1,9 +1,9 @@
 # Standard Library Plan (Initial)
 
-標準ライブラリ（LazyScript modules）の初期案。各モジュールは「無名名前空間でレコードを返す」`lib/*.ls` を基本とし、`~~require "module"` で読み込んで利用します。
+標準ライブラリ（LazyScript modules）の初期案。各モジュールは「無名名前空間でレコードを返す」`lib/*.ls` を基本とし、`!require "module"` で読み込んで利用します。
 
 ## 方針
-- 既存ビルトイン（`~add`, `println` など）を最小限ラップし、名前空間経由で提供。
+- 既存ビルトイン（`~~add`, `println` など）を最小限ラップし、名前空間経由で提供。
 - 段階的に関数群を拡充。まずは日常ユースの小粒ユーティリティに集中。
 - 互換維持しつつ、明示の名前空間利用（別名束縛）を推奨。
 
@@ -35,12 +35,12 @@
 
 ## 配置と利用
 - 各ファイル: `lib/<module>.ls` がレコードを返す。
-- 例: `~math = ~~require "math"; math.add 1 2;`
+- 例: `~math = !require "math"; math.add 1 2;`
 - 別名: `~add = (~math add)` のように alias を用意可能。
 
 ## テスト方針
 - 各モジュール 1〜3 ケースの最小テストを `test/` に追加。
-- 例: `~~require "math"` で代表関数の検証。
+- 例: `!require "math"` で代表関数の検証。
 
 ## 今後
 - まずは alias ベース（ビルトイン委譲）で雛形を追加。

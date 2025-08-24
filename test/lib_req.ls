@@ -1,1 +1,1 @@
-((~prelude println) "OK-from-lib");
+~~println "OK-from-lib";
