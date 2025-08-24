@@ -1,1 +1,1 @@
-!{ !def main (\ _ -> !{ ~~println [4,5] }) };
+!{ !def main (\ _ -> !{ !println [4,5] }) };

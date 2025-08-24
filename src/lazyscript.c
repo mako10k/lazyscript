@@ -362,11 +362,23 @@ static lsthunk_t* lsbuiltin_prelude_mux(lssize_t argc, lsthunk_t* const* args, v
   // Back-compat: if a dot-symbol is passed (e.g., .require), use internal dispatch
   if (lsthunk_get_type(key) == LSTTYPE_SYMBOL) {
     const lsstr_t* s = lsthunk_get_symbol(key);
+    // Reserved internal keys that must be handled by the host
     if (lsstrcmp(s, lsstr_cstr(".env")) == 0) {
-      // Delegate .env to the evaluated Prelude value (lib/Prelude.ls)
+      // Delegate .env lookup to the evaluated Prelude value (lib/Prelude.ls)
       return lsthunk_eval(mux->pval, 1, &args[0]);
     }
-    return lsbuiltin_prelude_internal_dispatch(1, args, mux->tenv);
+    if (lsstrcmp(s, lsstr_cstr(".require")) == 0 ||
+        lsstrcmp(s, lsstr_cstr(".include")) == 0 ||
+        lsstrcmp(s, lsstr_cstr(".import")) == 0 ||
+        lsstrcmp(s, lsstr_cstr(".withImport")) == 0 ||
+        lsstrcmp(s, lsstr_cstr(".def")) == 0 ||
+        lsstrcmp(s, lsstr_cstr(".nsMembers")) == 0 ||
+        lsstrcmp(s, lsstr_cstr(".nsSelf")) == 0 ||
+        lsstrcmp(s, lsstr_cstr(".builtin")) == 0) {
+      return lsbuiltin_prelude_internal_dispatch(1, args, mux->tenv);
+    }
+    // All other dot-symbols (e.g., .add) are members of the evaluated Prelude namespace value
+    return lsthunk_eval(mux->pval, 1, &args[0]);
   }
   // Bare constructor symbol (e.g., nslit$N)
   if (lsthunk_get_type(key) == LSTTYPE_ALGE && lsthunk_get_argc(key) == 0) {

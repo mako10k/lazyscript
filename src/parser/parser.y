@@ -343,76 +343,44 @@ efact:
         }
       }
     | '{' nslit_entries '}' {
-          // Pure namespace literal sugar with optional local bindings:
-          // { a = e1; p <- e2; b = e3; } => (\p -> (~prelude nslit$4) 'a e1 'b e3) e2
+          // Pure namespace literal sugar (members only):
+          // { .a = e1; .b = e2; } =>
+          //   let base = (~prelude nslit$4) '.a a '.b b in
+          //   (\a -> \b -> base) e1 e2
           const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
           const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
           lssize_t ec = $2 ? lsarray_get_size($2) : 0;
-          // Count members and locals
-          lssize_t memberc = 0, localc = 0;
-          for (lssize_t i = 0; i < ec; i++) {
-            const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
-            const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
-            // tag is a constructor 'member or 'local
-            if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
-              const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
-              if (lsstrcmp(cname, lsstr_cstr("member")) == 0) { memberc++; localc++; }
-              else if (lsstrcmp(cname, lsstr_cstr("local")) == 0) localc++;
-            }
-          }
-          lssize_t argc = memberc * 2;
+          lssize_t argc = ec * 2;
           char buf[32];
           snprintf(buf, sizeof(buf), "nslit$%ld", (long)argc);
           const lsexpr_t *sym_nslit = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
           const lsexpr_t *fn_nslit = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_nslit));
           const lsexpr_t **args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
-          // Fill member args in order
-          lssize_t mi = 0;
           for (lssize_t i = 0; i < ec; i++) {
             const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
-            const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
-            if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
-              const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
-              if (lsstrcmp(cname, lsstr_cstr("member")) == 0) {
-                const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
-                args[2*mi] = sym;
-                lsloc_t loc = lsexpr_get_loc(sym);
-                const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
-                const lsref_t *r = lsref_new(sname, loc);
-                args[2*mi+1] = lsexpr_with_loc(lsexpr_new_ref(r), loc);
-                mi++;
-              }
-            }
+            const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
+            args[2*i] = sym;
+            lsloc_t loc = lsexpr_get_loc(sym);
+            const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
+            const lsref_t *r = lsref_new(sname, loc);
+            args[2*i+1] = lsexpr_with_loc(lsexpr_new_ref(r), loc);
           }
           const lsexpr_t *base_ns = lsexpr_new_appl(lseappl_new(fn_nslit, argc, args));
-          if (localc == 0) {
-            $$ = base_ns;
-          } else {
-            // Build closure binds from locals without creating empty array
+          if (ec == 0) { $$ = base_ns; }
+          else {
+            // Build closure binds for each member name = rhs (from entries)
             const lsarray_t *binds = NULL;
             for (lssize_t i = 0; i < ec; i++) {
               const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
-              const lsexpr_t *tag = (const lsexpr_t*)lsarray_get(ent)[0];
-              if (lsexpr_get_type(tag) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(tag)) == 0) {
-                const lsstr_t *cname = lsealge_get_constr(lsexpr_get_alge(tag));
-                if (lsstrcmp(cname, lsstr_cstr("local")) == 0) {
-                  const lspat_t *p = (const lspat_t*)lsarray_get(ent)[1];
-                  const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[2];
-                  const lsbind_t *b = lsbind_new(p, rhs);
-                  if (!binds) binds = lsarray_new(1, b);
-                  else binds = lsarray_push((lsarray_t*)binds, (void*)b);
-                } else if (lsstrcmp(cname, lsstr_cstr("member")) == 0) {
-                  const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
-                  lsloc_t loc = lsexpr_get_loc(sym);
-                  const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
-                  const lsref_t *r = lsref_new(sname, loc);
-                  const lspat_t *p = lspat_new_ref(r);
-                  const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[2];
-                  const lsbind_t *b = lsbind_new(p, rhs);
-                  if (!binds) binds = lsarray_new(1, b);
-                  else binds = lsarray_push((lsarray_t*)binds, (void*)b);
-                }
-              }
+              const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
+              lsloc_t loc = lsexpr_get_loc(sym);
+              const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
+              const lsref_t *r = lsref_new(sname, loc);
+              const lspat_t *p = lspat_new_ref(r);
+              const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[2];
+              const lsbind_t *b = lsbind_new(p, rhs);
+              if (!binds) binds = lsarray_new(1, b);
+              else binds = lsarray_push((lsarray_t*)binds, (void*)b);
             }
             lssize_t bc = lsarray_get_size(binds);
             const lsbind_t *const *bs = (const lsbind_t *const *)lsarray_get(binds);
@@ -438,7 +406,7 @@ nsentry:
     
     ;
 
-// Pure nslit entries: allow both members and locals
+// Pure nslit entries: members only (locals within ns literal are deprecated)
 nslit_entries:
   /* empty */ { $$ = NULL; }
   | nslit_entry { $$ = lsarray_new(1, $1); }
@@ -452,11 +420,6 @@ nslit_entry:
     const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
     const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @1);
     $$ = lsarray_new(3, tag, sym, $3);
-  }
-  // local: pattern '<-' expr
-  | pat LSTLEFTARROW expr {
-    const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("local"), 0, NULL));
-    $$ = lsarray_new(3, tag, $1, $3);
   }
   ;
 
@@ -483,30 +446,32 @@ dostmts:
         const lsexpr_t *ret = lsexpr_new_appl(lseappl_new(nsref, 1, &ret_sym));
         lssize_t sz = lsarray_get_size($1);
         if (sz == 1) {
-          // Single statement: run effectful action and return unit
-          // chain A (_ -> return ())
-          const lsexpr_t *chain_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("chain"), 0, NULL));
-          const lsexpr_t *chain = lsexpr_new_appl(lseappl_new(nsref, 1, &chain_sym));
-          const lspat_t *argpat = lspat_new_wild();
-          const lsexpr_t *unit = lsexpr_new_alge(lsealge_new(lsstr_cstr(","), 0, NULL));
-          const lsexpr_t *ret_arg[] = { unit };
-          const lsexpr_t *ret_unit = lsexpr_new_appl(lseappl_new(ret, 1, ret_arg));
-          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(argpat, ret_unit));
+          // Final single statement: evaluate in effects and return its value
+          // bind A (x -> return x)
+          const lsexpr_t *bind_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("bind"), 0, NULL));
+          const lsexpr_t *bind = lsexpr_new_appl(lseappl_new(nsref, 1, &bind_sym));
           const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[0];
+          // Use a fresh wildcard ref name by patterning on a synthetic ref; here reuse '?x' via a new ref is non-trivial.
+          // Instead, build \x -> (~prelude return) x using a new lambda param pattern.
+          const lsref_t *xr = lsref_new(lsstr_cstr("x"), @$);
+          const lspat_t *xpat = lspat_new_ref(xr);
+          const lsexpr_t *xexpr = lsexpr_new_ref(xr);
+          const lsexpr_t *ret_x_args[] = { xexpr };
+          const lsexpr_t *ret_x = lsexpr_new_appl(lseappl_new(ret, 1, ret_x_args));
+          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(xpat, ret_x));
           const lsexpr_t *args2[] = { ae, lam };
-          $$ = lsexpr_new_appl(lseappl_new(chain, 2, args2));
+          $$ = lsexpr_new_appl(lseappl_new(bind, 2, args2));
         } else {
-          // tail bind: desugar to bind A (x -> return ())
+          // Final tail bind: desugar to bind A (x -> return x)
           const lsexpr_t *xexpr = (const lsexpr_t *)lsarray_get($1)[0];
           const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[1];
           const lsexpr_t *bind_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("bind"), 0, NULL));
           const lsexpr_t *bind = lsexpr_new_appl(lseappl_new(nsref, 1, &bind_sym));
           const lsref_t *x = lsexpr_get_ref(xexpr);
           const lspat_t *pat = lspat_new_ref(x);
-          const lsexpr_t *unit = lsexpr_new_alge(lsealge_new(lsstr_cstr(","), 0, NULL));
-          const lsexpr_t *ret_arg[] = { unit };
-          const lsexpr_t *ret_unit = lsexpr_new_appl(lseappl_new(ret, 1, ret_arg));
-          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(pat, ret_unit));
+          const lsexpr_t *ret_arg[] = { xexpr };
+          const lsexpr_t *ret_x = lsexpr_new_appl(lseappl_new(ret, 1, ret_arg));
+          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(pat, ret_x));
           const lsexpr_t *args2[] = { ae, lam };
           $$ = lsexpr_new_appl(lseappl_new(bind, 2, args2));
         }

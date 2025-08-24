@@ -1,1 +1,1 @@
-~~chain (()) (\ _ -> ~~println "X");
+~~chain (()) (\ _ -> !println "X");

@@ -1,5 +1,4 @@
 !{
-  ~~nsnew NS;
-  NS <- { .Foo = 1; };  # replace NS binding by literal value (immutable)
-  ~~nsdefv ~NS .Bar 2  # should error (immutable)
+  NS <- { .Foo = 1; };  # immutable value
+  ((~NS .__set) .Bar 2)
 };
