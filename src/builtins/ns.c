@@ -34,8 +34,8 @@ static int ns_depr_mode(void) {
   if (cached >= 0) return cached;
   const char* v = getenv("LS_NS_DEPRECATION");
   if (!v || !v[0]) {
-    // Back-compat: default is warn
-    cached = 0;
+    // Default: quiet (no warnings) unless explicitly requested
+    cached = 3; // quiet
     return cached;
   }
   if (v[0] == '0') { cached = 0; return cached; }
@@ -44,6 +44,7 @@ static int ns_depr_mode(void) {
   if (strcmp(v, "warn") == 0) { cached = 0; return cached; }
   if (strcmp(v, "error") == 0 || strcmp(v, "err") == 0 || strcmp(v, "errout") == 0) { cached = 1; return cached; }
   if (strcmp(v, "hard") == 0 || strcmp(v, "fatal") == 0) { cached = 2; return cached; }
+  if (strcmp(v, "quiet") == 0 || strcmp(v, "off") == 0) { cached = 3; return cached; }
   cached = 0; return cached;
 }
 
@@ -369,131 +370,25 @@ static const lsstr_t* ns_make_key(const lsstr_t* base) {
 }
 
 lsthunk_t* lsbuiltin_nsnew(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc;
-  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return NULL;
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: nsnew: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  // Deprecation gate
-  {
-    int mode = ns_depr_handle_warn("nsnew", NULL);
-    if (mode == 1) return ls_make_err("nsnew: named namespaces are deprecated");
-    if (mode == 2) { lsprintf(stderr, 0, "E: nsnew: named namespaces are disabled\n"); return NULL; }
-  }
-  lsthunk_t* namev = ls_eval_arg(args[0], "nsnew: name");
-  if (lsthunk_is_err(namev)) return namev;
-  if (!namev) return ls_make_err("nsnew: name eval");
-  if (lsthunk_get_type(namev) != LSTTYPE_ALGE || lsthunk_get_argc(namev) != 0) {
-    return ls_make_err("nsnew: expected bare symbol");
-  }
-  const lsstr_t* name = lsthunk_get_constr(namev);
-  if (!g_namespaces) g_namespaces = lshash_new(16);
-  lsns_t* ns = lsmalloc(sizeof(lsns_t)); ns->map = lshash_new(16); ns->is_mutable = 1;
-  lshash_data_t oldv; (void)lshash_put(g_namespaces, name, (const void*)ns, &oldv);
-  // Bind named namespace as (~Name sym)
-  lstenv_put_builtin(tenv, name, 1, lsbuiltin_ns_dispatch, ns);
-  return ls_make_unit();
+  (void)argc; (void)args; (void)data;
+  return ls_make_err("nsnew: mutable/named namespaces are removed; use { ... } literal");
 }
 
 lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; lstenv_t* tenv = (lstenv_t*)data; (void)tenv; // unused
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: nsdef: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  // Deprecation gate
-  {
-    int mode = ns_depr_handle_warn("nsdef", NULL);
-    if (mode == 1) return ls_make_err("nsdef: named namespaces are deprecated");
-    if (mode == 2) { lsprintf(stderr, 0, "E: nsdef: named namespaces are disabled\n"); return NULL; }
-  }
-  lsthunk_t* nsv = ls_eval_arg(args[0], "nsdef: ns");
-  if (lsthunk_is_err(nsv)) return nsv;
-  lsthunk_t* symv = ls_eval_arg(args[1], "nsdef: key");
-  if (lsthunk_is_err(symv)) return symv;
-  if (!nsv || !symv) return ls_make_err("nsdef: arg eval");
-  if (lsthunk_get_type(nsv) != LSTTYPE_ALGE || lsthunk_get_argc(nsv) != 0) {
-    return ls_make_err("nsdef: expected ns symbol");
-  }
-  const lsstr_t* nsname  = lsthunk_get_constr(nsv);
-  const lsstr_t* symname = ns_encode_key_from_thunk(symv);
-  if (!symname) return ls_make_err("nsdef: symbol expected");
-  if (!g_namespaces) {
-    return ls_make_err("nsdef: unknown namespace");
-  }
-  lshash_data_t nsp;
-  if (!lshash_get(g_namespaces, nsname, &nsp)) {
-    return ls_make_err("nsdef: unknown namespace");
-  }
-  lsns_t* ns = (lsns_t*)nsp; if (!ns || !ns->map) return ls_make_err("nsdef: invalid namespace");
-  if (!ns->is_mutable) return ls_make_err("nsdef: immutable namespace");
-  lsthunk_t* val = ls_eval_arg(args[2], "nsdef: value");
-  if (lsthunk_is_err(val)) return val;
-  if (!val) return ls_make_err("nsdef: value eval");
-  lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
-  return ls_make_unit();
+  (void)argc; (void)args; (void)data;
+  return ls_make_err("nsdef: mutable/named namespaces are removed; use { ... } literal");
 }
 
 // Create an anonymous namespace value: returns NS value usable as (~NS sym)
 lsthunk_t* lsbuiltin_nsnew0(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; (void)args; (void)data;
-  lsns_t* ns = lsmalloc(sizeof(lsns_t)); ns->map = lshash_new(16); ns->is_mutable = 1;
-  if (NS_DLOG_ENABLED) {
-    lsprintf(stderr, 0, "DBG nsnew0 ns=%p map=%p\n", (void*)ns, (void*)ns->map);
-  }
-  // For anonymous namespaces, we return the value directly; no need to register
-  return lsthunk_new_builtin(lsstr_cstr("namespace"), 1, lsbuiltin_ns_value, (void*)ns);
+  return ls_make_err("nsnew0: mutable namespaces are removed; use { ... } literal");
 }
 
 // Define into a namespace value directly: (nsdefv NS sym value)
 lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)data;
-  lsthunk_t* nsv = ls_eval_arg(args[0], "nsdefv: ns");
-  if (lsthunk_is_err(nsv)) return nsv;
-  if (!nsv) return ls_make_err("nsdefv: ns eval");
-  // Accept either a namespace value (builtin carrying ns pointer) or a bare symbol
-  lsns_t* ns = NULL;
-  if (lsthunk_is_builtin(nsv)) {
-    // Verify it's our namespace-value builtin
-    lstbuiltin_func_t fn = lsthunk_get_builtin_func(nsv);
-    if (fn == lsbuiltin_ns_value) {
-      ns = (lsns_t*)lsthunk_get_builtin_data(nsv);
-    }
-  } else if (lsthunk_get_type(nsv) == LSTTYPE_ALGE && lsthunk_get_argc(nsv) == 0) {
-    int mode = ns_depr_handle_warn("nsdefv", "passing named namespace (~NS); pass namespace value instead");
-    if (mode == 1) return ls_make_err("nsdefv: named namespaces are deprecated");
-    if (mode == 2) { lsprintf(stderr, 0, "E: nsdefv: named namespaces are disabled\n"); return NULL; }
-    const lsstr_t* nsname = lsthunk_get_constr(nsv);
-    if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
-  }
-  // silently accept resolved namespace
-  if (!ns || !ns->map) {
-    return ls_make_err("nsdefv: invalid namespace");
-  }
-  if (!ns->is_mutable) {
-    return ls_make_err("nsdefv: immutable namespace");
-  }
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: nsdefv: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  lsthunk_t* symv = ls_eval_arg(args[1], "nsdefv: key");
-  if (lsthunk_is_err(symv)) return symv;
-  if (!symv) return ls_make_err("nsdefv: key eval");
-  const lsstr_t* symname = ns_encode_key_from_thunk(symv);
-  if (!symname) return ls_make_err("nsdefv: symbol expected");
-  lsthunk_t* val = ls_eval_arg(args[2], "nsdefv: value");
-  if (lsthunk_is_err(val)) return val;
-  if (!val) return ls_make_err("nsdefv: value eval");
-  if (NS_DLOG_ENABLED) {
-    lsprintf(stderr, 0, "DBG nsdefv put ns=%p ", (void*)ns);
-    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, symname);
-    lsprintf(stderr, 0, "\n");
-  }
-  // insert into namespace map
-  lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)val, &oldv);
-  return ls_make_unit();
+  (void)argc; (void)args; (void)data;
+  return ls_make_err("nsdefv: mutable namespaces are removed; use { ... } literal");
 }
 
 // Construct a namespace value from literal pairs: (nslit sym1 val1 sym2 val2 ...)

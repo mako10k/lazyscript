@@ -1,5 +1,3 @@
 !{
-  ns <- !nsnew0;
-  !nsdefv ~ns .Foo 42;
-  ~~println (~~to_str (~ns .Foo))
+  ~~println (~~to_str ((!!{ .Foo = 42 }) .Foo))
 };

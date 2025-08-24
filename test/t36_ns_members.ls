@@ -1,8 +1,3 @@
 !{
-  ~ns <- !nsnew0;
-  ~~nsdefv ~ns .a 1;
-  ~~nsdefv ~ns .b 2;
-  ~~nsdefv ~ns .aa 3;
-  ~~nsdefv ~ns .ab 4;
-  ~~println (~~to_str (~~nsMembers ~ns));
+  ~~println (~~to_str (~~nsMembers (!!{ .a = 1; .b = 2; .aa = 3; .ab = 4 })));
 };

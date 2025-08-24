@@ -36,13 +36,9 @@ static lsthunk_t* pl_internal_dispatch(lssize_t argc, lsthunk_t* const* args, vo
     return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, pl_withImport, tenv);
   if (lsstrcmp(s, lsstr_cstr(".def")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, pl_def, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".nsnew")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".nsdef")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".nsnew0")) == 0) return lsbuiltin_nsnew0(0, NULL, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".nsdefv")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".include")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, pl_require_pure, tenv);
+  // Mutable namespace APIs removed
   if (lsstrcmp(s, lsstr_cstr(".nsMembers")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
   if (lsstrcmp(s, lsstr_cstr(".nsSelf")) == 0)
@@ -281,6 +277,8 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, pl_require, tenv);
   if (lsstrcmp(name, lsstr_cstr("requirePure")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, pl_require_pure, tenv);
+  if (lsstrcmp(name, lsstr_cstr("include")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, pl_require_pure, tenv);
   if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, pl_import, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)
@@ -311,19 +309,7 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
     lsthunk_t* argv1[1] = { key };
     return lsthunk_eval(core_ns, 1, argv1);
   }
-  if (lsstrcmp(name, lsstr_cstr("nsnew")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
-  if (lsstrcmp(name, lsstr_cstr("nsdef")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
-  if (lsstrcmp(name, lsstr_cstr("nsnew0")) == 0) {
-    if (!ls_effects_allowed()) {
-      lsprintf(stderr, 0, "E: nsnew0: effect used in pure context (enable seq/chain)\n");
-      return NULL;
-    }
-    return lsbuiltin_nsnew0(0, NULL, tenv);
-  }
-  if (lsstrcmp(name, lsstr_cstr("nsdefv")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  // Mutable namespace APIs removed
   if (lsstrcmp(name, lsstr_cstr("nsMembers")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
   if (lsstrcmp(name, lsstr_cstr("builtin")) == 0 || lsstrcmp(name, lsstr_cstr(".builtin")) == 0)
