@@ -1,1 +1,1 @@
-~prelude requirePure "lib/NsLocalDemo.ls";
+!requirePure "lib/NsLocalDemo.ls";
