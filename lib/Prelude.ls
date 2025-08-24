@@ -12,6 +12,11 @@
   .nsMembers  = (~builtins .nsMembers);
   .nsSelf     = (~builtins .nsSelf);
   .include    = (~internal .include); # pure include（その場のスコープで評価して値を返す）
+  # 汎用ユーティリティ（純粋）
+  .flip       = (\~f -> \~x -> \~y -> (~f ~y ~x));
+  .fix        = (\~f -> (\~x -> ~f (~x ~x)) (\~x -> ~f (~x ~x)));
+  .id         = (\~x -> ~x);
+  .const      = (\~x -> (\_ -> ~x));
   # nslit$N はプリミティブ経由で利用（値プレリュードでは未公開）
   # 環境を変更する内部 API（Prelude 評価時のみ有効な ~internal から引き出し）
   .env = {
@@ -22,9 +27,6 @@
     .import      = (~internal .import);
     .withImport  = (~internal .withImport);
     .def         = (~internal .def);
-  # 可変 NS API は提供しないが、移行用に明示エラーを返すスタブを公開
-  .nsnew0      = (~internal .nsnew0);
-  .nsdefv      = (~internal .nsdefv);
   # 可変名前空間 API は削除済みのため未公開
   # .nsMembers/.nsSelf は純粋 API としてトップレベルに公開済み
   };

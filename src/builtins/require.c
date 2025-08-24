@@ -87,7 +87,4 @@ lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void
   return ret;
 }
 
-// requirePure: alias to include (pure load returning module value; no env mutation)
-lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data) {
-  return lsbuiltin_prelude_include(argc, args, data);
-}
+// requirePure removed: use include instead

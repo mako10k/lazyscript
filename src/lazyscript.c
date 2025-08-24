@@ -270,8 +270,6 @@ static lsthunk_t* lsbuiltin_apply_thunk(lssize_t argc, lsthunk_t* const* args, v
 
 // Prelude MUX: (~prelude key) ->
 //   if key starts with "nslit$": return builtin of arity N for lsbuiltin_nslit
-//   if key == nsnew0: execute lsbuiltin_nsnew0 and return ns value
-//   if key == nsdefv: return builtin of arity 3 for lsbuiltin_nsdefv
 //   else: delegate to the evaluated Prelude value (namespace literal)
 typedef struct {
   lsthunk_t* pval;  // evaluated Prelude value (namespace)
@@ -279,8 +277,6 @@ typedef struct {
 } prelude_mux_t;
 
 extern lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data);
-extern lsthunk_t* lsbuiltin_nsnew0(lssize_t argc, lsthunk_t* const* args, void* data);
-extern lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data);
 
 // Host-side implementations of a few prelude internal ops (def/import/withImport)
 static lsthunk_t* lsbuiltin_prelude_def(lssize_t argc, lsthunk_t* const* args, void* data) {
@@ -346,9 +342,7 @@ static lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* 
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsnew"), 1, lsbuiltin_nsnew, tenv);
   if (lsstrcmp(s, lsstr_cstr(".nsdef")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsdef"), 3, lsbuiltin_nsdef, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".nsnew0")) == 0) return lsbuiltin_nsnew0(0, NULL, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".nsdefv")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, tenv);
+  // Mutable namespace APIs removed; no internal exposure
   if (lsstrcmp(s, lsstr_cstr(".nsMembers")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.nsMembers"), 1, lsbuiltin_ns_members, NULL);
   if (lsstrcmp(s, lsstr_cstr(".nsSelf")) == 0)
@@ -374,7 +368,7 @@ static lsthunk_t* lsbuiltin_prelude_mux(lssize_t argc, lsthunk_t* const* args, v
     }
     return lsbuiltin_prelude_internal_dispatch(1, args, mux->tenv);
   }
-  // Bare constructor symbol (e.g., println, nslit$N, nsnew0, nsdefv)
+  // Bare constructor symbol (e.g., nslit$N)
   if (lsthunk_get_type(key) == LSTTYPE_ALGE && lsthunk_get_argc(key) == 0) {
     const lsstr_t* name = lsthunk_get_constr(key);
     const char* cname = lsstr_get_buf(name);
@@ -383,12 +377,6 @@ static lsthunk_t* lsbuiltin_prelude_mux(lssize_t argc, lsthunk_t* const* args, v
       long n = strtol(cname + 6, NULL, 10);
       if (n < 0) n = 0;
       return lsthunk_new_builtin(lsstr_cstr("prelude.nslit"), (int)n, lsbuiltin_nslit, NULL);
-    }
-    if (cname && strcmp(cname, "nsnew0") == 0) {
-      return lsbuiltin_nsnew0(0, NULL, mux->tenv);
-    }
-    if (cname && strcmp(cname, "nsdefv") == 0) {
-      return lsthunk_new_builtin(lsstr_cstr("prelude.nsdefv"), 3, lsbuiltin_nsdefv, mux->tenv);
     }
     // Default: delegate to prelude value (~pval name)
     return lsthunk_eval(mux->pval, 1, &args[0]);
