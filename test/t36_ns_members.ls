@@ -4,5 +4,5 @@
   ~~nsdefv ~ns .b 2;
   ~~nsdefv ~ns .aa 3;
   ~~nsdefv ~ns .ab 4;
-  ~~println (~~to_str !nsMembers ~ns));
+  ~~println (~~to_str (~~nsMembers ~ns));
 };
