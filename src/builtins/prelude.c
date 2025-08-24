@@ -149,7 +149,7 @@ static lsthunk_t* lsbuiltin_prelude_def(lssize_t argc, lsthunk_t* const* args, v
 }
 
 lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void* data);
-lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data);
+lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data);
 lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* lsbuiltin_prelude_import(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* lsbuiltin_prelude_with_import(lssize_t argc, lsthunk_t* const* args, void* data);
@@ -164,8 +164,8 @@ lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* const* 
   const lsstr_t* s = lsthunk_get_symbol(keyv);
   if (lsstrcmp(s, lsstr_cstr(".require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".requirePure")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".include")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_include, tenv);
   if (lsstrcmp(s, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
   if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
@@ -295,8 +295,8 @@ static lsthunk_t* lsbuiltin_prelude_dispatch(lssize_t argc, lsthunk_t* const* ar
     return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, lsbuiltin_prelude_def, tenv);
   if (lsstrcmp(name, lsstr_cstr("require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
-  if (lsstrcmp(name, lsstr_cstr("requirePure")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
+  if (lsstrcmp(name, lsstr_cstr("include")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_include, tenv);
   if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)

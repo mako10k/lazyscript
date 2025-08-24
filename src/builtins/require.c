@@ -63,26 +63,26 @@ lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void
   return ls_make_unit();
 }
 
-// Pure-style require: returns the program's resulting value without mutating the current env.
-// This intentionally allows being called in a pure context; any effectful code inside the
-// module will still fail at call sites (e.g., println) due to their own guards.
-lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data) {
+// include: evaluate another file and return its resulting value without mutating the
+// current environment.  Loading errors are treated as fatal.
+lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
-  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return ls_make_err("requirePure: no env");
-  lsthunk_t* pathv = ls_eval_arg(args[0], "requirePure: path");
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) { lsprintf(stderr, 0, "F: include: no env\n"); return NULL; }
+  lsthunk_t* pathv = ls_eval_arg(args[0], "include: path");
   if (lsthunk_is_err(pathv)) return pathv;
-  if (!pathv) return ls_make_err("requirePure: path eval");
+  if (!pathv) { lsprintf(stderr, 0, "F: include: path eval\n"); return NULL; }
   if (lsthunk_get_type(pathv) != LSTTYPE_STR) {
-    return ls_make_err("requirePure: expected string path");
+    return ls_make_err("include: expected string path");
   }
   size_t n=0; char* buf=NULL; FILE* fp=lsopen_memstream_gc(&buf,&n);
   lsstr_print_bare(fp, LSPREC_LOWEST, 0, lsthunk_get_str(pathv)); fclose(fp);
   const char* path = buf;
   const lsprog_t* prog = ls_require_resolve(path);
-  if (!prog) return ls_make_err("requirePure: not found");
+  if (!prog) { lsprintf(stderr, 0, "F: include: not found\n"); return NULL; }
   // Evaluate in an isolated child environment with the current env as parent.
   lstenv_t* child = lstenv_new(tenv);
   // Do NOT enable effects here; pure modules will work, effectful ones will raise at call sites.
   lsthunk_t* ret = lsprog_eval(prog, child);
-  return ret ? ret : ls_make_err("requirePure: eval");
+  if (!ret) { lsprintf(stderr, 0, "F: include: eval\n"); return NULL; }
+  return ret;
 }

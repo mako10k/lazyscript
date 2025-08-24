@@ -1,5 +1,5 @@
 !{
-  ~N <- !requirePure "lib/Ns.ls";
+  ~N <- ~~include "lib/Ns.ls";
   ns <- !nsnew0;
   !nsdefv ns .a 1;
   !nsdefv ns .b 2;

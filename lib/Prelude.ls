@@ -15,9 +15,9 @@
   .nsSelf     = (~builtins .nsSelf);
   # nslit$N はプリミティブ経由で利用（値プレリュードでは未公開）
   # 環境を変更する内部 API（Prelude 評価時のみ有効な ~internal から引き出し）
+  .include   = (~internal .include);
   .env = {
     .require     = (~internal .require);
-    .requirePure = (~internal .requirePure);
     .import      = (~internal .import);
     .withImport  = (~internal .withImport);
     .def         = (~internal .def);

@@ -1,1 +1,1 @@
-!{ ~M <- !requirePure "lib/NsLocalDemo.ls"; ~~println (~~to_str (((~M .sum) ()))) };
+!{ ~M <- ~~include "lib/NsLocalDemo.ls"; ~~println (~~to_str (((~M .sum) ()))) };

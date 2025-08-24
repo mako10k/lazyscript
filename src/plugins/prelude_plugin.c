@@ -16,7 +16,7 @@
 
 // forward decls used by pl_internal_dispatch
 static lsthunk_t* pl_require(lssize_t argc, lsthunk_t* const* args, void* data);
-static lsthunk_t* pl_require_pure(lssize_t argc, lsthunk_t* const* args, void* data);
+static lsthunk_t* pl_include(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* pl_import(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* pl_withImport(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* pl_def(lssize_t argc, lsthunk_t* const* args, void* data);
@@ -28,8 +28,8 @@ static lsthunk_t* pl_internal_dispatch(lssize_t argc, lsthunk_t* const* args, vo
   const lsstr_t* s = lsthunk_get_symbol(keyv);
   if (lsstrcmp(s, lsstr_cstr(".require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, pl_require, tenv);
-  if (lsstrcmp(s, lsstr_cstr(".requirePure")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, pl_require_pure, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".include")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, pl_include, tenv);
   if (lsstrcmp(s, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, pl_import, tenv);
   if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
@@ -131,16 +131,16 @@ static lsthunk_t* pl_def(lssize_t argc, lsthunk_t* const* args, void* data) {
 
 // Forward to host implementations for module loading
 extern lsthunk_t* lsbuiltin_prelude_require(lssize_t, lsthunk_t* const*, void*);
-extern lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t, lsthunk_t* const*, void*);
+extern lsthunk_t* lsbuiltin_prelude_include(lssize_t, lsthunk_t* const*, void*);
 
 static lsthunk_t* pl_require(lssize_t argc, lsthunk_t* const* args, void* data) {
   lstenv_t* tenv = (lstenv_t*)data;
   return lsbuiltin_prelude_require(argc, args, tenv);
 }
 
-static lsthunk_t* pl_require_pure(lssize_t argc, lsthunk_t* const* args, void* data) {
+static lsthunk_t* pl_include(lssize_t argc, lsthunk_t* const* args, void* data) {
   lstenv_t* tenv = (lstenv_t*)data;
-  return lsbuiltin_prelude_require_pure(argc, args, tenv);
+  return lsbuiltin_prelude_include(argc, args, tenv);
 }
 
 static lsthunk_t* pl_chain(lssize_t argc, lsthunk_t* const* args, void* data) {
@@ -279,8 +279,8 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
     return lsthunk_new_builtin(lsstr_cstr("prelude.def"), 2, pl_def, tenv);
   if (lsstrcmp(name, lsstr_cstr("require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, pl_require, tenv);
-  if (lsstrcmp(name, lsstr_cstr("requirePure")) == 0)
-    return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, pl_require_pure, tenv);
+  if (lsstrcmp(name, lsstr_cstr("include")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, pl_include, tenv);
   if (lsstrcmp(name, lsstr_cstr("import")) == 0 || lsstrcmp(name, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, pl_import, tenv);
   if (lsstrcmp(name, lsstr_cstr("nsSelf")) == 0)

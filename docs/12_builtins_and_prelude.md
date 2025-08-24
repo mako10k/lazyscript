@@ -5,7 +5,7 @@
 要点
 - コアビルトインは外部プラグイン `core_builtins.so` で提供します。
 - `~builtins` と `~internal` は Prelude 評価中のみホストから注入され、ユーザコードからは見えません。
-- `~prelude` は「値」です。起動時に `requirePure("lib/Prelude.ls")` の結果で束縛されます。
+- `~prelude` は「値」です。起動時に `include("lib/Prelude.ls")` の結果で束縛されます。
 - ユーザは `~~sym`（純粋 API）と `!sym`（環境 API）経由で Prelude を使います。
 
 ## 提供コンポーネント
@@ -18,7 +18,7 @@
   - 上記の純粋 API を再エクスポート（`~~sym` で参照可能）。
   - `.env` 名前空間を持ち、環境操作 API をここから露出。
 - internal（環境 API 実体）
-  - require, requirePure, import, withImport, def, nsnew/nsdef/nsnew0/nsdefv など。
+  - require, include, import, withImport, def, nsnew/nsdef/nsnew0/nsdefv など。
   - これらは `~internal` として Prelude 評価時のみ利用でき、`Prelude.ls` 内の `.env` にブリッジされます。
 
 ## スコープと可視性
@@ -54,6 +54,20 @@
 
 ## 代表的なエクスポート一覧（Prelude）
 
-- 純粋: println, print, to_str, eq, lt, add, sub, seq, chain, bind, return, nsMembers, nsSelf
-- 環境: `.env` 配下に require, requirePure, import, withImport, def, nsnew/nsdef/nsnew0/nsdefv など
+- 純粋: println, print, to_str, eq, lt, add, sub, seq, chain, bind, return, nsMembers, nsSelf, include
+- 環境: `.env` 配下に require, import, withImport, def, nsnew/nsdef/nsnew0/nsdefv など
+ 
+### include の注意
 
+`include` は別ファイルを評価してその結果の値を返す純粋なロード機能です。循環参照の検出は行わないため、ファイルが互いに `include` を繰り返すと無限ループに陥る可能性があります。
+
+相互参照が必要な場合は、呼び出し側で変数を束縛しそれを各ファイルから参照させるパターンを用いてください。
+
+```
+!{
+  A = (~prelude include) "lib/A.ls";
+  B = ((~prelude include) "lib/B.ls"; ~A = A);
+}
+```
+
+呼び出し側クロージャで値を共有することで、循環的な `include` を避けつつ相互参照を実現できます。

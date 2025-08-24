@@ -1,6 +1,6 @@
 !{
   ~~println "START";
-  ~N <- ((~prelude requirePure) "lib/Ns.ls");
+  ~N <- ((~prelude include) "lib/Ns.ls");
   ~~println "AFTER_REQUIRE";
   ~ns <- ((~prelude nsnew0));
   ~~nsdefv ~ns .a 1;

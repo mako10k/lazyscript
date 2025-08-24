@@ -250,13 +250,13 @@ static lsthunk_t* lsbuiltin_apply_thunk(lssize_t argc, lsthunk_t* const* args, v
 
 // Forward decls from require/builtin loader
 lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void* data);
-lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data);
+lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data);
 // internal dispatch from built-in prelude (non-static)
 lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* const* args, void* data);
 
 static void ls_bind_prelude_value(lstenv_t* tenv) {
   if (!tenv) return;
-  // 1) Inject ~builtins into this env (so child env in requirePure inherits it)
+  // 1) Inject ~builtins into this env (so child env in include inherits it)
   {
     lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
     lsthunk_t* cargv[1] = { carg };
@@ -270,10 +270,10 @@ static void ls_bind_prelude_value(lstenv_t* tenv) {
     lsthunk_t* internal_ns = lsthunk_new_builtin(lsstr_cstr("prelude.internal"), 1, lsbuiltin_prelude_internal_dispatch, tenv);
     lstenv_put_builtin(tenv, lsstr_cstr("internal"), 0, lsbuiltin_getter0_local, internal_ns);
   }
-  // 2) Evaluate Prelude.ls in a child env via requirePure and capture the returned namespace value
+  // 2) Evaluate Prelude.ls in a child env via include and capture the returned namespace value
   lsthunk_t* parg = lsthunk_new_str(lsstr_cstr("lib/Prelude.ls"));
   lsthunk_t* pargv[1] = { parg };
-  lsthunk_t* pval = lsbuiltin_prelude_require_pure(1, pargv, tenv);
+  lsthunk_t* pval = lsbuiltin_prelude_include(1, pargv, tenv);
   if (!pval) return;
   // 3) Rebind name "prelude" to apply to that value (so (~prelude key) works)
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_apply_thunk, pval);
@@ -378,7 +378,7 @@ int main(int argc, char** argv) {
           if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
           ls_register_builtin_prelude(tenv);
         }
-  // Override ~prelude to the value from requirePure("lib/Prelude.ls")
+  // Override ~prelude to the value from include("lib/Prelude.ls")
   ls_bind_prelude_value(tenv);
         int saved_run_main = g_run_main;
         g_run_main         = 0; // -e は従来通り：最終値を出力
@@ -576,7 +576,7 @@ int main(int argc, char** argv) {
         if (g_debug) lsprintf(stderr, 0, "I: prelude: using built-in (fallback)\n");
         ls_register_builtin_prelude(tenv);
       }
-  // Override ~prelude to the value from requirePure("lib/Prelude.ls")
+  // Override ~prelude to the value from include("lib/Prelude.ls")
   ls_bind_prelude_value(tenv);
       // Evaluate init script (if any) into the same environment
       ls_maybe_eval_init(tenv);
