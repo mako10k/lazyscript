@@ -71,6 +71,9 @@ static int ns_depr_handle_warn(const char* api, const char* detail) {
 // Forward decls
 static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* lsbuiltin_ns_set(lssize_t argc, lsthunk_t* const* args, void* data);
+// Debug helper forward decls (defined later)
+typedef struct { int first; } _ns_dbg_ctx_t;
+static void _ns_dbg_cb(const lsstr_t* key, lshash_data_t value, void* data);
 // Represent an ns value as a 1-ary builtin that dispatches on symbol: (~NS sym)
 static lshash_t* g_namespaces = NULL; // name -> ns* (named namespaces only)
 lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data) {
@@ -315,6 +318,19 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
   }
   lshash_data_t  valp;
   if (!lshash_get(ns->map, key, &valp)) {
+    if (NS_DLOG_ENABLED) {
+      lsprintf(stderr, 0, "DBG ns_lookup undefined key=");
+      lsstr_print_bare(stderr, LSPREC_LOWEST, 0, key);
+      lsprintf(stderr, 0, "\n");
+    }
+    // Optional runtime debug: if LAZYSCRIPT_DEBUG is set, dump available keys
+    const char* dbg = getenv("LAZYSCRIPT_DEBUG");
+    if (dbg && *dbg) {
+      lsprintf(stderr, 0, "I: namespace: available keys: [");
+      _ns_dbg_ctx_t c = { 1 };
+      lshash_foreach(ns->map, _ns_dbg_cb, &c);
+      lsprintf(stderr, 0, "]\n");
+    }
     return ls_make_err("namespace: undefined");
   }
   if (NS_DLOG_ENABLED) {
@@ -436,4 +452,17 @@ lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data) {
     lsprintf(stderr, 0, "DBG nslit end ns=%p map=%p\n", (void*)ns, (void*)ns->map);
   }
   return lsthunk_new_builtin(lsstr_cstr("namespace"), 1, lsbuiltin_ns_value, (void*)ns);
+}
+
+static void _ns_dbg_cb(const lsstr_t* key, lshash_data_t value, void* data) {
+  (void)value;
+  _ns_dbg_ctx_t* c = (_ns_dbg_ctx_t*)data;
+  if (!key || !c) return;
+  const char* bytes = lsstr_get_buf(key);
+  lssize_t    len   = lsstr_get_len(key);
+  if (!bytes || len <= 0) return;
+  if (bytes[0] != 'S') return; // only symbol keys
+  if (!c->first) lsprintf(stderr, 0, ", ");
+  c->first = 0;
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsstr_new(bytes + 1, len - 1));
 }

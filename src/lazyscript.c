@@ -332,6 +332,8 @@ static lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* 
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
   if (lsstrcmp(s, lsstr_cstr(".requirePure")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.requirePure"), 1, lsbuiltin_prelude_require_pure, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".include")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_require_pure, tenv);
   if (lsstrcmp(s, lsstr_cstr(".import")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
   if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
@@ -402,9 +404,12 @@ static void ls_bind_prelude_value(lstenv_t* tenv) {
   if (!tenv) return;
   // 1) Inject ~builtins into this env (so child env in requirePure inherits it)
   {
-    lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
-    lsthunk_t* cargv[1] = { carg };
-    lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
+  lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
+  lsthunk_t* cargv[1] = { carg };
+  // Loading builtins (dlopen) is considered an effect; enable token in strict mode
+  if (ls_effects_get_strict()) ls_effects_begin();
+  lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
+  if (ls_effects_get_strict()) ls_effects_end();
     if (core_ns) {
       lstenv_put_builtin(tenv, lsstr_cstr("builtins"), 0, lsbuiltin_getter0_local, core_ns);
     }

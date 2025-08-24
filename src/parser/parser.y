@@ -483,9 +483,18 @@ dostmts:
         const lsexpr_t *ret = lsexpr_new_appl(lseappl_new(nsref, 1, &ret_sym));
         lssize_t sz = lsarray_get_size($1);
         if (sz == 1) {
-      const lsexpr_t *e = (const lsexpr_t *)lsarray_get($1)[0];
-      const lsexpr_t *args[] = { e };
-      $$ = lsexpr_new_appl(lseappl_new(ret, 1, args));
+          // Single statement: run effectful action and return unit
+          // chain A (_ -> return ())
+          const lsexpr_t *chain_sym = lsexpr_new_alge(lsealge_new(lsstr_cstr("chain"), 0, NULL));
+          const lsexpr_t *chain = lsexpr_new_appl(lseappl_new(nsref, 1, &chain_sym));
+          const lspat_t *argpat = lspat_new_wild();
+          const lsexpr_t *unit = lsexpr_new_alge(lsealge_new(lsstr_cstr(","), 0, NULL));
+          const lsexpr_t *ret_arg[] = { unit };
+          const lsexpr_t *ret_unit = lsexpr_new_appl(lseappl_new(ret, 1, ret_arg));
+          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(argpat, ret_unit));
+          const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[0];
+          const lsexpr_t *args2[] = { ae, lam };
+          $$ = lsexpr_new_appl(lseappl_new(chain, 2, args2));
         } else {
           // tail bind: desugar to bind A (x -> return ())
           const lsexpr_t *xexpr = (const lsexpr_t *)lsarray_get($1)[0];
