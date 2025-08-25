@@ -1,4 +1,4 @@
 !{
   # nsdef on unknown named namespace should error
-  (~~nsdef NonExist .x 1)
+  (~~nsdef NonExist x 1)
 };

@@ -37,6 +37,7 @@ src/parser/lexer.c
 src/parser/lexer.h
 src/parser/parser.c
 src/parser/parser.h
+src/parser/parser.output
 
 *~
 *.o
@@ -59,6 +60,7 @@ conftest.l
 !/.github/workflows/
 !/.github/workflows/**
 
+/.ci_artifacts/
 
 
 # Logs and test harness artifacts

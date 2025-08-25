@@ -1,1 +1,1 @@
-!{ ~~println "ping" };
+!{ !println "ping" };

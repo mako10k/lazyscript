@@ -176,6 +176,12 @@ static const rv_t* eval_value(FILE* outfp, const lscir_value_t* v, eval_ctx_t* c
   }
   case LCIR_VAL_LAM:
     return rv_lam(v->lam.param, v->lam.body, ctx ? ctx->env : NULL);
+  case LCIR_VAL_NSLIT: {
+    for (int i = 0; i < v->nslit.count; i++) {
+      (void)eval_value(outfp, v->nslit.vals[i], ctx);
+    }
+    return rv_unit();
+  }
   }
   return rv_unit();
 }

@@ -1,1 +1,1 @@
-((~prelude println) ((~to_str) .'he\'llo'));
+!println (~~to_str .'he\'llo');

@@ -14,7 +14,8 @@ lsthunk_t* lsbuiltin_to_string(lssize_t argc, lsthunk_t* const* args, void* data
   lsthunk_t* v = ls_eval_arg(args[0], "to_string: arg");
   if (lsthunk_is_err(v)) { fclose(fp); return v; }
   if (!v) { fclose(fp); return ls_make_err("to_string: arg eval"); }
-  lsthunk_dprint(fp, LSPREC_LOWEST, 0, v);
+  // Deep print to evaluate nested structures so results like Some 3 are rendered
+  lsthunk_deep_print(fp, LSPREC_LOWEST, 0, v);
   fclose(fp);
   const lsstr_t* str = lsstr_new(buf, len);
   return lsthunk_new_str(str);

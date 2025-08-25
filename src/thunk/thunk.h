@@ -269,6 +269,8 @@ lsthunk_t*              lsprog_eval(const lsprog_t* prog, lstenv_t* tenv);
 void                    lsthunk_print(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk);
 
 void                    lsthunk_dprint(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk);
+// Deep print: recursively evaluate substructures while printing (used by to_string)
+void                    lsthunk_deep_print(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk);
 
 // For now, cloning a thunk returns the same pointer (immutable semantics).
 // If thunk mutability is introduced, replace with a deep copy.

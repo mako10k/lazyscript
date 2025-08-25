@@ -45,6 +45,7 @@ static void print_value_like(FILE *fp, int indent, const lsexpr_t *expr) {
   case LSETYPE_APPL: { const lseappl_t *ap = lsexpr_get_appl(expr); print_list_open(fp, indent, "app"); print_space(fp); print_value_like(fp, 0, lseappl_get_func(ap)); lssize_t argc = lseappl_get_argc(ap); const lsexpr_t *const *args = lseappl_get_args(ap); for (lssize_t i = 0; i < argc; i++) { print_space(fp); print_value_like(fp, 0, args[i]); } print_list_close(fp); return; }
   case LSETYPE_CHOICE:
   case LSETYPE_CLOSURE:
+  case LSETYPE_NSLIT:
     lsexpr_print(fp, LSPREC_LOWEST, indent, expr); return;
   }
 }
@@ -86,6 +87,9 @@ static const lscir_value_t *lower_value(const lsexpr_t *e) {
   case LSETYPE_REF: return mk_val_var(extract_ref_name(lsexpr_get_ref(e)));
   case LSETYPE_ALGE: return lower_alge_value(lsexpr_get_alge(e));
   case LSETYPE_LAMBDA: { const lselambda_t *lam = lsexpr_get_lambda(e); const char *param = extract_pat_name(lselambda_get_param(lam)); const lsexpr_t *body = lselambda_get_body(lam); const lscir_expr_t *be = lower_expr(body); if (be) return mk_val_lam(param, be); return NULL; }
+  case LSETYPE_NSLIT:
+    // TODO: lower to prelude.nslit application when needed; for now, not a value.
+    return NULL;
   default: return NULL; }
 }
 
@@ -159,6 +163,9 @@ static const lscir_expr_t *lower_expr(const lsexpr_t *e) {
     const lscir_value_t *f = mk_val_var("|"); const lscir_value_t **args_arr = lsmalloc(sizeof(const lscir_value_t*) * 2); args_arr[0] = vl; args_arr[1] = vr; const lscir_expr_t *core = mk_exp_app(f, 2, args_arr); if (rn) core = mk_exp_let(rn, lower_expr(r), core); if (ln) core = mk_exp_let(ln, lower_expr(l), core); return core;
   }
   case LSETYPE_CLOSURE: return lower_closure(lsexpr_get_closure(e));
+  case LSETYPE_NSLIT:
+    // Lowering not implemented yet; print as AST for now
+    return NULL;
   default: { const lscir_value_t *v = lower_value(e); return v ? mk_exp_val(v) : NULL; }
   }
 }

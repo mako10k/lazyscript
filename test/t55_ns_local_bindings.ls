@@ -1,1 +1,1 @@
-~prelude requirePure "lib/NsLocalDemo.ls";
+~~include "lib/NsLocalDemo.ls";
