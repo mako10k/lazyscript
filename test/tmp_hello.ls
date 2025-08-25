@@ -1,3 +1,3 @@
 !{
-  ~~println "A";
+  !println "A";
 };

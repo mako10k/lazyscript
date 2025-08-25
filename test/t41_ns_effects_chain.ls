@@ -1,5 +1,5 @@
 !{
-  ns <- !nsnew0;
-  ~~chain (!nsdefv ns .x 1) (\~_ -> ());
-  ~~nsMembers ~ns
+  ~ns <- { .x = 1 };
+  ~~chain (~~return ()) (\~_ -> ());
+  !println (~~to_str (~~nsMembers ~ns));
 };

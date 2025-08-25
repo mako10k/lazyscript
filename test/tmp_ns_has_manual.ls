@@ -11,6 +11,6 @@
       ~xs)
   ));
 
-  ~~println (~to_str (((~has .a) [ .a, .b ])));
-  ~~println (~to_str (((~has .c) [ .a, .b ])));
+  !println (~to_str (((~has .a) [ .a, .b ])));
+  !println (~to_str (((~has .c) [ .a, .b ])));
 };

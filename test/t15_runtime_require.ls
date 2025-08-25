@@ -1,1 +1,1 @@
-!{ !require "lib_req.ls"; ~~println "done" };
+!{ !require "lib_req.ls"; !println "done" };

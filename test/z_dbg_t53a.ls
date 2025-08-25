@@ -1,4 +1,4 @@
 !{
-  ~L <- ((~prelude requirePure) "lib/List.ls");
-  ~~println (~to_str ((~L .nil)));
+  ~L <- ((~prelude include) "lib/List.ls");
+  !println (~to_str ((~L .nil)));
 };

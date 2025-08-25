@@ -1,1 +1,1 @@
-!{ ~~print "X"; ~~print "Y"; "Y" };
+!{ !print "X"; !print "Y"; "Y" };

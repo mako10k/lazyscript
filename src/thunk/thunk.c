@@ -11,6 +11,13 @@
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>
+ #include "expr/enslit.h"
+ #include "expr/eappl.h"
+ #include "expr/ealge.h"
+ #include "expr/eclosure.h"
+ #include "misc/bind.h"
+ #include "pat/pat.h"
+ #include "common/array.h"
 
 // Debug tracing for thunk evaluation (off by default). Enable with -DLS_TRACE=1
 #ifndef LS_TRACE
@@ -237,17 +244,7 @@ lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
   lstrace_set_pending_loc(lsexpr_get_loc(expr));
   switch (lsexpr_get_type(expr)) {
   case LSETYPE_ALGE:
-    {
-      const lsealge_t* ealge = lsexpr_get_alge(expr);
-      // If this is a zero-arity constructor and the constructor name starts with '.', treat as Symbol
-      if (lsealge_get_argc(ealge) == 0) {
-        const lsstr_t* c = lsealge_get_constr(ealge);
-        const char*    s = lsstr_get_buf(c);
-        if (s && s[0] == '.')
-          return lsthunk_new_symbol(c);
-      }
-      return lsthunk_new_ealge(ealge, tenv);
-    }
+  return lsthunk_new_ealge(lsexpr_get_alge(expr), tenv);
   case LSETYPE_APPL:
     return lsthunk_new_eappl(lsexpr_get_appl(expr), tenv);
   case LSETYPE_CHOICE:
@@ -262,6 +259,34 @@ lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
     return lsthunk_new_ref(lsexpr_get_ref(expr), tenv);
   case LSETYPE_STR:
     return lsthunk_new_str(lsexpr_get_str(expr));
+  case LSETYPE_SYMBOL:
+    return lsthunk_new_symbol(lsexpr_get_symbol(expr));
+  case LSETYPE_NSLIT: {
+    // Evaluate AST-level nslit by delegating to builtin nslit implementation.
+    // Build (~prelude nslit$2N) '.a a '.b b ... and thunk it in current env.
+    const lsenslit_t* ns = lsexpr_get_nslit(expr);
+    lssize_t ec = lsenslit_get_count(ns);
+    // Build prelude reference and symbol nslit$2N
+    const lsexpr_t* prelude = lsexpr_new_ref(lsref_new(lsstr_cstr("prelude"), lsexpr_get_loc(expr)));
+    char buf[32]; snprintf(buf, sizeof(buf), "nslit$%ld", (long)(ec * 2));
+    const lsexpr_t* sym = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
+    const lsexpr_t* call = lsexpr_new_appl(lseappl_new(prelude, 1, &sym));
+    // Build args: '.name value pairs ... (value is the original expression thunk)
+    lssize_t argc = ec * 2;
+    const lsexpr_t** args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
+    for (lssize_t i = 0; i < ec; i++) {
+      const lsstr_t* name = lsenslit_get_name(ns, i);
+      const lsexpr_t* symi = lsexpr_new_symbol(name);
+      args[2*i] = symi;
+      // Use the original member expression as the value; wrapping and nsSelf
+      // handling are performed in lsbuiltin_nslit via member wrappers.
+      args[2*i + 1] = lsenslit_get_expr(ns, i);
+    }
+    const lsexpr_t* base = lsexpr_new_appl(lseappl_new(call, argc, args));
+  // No implicit closure-binds for member names; rely on explicit (~prelude .nsSelf)
+  // or user-provided closures for mutual references.
+  return lsthunk_new_expr(base, tenv);
+  }
   }
   assert(0);
 }
