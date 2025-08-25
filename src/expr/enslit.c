@@ -102,8 +102,8 @@ void lsenslit_print(FILE* fp, lsprec_t prec, int indent, const lsenslit_t* ns, l
       if (nc && nc->lc_loc.first_line == rhs_line && nc->lc_text) {
         const char* s = lsstr_get_buf(nc->lc_text);
         if (s && s[0] == '#') {
-          // We want ';' to terminate the member before the EOL comment, and ensure next line is indented
-          lsprintf(fp, indent + 1, "; %s\n", s);
+          // We want ';' to terminate the member before the EOL comment, and avoid leaving trailing indent spaces
+          lsprintf(fp, 0, "; %s\n", s);
           lsfmt_consume_next_comment();
           // ';' and newline were already printed above, so skip printing another here.
           if (i + 1 == n) {
@@ -119,31 +119,47 @@ void lsenslit_print(FILE* fp, lsprec_t prec, int indent, const lsenslit_t* ns, l
                 nc2 = lsfmt_peek_next_comment();
               }
             }
+          } else {
+            // Not last entry: seed indentation for the following standalone comments/member line.
+            // NOTE: Avoid lsprintf with an empty string because it can clear the line-start state
+            // and prevent subsequent flush from applying its own indentation. Instead, emit the
+            // exact indentation spaces here so following comment lines start at the inner indent.
+            for (int sp = 0; sp < indent + 1; sp++) lsprintf(fp, 0, "  ");
           }
           continue; // go to next member or close block
         }
       }
     }
-  // No EOL comment: end the member cleanly with semicolon and newline (with indent to prepare next line)
-  lsprintf(fp, indent + 1, ";\n");
+    // No EOL comment: end the member cleanly with semicolon and newline
     if (i + 1 == n) {
+      // Last member: avoid leaving trailing indent spaces for the next line (closing brace)
+      lsprintf(fp, 0, ";\n");
       // Last entry: after ending the line, flush block-internal comments (before closing brace)
       if (lsfmt_is_active()) {
         const lscomment_t* nc = lsfmt_peek_next_comment();
         while (nc && nc->lc_loc.first_line <= (loc.last_line > 0 ? loc.last_line - 1 : INT_MAX)) {
           if (nc->lc_text) {
             const char* s = lsstr_get_buf(nc->lc_text);
-            if (s && s[0]) lsprintf(fp, indent + 1, "%s\n", s);
+            if (s && s[0]) {
+              // Manually indent comment lines without causing trailing spaces after newline
+              for (int sp = 0; sp < indent + 1; sp++) lsprintf(fp, 0, "  ");
+              lsprintf(fp, 0, "%s\n", s);
+            }
           }
           lsfmt_consume_next_comment();
           nc = lsfmt_peek_next_comment();
         }
       }
+    } else {
+      // Not last member: keep standard behavior which seeds indentation for the next line
+      lsprintf(fp, indent + 1, ";\n");
     }
   }
   // Emit any comments that fall on the same line as the closing '}' or just before it
   if (lsfmt_is_active() && loc.last_line > 0) {
     lsfmt_flush_comments_up_to(fp, loc.last_line - 1, indent + 1);
   }
-  lsprintf(fp, indent, "}");
+  // Print closing brace aligned to current indent without relying on lsprintf's post-newline padding
+  for (int sp = 0; sp < indent; sp++) lsprintf(fp, 0, "  ");
+  lsprintf(fp, 0, "}");
 }
