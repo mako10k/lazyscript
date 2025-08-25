@@ -1,1 +1,1 @@
-!{ ~~println "X" };
+!{ !println "X" };

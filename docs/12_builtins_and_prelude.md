@@ -30,11 +30,11 @@
 ## 使い方（ユーザ視点）
 
 - 純粋 API: `~~sym` → `(~prelude sym)` に展開
-  - 例: `((~~println) "hello")`
+  - 例: `((!println) "hello")`
 - 環境 API: `!sym` → `(~prelude .env .sym)` に展開
   - 例: `!require "lib/Foo.ls"`
 - do ブロック: `!{ ... }` は `chain/bind/return` で順序を明示
-  - 例: `!{ !require "lib.x"; ~~println "ok" }`
+  - 例: `!{ !require "lib.x"; !println "ok" }`
 
 ## 注意点
 

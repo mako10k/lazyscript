@@ -84,7 +84,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 66
+%expect 70
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -110,6 +110,7 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 
 %token <intval> LSTINT
 %token <strval> LSTSYMBOL
+%token <strval> LSTDOTSYMBOL
 %token <strval> LSTPRELUDE_CONSTR
 %token <strval> LSTPRELUDE_SYMBOL
 %token <strval> LSTPRELUDE_STR
@@ -208,6 +209,7 @@ ealge:
 expr5:
       efact { $$ = $1; }
   | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1, 0, NULL)); }
+  | LSTDOTSYMBOL { $$ = lsexpr_with_loc(lsexpr_new_symbol($1), @$); }
     
     ;
 
@@ -242,11 +244,11 @@ efact:
         const lsexpr_t *args[] = { sym };
         $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
       }
-    | LSTPRELUDE_SYMBOL {
-        // ~~.symbol => (~<ns> .symbol)
+  | LSTPRELUDE_SYMBOL {
+    // ~~.symbol => (~<ns> .symbol) where .symbol is a first-class symbol
         const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
         const lsexpr_t *nsref = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
-        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @$);
         const lsexpr_t *args[] = { sym };
         $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(nsref, 1, args)), @$);
       }
@@ -278,7 +280,7 @@ efact:
         // !ident => (~<ns> .env .ident)
         const char *ns = lsscan_get_sugar_ns(yyget_extra(yyscanner));
         const lsexpr_t *prelude = lsexpr_with_loc(lsexpr_new_ref(lsref_new(lsstr_cstr(ns), @$)), @$);
-        const lsexpr_t *sym_env = lsexpr_new_alge(lsealge_new(lsstr_cstr(".env"), 0, NULL));
+        const lsexpr_t *sym_env = lsexpr_with_loc(lsexpr_new_symbol(lsstr_cstr(".env")), @$);
         const lsexpr_t *call_env = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(prelude, 1, &sym_env)), @$);
         // build .ident symbol
         char buf[256];
@@ -286,12 +288,12 @@ efact:
         size_t idlen = (size_t)lsstr_get_len($1);
         if (idlen + 1 >= sizeof(buf)) {
           // fallback without dot if too long (unlikely)
-          const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+          const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @$);
           const lsexpr_t *args[] = { sym };
           $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(call_env, 1, args)), @$);
         } else {
           buf[0] = '.'; for (size_t i = 0; i < idlen; ++i) buf[i+1] = id[i]; buf[idlen+1] = '\0';
-          const lsexpr_t *sym = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
+          const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol(lsstr_cstr(buf)), @$);
           const lsexpr_t *args[] = { sym };
           $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(call_env, 1, args)), @$);
         }
@@ -305,7 +307,10 @@ efact:
         for (lssize_t i = 0; i < ec; i++) {
           const lsarray_t *ent = (const lsarray_t*)lsarray_get($4)[i];
           const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[0];
-          const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
+          const lsstr_t *sname = NULL;
+          if (lsexpr_typeof(sym) == LSEQ_SYMBOL) sname = lsexpr_get_symbol(sym);
+          else if (lsexpr_typeof(sym) == LSEQ_ALGE && lsealge_get_argc(lsexpr_get_alge(sym)) == 0)
+            sname = lsealge_get_constr(lsexpr_get_alge(sym));
           names[i] = sname;
           exprs[i] = (const lsexpr_t*)lsarray_get(ent)[1];
         }
@@ -320,7 +325,10 @@ efact:
           for (lssize_t i = 0; i < ec; i++) {
             const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
             const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
-            const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
+            const lsstr_t *sname = NULL;
+            if (lsexpr_typeof(sym) == LSEQ_SYMBOL) sname = lsexpr_get_symbol(sym);
+            else if (lsexpr_typeof(sym) == LSEQ_ALGE && lsealge_get_argc(lsexpr_get_alge(sym)) == 0)
+              sname = lsealge_get_constr(lsexpr_get_alge(sym));
             names[i] = sname;
             exprs[i] = (const lsexpr_t*)lsarray_get(ent)[2];
           }
@@ -329,7 +337,7 @@ efact:
         }
     ;
 
-// !!{ a = e; b = e2; } entries
+// !!{ .a = e; .b = e2; } entries (deprecated form still supported via !!)
 nsentries:
   /* empty */ { $$ = NULL; }
     | nsentry { $$ = lsarray_new(1, $1); }
@@ -338,11 +346,20 @@ nsentries:
     ;
 
 nsentry:
-      LSTSYMBOL '=' expr {
-        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+      LSTDOTSYMBOL '=' expr {
+        const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @1);
         $$ = lsarray_new(2, sym, $3);
       }
-    
+    | LSTSYMBOL '=' expr {
+        // Support legacy !!{ a = e } by converting to .a symbol
+        const char* id = lsstr_get_buf($1);
+        lssize_t    n  = lsstr_get_len($1);
+        char* buf = lsmalloc((size_t)n + 2);
+        buf[0] = '.'; for (lssize_t i = 0; i < n; ++i) buf[1 + i] = id[i]; buf[n + 1] = '\0';
+        const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol(lsstr_new(buf, n + 1)), @1);
+        lsfree(buf);
+        $$ = lsarray_new(2, sym, $3);
+      }
     ;
 
 // Pure nslit entries: members only (locals within ns literal are deprecated)
@@ -354,16 +371,16 @@ nslit_entries:
   ;
 
 nslit_entry:
-  // member: symbol '=' expr
-  LSTSYMBOL '=' expr {
+  // member: .symbol '=' expr
+  LSTDOTSYMBOL '=' expr {
     const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
-    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @1);
+    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @1);
     $$ = lsarray_new(3, tag, sym, $3);
   }
-  | LSTSYMBOL lamparams '=' expr {
+  | LSTDOTSYMBOL lamparams '=' expr {
     // .sym p1 p2 ... = body  ==>  .sym = \p1 -> \p2 -> ... -> body
     const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
-    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @1);
+    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @1);
     lssize_t argc = lsarray_get_size($2);
     const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
     const lsexpr_t *b = $4;

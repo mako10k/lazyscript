@@ -5,5 +5,5 @@
     (\~_ ->
       ((~prelude chain)
         (~~nsdefv ~ns .seed (Some 2))
-  (\~_ -> ~~println (~~to_str (((~ns .map) (\~n -> ~~add ~n 1)) (~ns .seed)))))));
+  (\~_ -> !println (~~to_str (((~ns .map) (\~n -> ~~add ~n 1)) (~ns .seed)))))));
 };

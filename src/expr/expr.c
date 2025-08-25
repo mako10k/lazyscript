@@ -24,6 +24,7 @@ struct lsexpr {
     const lsint_t*      le_intval;
     const lsstr_t*      le_strval;
   const lsenslit_t*   le_nslit;
+  const lsstr_t*      le_symbol; // dot symbol literal
   };
 };
 
@@ -87,6 +88,14 @@ const lsexpr_t* lsexpr_new_choice(const lsechoice_t* echoice) {
   expr->le_type   = LSETYPE_CHOICE;
   expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
   expr->le_choice = echoice;
+  return expr;
+}
+
+const lsexpr_t* lsexpr_new_symbol(const lsstr_t* sym) {
+  lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
+  expr->le_type   = LSETYPE_SYMBOL;
+  expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_symbol = sym;
   return expr;
 }
 
@@ -169,6 +178,10 @@ void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr) {
   case LSETYPE_NSLIT:
     lsenslit_print(fp, prec, indent, expr->le_nslit);
     return;
+  case LSETYPE_SYMBOL:
+    // print symbol as its literal (e.g., .name)
+    lsstr_print(fp, prec, indent, expr->le_symbol);
+    return;
   }
   lsprintf(fp, indent, "Unknown expression type %d\n", expr->le_type);
 }
@@ -180,6 +193,11 @@ lsloc_t lsexpr_get_loc(const lsexpr_t* expr) {
 const lsenslit_t* lsexpr_get_nslit(const lsexpr_t* expr) {
   assert(expr->le_type == LSETYPE_NSLIT);
   return expr->le_nslit;
+}
+
+const lsstr_t* lsexpr_get_symbol(const lsexpr_t* expr) {
+  assert(expr->le_type == LSETYPE_SYMBOL);
+  return expr->le_symbol;
 }
 const lsexpr_t* lsexpr_with_loc(const lsexpr_t* expr_in, lsloc_t loc) {
   // cast away const for internal mutation; API returns same pointer as const

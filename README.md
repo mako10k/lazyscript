@@ -155,7 +155,7 @@ LAZYSCRIPT_PRELUDE_SO=/path/to/liblazyscript_prelude.so ./src/lazyscript -e '...
 
 - `~~def Name value`
   - 現在の環境に `Name` を束縛します（トップレベル相当）。以降 `~Name` で参照可能。
-  - 例: `{ ~~def foo 123; ~~println (~to_str ~foo) };  # => 123`
+  - 例: `{ ~~def foo 123; !println (~to_str ~foo) };  # => 123`
 
 メモ: 参照の解決は評価時にも行われるため、`def` や `require` で後から導入された名前も参照可能です。
 

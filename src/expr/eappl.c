@@ -67,14 +67,18 @@ void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eap
   for (size_t i = 0; i < (size_t)argc; i++) {
     const lsexpr_t* arg = eappl->lea_args[i];
     int omit_space = 0;
-    // If first argument is a zero-arity algebraic constructor starting with '.',
+    // If first argument is a dot symbol (or 0-ary alge starting with '.' for back-compat),
     // print it immediately after callee (e.g., ~internal.include)
-    if (i == 0 && arg && lsexpr_typeof(arg) == LSEQ_ALGE) {
-      const lsealge_t* a = lsexpr_get_alge(arg);
-      if (lsealge_get_argc(a) == 0) {
-        const lsstr_t* cname = lsealge_get_constr(a);
-        const char*    cb    = cname ? lsstr_get_buf(cname) : NULL;
-        if (cb && cb[0] == '.') omit_space = 1;
+    if (i == 0 && arg) {
+      if (lsexpr_typeof(arg) == LSEQ_SYMBOL) {
+        omit_space = 1;
+      } else if (lsexpr_typeof(arg) == LSEQ_ALGE) {
+        const lsealge_t* a = lsexpr_get_alge(arg);
+        if (lsealge_get_argc(a) == 0) {
+          const lsstr_t* cname = lsealge_get_constr(a);
+          const char*    cb    = cname ? lsstr_get_buf(cname) : NULL;
+          if (cb && cb[0] == '.') omit_space = 1;
+        }
       }
     }
     if (!omit_space)

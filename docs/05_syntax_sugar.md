@@ -3,7 +3,7 @@
 LazyScript には次の 2 系統の糖衣があり、どちらも「現在の糖衣名前空間」に展開されます（既定は `prelude`。CLI `--sugar-namespace` または環境変数 `LAZYSCRIPT_SUGAR_NS` で切替）。
 
 - 純粋 API 参照: `~~sym` → `(~<ns> sym)`
-  - 例: `((~~println) "hi")` は `(~prelude println) "hi"` に展開。
+  - 例: `((!println) "hi")` は `(~prelude println) "hi"` に展開。
 - 環境操作 API 参照: `!sym` → `(~<ns> .env .sym)`
   - 例: `!require "lib/Foo.ls"` は `(~prelude .env .require) "lib/Foo.ls"` に展開。
 
@@ -28,7 +28,7 @@ LazyScript には次の 2 系統の糖衣があり、どちらも「現在の糖
 例:
 
 ```
-!{ ~~println "A"; ~~println "B" };
+!{ !println "A"; !println "B" };
 ```
 
 出力:
@@ -42,7 +42,7 @@ B
 環境 API（`!sym`）と併用する例:
 
 ```
-!{ !require "test/lib_req.ls"; ~~println "ok" };
+!{ !require "test/lib_req.ls"; !println "ok" };
 ```
 
 出力:
@@ -67,7 +67,7 @@ ok
 例（CLI で一時切替）:
 
 ```
-src/lazyscript --sugar-namespace prelude -e '!{ ~~println "hi" }'
+src/lazyscript --sugar-namespace prelude -e '!{ !println "hi" }'
 ```
 
 ## 環境 API の小例（!def）
@@ -75,7 +75,7 @@ src/lazyscript --sugar-namespace prelude -e '!{ ~~println "hi" }'
 ```
 !{
   !def .x 42;
-  ~~println (~to_str ~x)
+  !println (~to_str ~x)
 };
 ```
 

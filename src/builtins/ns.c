@@ -201,9 +201,8 @@ static int ns_item_cmp(const void* a, const void* b) {
 // build cons list from an array of thunks: elems[0] : (elems[1] : ... [] )
 // Convert a collected key item back into an expression representing its const value
 static const lsexpr_t* ns_item_to_expr(const ns_key_item_t* it) {
-  // Symbol literal as a zero-arity constructor (e.g., .name)
-  const lsealge_t* ea = lsealge_new(lsstr_new(it->bytes, it->len), 0, NULL);
-  return lsexpr_new_alge(ea);
+  // Return a first-class symbol literal (e.g., .name)
+  return lsexpr_new_symbol(lsstr_new(it->bytes, it->len));
 }
 
 // Build cons-list expression from collected items then thunk it once at the end

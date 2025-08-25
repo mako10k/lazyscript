@@ -22,7 +22,7 @@ LazyScript の名前空間は「シンボルキー → 値」の写像です。�
 ```
 !{ ~~nsnew NS;
    ~~nsdef NS .Foo 42;
-   ~~println (~to_str ((~NS .Foo)))
+   !println (~to_str ((~NS .Foo)))
 };
 ```
 
@@ -31,7 +31,7 @@ LazyScript の名前空間は「シンボルキー → 値」の写像です。�
 ```
 !{
   ns <- { .A = { .B = 1 } };
-  ~~println (~to_str ((~ns .A).B));
+  !println (~to_str ((~ns .A).B));
 };
 ```
 
@@ -47,7 +47,7 @@ LazyScript の名前空間は「シンボルキー → 値」の写像です。�
 !{
   ns <- (~~nsnew0);
   (~~nsdefv ns .Foo 42);
-  ~~println (~to_str ((~ns .Foo)))
+  !println (~to_str ((~ns .Foo)))
 };
 ```
 
@@ -57,7 +57,7 @@ LazyScript の名前空間は「シンボルキー → 値」の写像です。�
 !{
   ns <- (~~nsnew0);
   ((~ns .__set) .Foo 42);
-  ~~println (~to_str ((~ns .Foo)))
+  !println (~to_str ((~ns .Foo)))
 };
 ```
 
@@ -81,7 +81,7 @@ LazyScript の名前空間は「シンボルキー → 値」の写像です。�
   ~~nsdefv ~ns .b 2;
   ~~nsdefv ~ns .aa 3;
   ~~nsdefv ~ns .ab 4;
-  ~~println (~to_str (~~nsMembers ~ns));
+  !println (~to_str (~~nsMembers ~ns));
 };
 -- 出力: [.a, .aa, .ab, .b]
 ```
