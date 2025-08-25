@@ -63,6 +63,32 @@ static int is_dot_symbol_or_ctor(const lsexpr_t* e) {
   return 0;
 }
 
+// Try to print an application that is a pure dot-chain without parentheses.
+// Pattern: ((...(left .d1) .d2) ... .dn). If 'e' matches this pattern, prints
+//   left d1 d2 ... dn (concatenated without spaces) and returns 1.
+// Otherwise returns 0 and prints nothing.
+// When argument is an application whose ALL arguments are dot-symbol-or-ctor,
+// print it without surrounding parentheses by emitting the left base then each
+// dot argument fused. Returns 1 if handled, 0 otherwise. Caller is responsible
+// for emitting a leading space if needed.
+static int try_print_pure_dot_chain_arg(FILE* stream, int indent, const lsexpr_t* e) {
+  if (!e || lsexpr_typeof(e) != LSEQ_APPL) return 0;
+  const lseappl_t* ap = lsexpr_get_appl(e);
+  lssize_t argc = lseappl_get_argc(ap);
+  if (argc <= 0) return 0;
+  for (lssize_t i = 0; i < argc; i++) {
+    if (!is_dot_symbol_or_ctor(lseappl_get_args(ap)[i])) return 0;
+  }
+  const lsexpr_t* left = lseappl_get_func(ap);
+  // Print left head
+  lsexpr_print(stream, LSPREC_APPL + 1, indent, left);
+  // Print all dot args fused
+  for (lssize_t i = 0; i < argc; i++) {
+    lsexpr_print(stream, LSPREC_APPL + 1, indent, lseappl_get_args(ap)[i]);
+  }
+  return 1;
+}
+
 void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eappl) {
   lssize_t argc = eappl->lea_argc;
   const lsexpr_t* func = eappl->lea_func;
@@ -93,8 +119,29 @@ void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eap
     int omit_space = 0;
     int is_dot = is_dot_symbol_or_ctor(arg);
 
-    // Special case: first printed argument is an application (left .sym)
-    if (i == 0 && arg && lsexpr_typeof(arg) == LSEQ_APPL) {
+    // If the argument is a pure dot-chain application, print it without parens.
+    if (arg && lsexpr_typeof(arg) == LSEQ_APPL) {
+      const lseappl_t* apc = lsexpr_get_appl(arg);
+      lssize_t ac = lseappl_get_argc(apc);
+      int pure = (ac > 0);
+      for (lssize_t j = 0; j < ac; j++) {
+        if (!is_dot_symbol_or_ctor(lseappl_get_args(apc)[j])) { pure = 0; break; }
+      }
+      if (pure) {
+        // Leading space like a normal (non-dot) argument
+        lsprintf(stream, indent, " ");
+        // Print left then all dot args fused
+        lsexpr_print(stream, LSPREC_APPL + 1, indent, lseappl_get_func(apc));
+        for (lssize_t j = 0; j < ac; j++) {
+          lsexpr_print(stream, LSPREC_APPL + 1, indent, lseappl_get_args(apc)[j]);
+        }
+        chain_active = 1; last_was_non_dot = 0;
+        continue;
+      }
+    }
+
+  // Special case (legacy): first printed argument is an application (left .sym)
+  if (i == 0 && arg && lsexpr_typeof(arg) == LSEQ_APPL) {
       const lseappl_t* inner = lsexpr_get_appl(arg);
       const lsexpr_t* in_left = lseappl_get_func(inner);
       if (lseappl_get_argc(inner) == 1) {

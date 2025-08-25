@@ -171,7 +171,7 @@ expr:
 expr1:
       expr2 { $$ = $1; }
   | expr2 '|' expr1 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new($1, $3)), @$); }
-    ;
+  ;
 
 expr2:
       expr3 { $$ = $1; }
@@ -192,8 +192,63 @@ expr3:
     ;
 
 eappl:
-      efact expr5 { $$ = lseappl_new($1, 1, &$2); }
-    | eappl expr5 { $$ = lseappl_add_arg($1, $2); }
+      efact expr5 {
+        // 関数位置がリテラル（.sym/Int/Str）の適用は禁止
+        int head_is_literal = 0;
+        switch (lsexpr_typeof($1)) {
+          case LSEQ_INT:
+          case LSEQ_STR:
+            head_is_literal = 1; break;
+          case LSEQ_SYMBOL:
+            head_is_literal = 1; break;
+          default: break;
+        }
+        if (head_is_literal) {
+          yyerror(&@1, yyget_extra(yyscanner), "literal (symbol/int/str) cannot be applied");
+          YYERROR;
+        }
+        $$ = lseappl_new($1, 1, &$2);
+      }
+    | eappl expr5 {
+        // 直前引数と今回引数が連続して .sym かつ、すでに非 .sym 引数が存在する場合はエラー
+        // 目的: `... X .f .g` のような外側アプリケーションでの隣接 .sym を禁止
+        // ただし `~B .c .d` のような内側の純 .sym チェーンは許可する
+        int is_dot = 0, last_is_dot = 0, has_non_dot_arg = 0;
+        const lsexpr_t *arg = $2;
+        if (lsexpr_typeof(arg) == LSEQ_SYMBOL) {
+          const char *s = lsstr_get_buf(lsexpr_get_symbol(arg));
+          if (s && s[0] == '.') is_dot = 1;
+        }
+        lssize_t argc = lseappl_get_argc($1);
+        if (argc > 0) {
+          // 直前引数を確認
+          const lsexpr_t *last = lseappl_get_args($1)[argc - 1];
+          if (lsexpr_typeof(last) == LSEQ_SYMBOL) {
+            const char *s2 = lsstr_get_buf(lsexpr_get_symbol(last));
+            if (s2 && s2[0] == '.') last_is_dot = 1;
+          }
+          // 既存引数に非 .sym が含まれるか
+          for (lssize_t i = 0; i < argc; i++) {
+            const lsexpr_t *ai = lseappl_get_args($1)[i];
+            if (!(lsexpr_typeof(ai) == LSEQ_SYMBOL && lsstr_get_buf(lsexpr_get_symbol(ai)) && lsstr_get_buf(lsexpr_get_symbol(ai))[0] == '.')) {
+              has_non_dot_arg = 1; break;
+            }
+          }
+        }
+        if (is_dot && last_is_dot && has_non_dot_arg) {
+          // ただし直前の直前が参照(~X)なら、`~X .c .d` の継続として許可
+          int prevprev_is_ref = 0;
+          if (argc >= 2) {
+            const lsexpr_t *pp = lseappl_get_args($1)[argc - 2];
+            if (lsexpr_typeof(pp) == LSEQ_REF) prevprev_is_ref = 1;
+          }
+          if (!prevprev_is_ref) {
+          yyerror(&@2, yyget_extra(yyscanner), "consecutive dot-symbol arguments are not allowed");
+          YYERROR;
+          }
+        }
+        $$ = lseappl_add_arg($1, $2);
+      }
     ;
 
 expr4:
