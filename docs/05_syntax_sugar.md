@@ -1,28 +1,34 @@
-# シンタックスシュガー: ~~sym → (~prelude sym)
+# シンタックスシュガー概要（~~ と !）
 
+LazyScript には次の 2 系統の糖衣があり、どちらも「現在の糖衣名前空間」に展開されます（既定は `prelude`。CLI `--sugar-namespace` または環境変数 `LAZYSCRIPT_SUGAR_NS` で切替）。
 
-## 実装メモ
-- Bison 警告の `%expect` を 36 に更新（新規トークン導入で競合カウントが増えたため）。
----
+- 純粋 API 参照: `~~sym` → `(~<ns> sym)`
+  - 例: `((!println) "hi")` は `(~prelude println) "hi"` に展開。
+- 環境操作 API 参照: `!sym` → `(~<ns> .env .sym)`
+  - 例: `!require "lib/Foo.ls"` は `(~prelude .env .require) "lib/Foo.ls"` に展開。
 
-# do ブロック（予約語なしの do 記法）
+いずれも「関数適用は通常の括弧」で行います。`~~sym` 自体は値（関数）です。
 
-- 目的: 予約語を導入せずに Haskell 風の do 記法を提供する。
-- 書式: `!{ stmt1 ; stmt2 ; ... ; stmtN }`  ※ 旧 `{ ... }` から `!{ ... }` に変更
-  - ステートメント `stmt` は以下のいずれか
-    - 式: `E`
-    - 束縛: `x <- E`（左辺は識別子。将来拡張でパターンも検討可能）
-- 末尾の意味: ブロック末尾は自動で `(~<ns> return)` に包む（暗黙の return）。
-- デシュガー（<ns> は糖衣名前空間: 既定 prelude）
-  - `E ; rest`   ⇒ `(~<ns> chain) E (\ _ -> rest')`
-  - `x <- E ; rest` ⇒ `(~<ns> bind) E (\ x -> rest')`
-  - `tail E`    ⇒ `(~<ns> return) E`
-- 空ブロック `{}` は現在エラー（将来 `return ()` へ拡張可）。
+注意: シェルの履歴展開の都合で、CLI `-e` に `!{ ... }` や `!require` を直接書く場合はクォートしてください。
 
-## 例
+関連: 詳細な背景とエクスポート一覧は `docs/12_builtins_and_prelude.md` を参照してください。
+
+## do ブロック（`!{ ... }`）
+
+予約語なしの do 記法を `!{ ... }` で提供します。ブロック内部は次にデシュガーされ、順序効果を明示します（`<ns>` は糖衣名前空間）。
+
+- 文の形:
+  - 式: `E`
+  - 束縛: `x <- E`（左辺は識別子）
+- デシュガー規則（右結合）:
+  - `E ; rest`        ⇒ `(~<ns> chain) E (\ _ -> rest')`
+  - `x <- E ; rest`   ⇒ `(~<ns> bind)  E (\ x -> rest')`
+  - 末尾 `E`          ⇒ `(~<ns> return) E`
+
+例:
 
 ```
-!{ ~~println "A"; ~~println "B" };
+!{ !println "A"; !println "B" };
 ```
 
 出力:
@@ -33,39 +39,56 @@ B
 ()
 ```
 
+環境 API（`!sym`）と併用する例:
+
 ```
-!{ x <- ~add 1 2; ~~println ~x };
+!{ !require "test/lib_req.ls"; !println "ok" };
 ```
 
 出力:
 
 ```
-3
+OK-from-lib
+ok
 ()
 ```
 
-## 実装メモ
-- lexer (`src/parser/lexer.l`): `"<-"` を `LSTLEFTARROW` として追加。
-- parser (`src/parser/parser.y`): `{ dostmts }` を `efact` の一分岐に追加し、
-  `dostmts` を右結合で `(~ns chain|bind|return)` に構築してデシュガー。
-- 糖衣名前空間は `lsscan_get_sugar_ns(...)` を使用（`--sugar-namespace` / `LAZYSCRIPT_SUGAR_NS`）。
-- ランタイム（インタプリタ）に `prelude.bind/2` を追加。
-- Core IR evaluator 側にも `bind/2` を追加（トークン有効化とラムダ適用）。
+## 実装の要点（参考）
 
-## 注意
-- 末尾セミコロンはエラー。必要なら許容し `return ()` に展開する改善余地あり。
-- 左辺は現状識別子のみ。`(~)` 参照（`pref`）も許容しているが、一般化は段階的に検討。
+- `~~sym` は lexer の `LSTPRELUDE_*` 系トークンで捕捉し、`(~<ns> sym)` に構文展開。
+- `!sym` は `LSTENVOP` として字句化し、`(~<ns> .env .sym)` に構文展開。
+- `!{ ... }` は `bind/chain/return` を用いた式列にデシュガー（`prelude` がそれらを再エクスポート）。
 
+補足: ドット連結の出力規則（フォーマッタ）
 
-## 例
-- `(~~println "hi");` → `hi` と `()` を出力。
-- `(~~return 7);` → `7`。
+- 先頭引数が `.sym` のとき関数/値名に連結し、以降の `.sym` も連結を継続する（非 `.sym` で打ち切り）。
+- 連結は通常の適用より高い優先順位で括弧を省く。
+- 空白や改行の有無には依存しない。
 
-## 名前空間の切り替え（実装済み）
-- `~~` の展開先名前空間（既定: `prelude`）は、CLI もしくは環境変数で切替可能です。
-  - 例: `--sugar-namespace somens` または `LAZYSCRIPT_SUGAR_NS=somens`
-- 実装メモ:
-  1. `lsscan_t` に `ls_sugar_ns` を追加し既定値を "prelude" に設定。
-  2. CLI `--sugar-namespace` / 環境変数 `LAZYSCRIPT_SUGAR_NS` で上書き。
-  3. `parser.y` の `LSTPRELUDESYM` 展開で `ls_sugar_ns` を参照。
+## 糖衣名前空間の切り替え
+
+- 既定は `prelude`。
+- 切替: `--sugar-namespace <ns>` または `LAZYSCRIPT_SUGAR_NS=<ns>`。
+
+例（CLI で一時切替）:
+
+```
+src/lazyscript --sugar-namespace prelude -e '!{ !println "hi" }'
+```
+
+## 環境 API の小例（!def）
+
+```
+!{
+  !def .x 42;
+  !println (~to_str ~x)
+};
+```
+
+出力:
+
+```
+42
+()
+```
   

@@ -14,6 +14,7 @@ typedef enum {
   LCIR_VAL_CONSTR,
   LCIR_VAL_VAR,
   LCIR_VAL_LAM,
+  LCIR_VAL_NSLIT,
 } lscir_val_kind_t;
 
 typedef enum {
@@ -43,6 +44,11 @@ struct lscir_value {
       const char*         param; // 単一引数（暫定）
       const lscir_expr_t* body;
     } lam;
+    struct {
+      const char* const*          names;
+      const lscir_value_t* const* vals;
+      int                         count;
+    } nslit;
   };
 };
 

@@ -13,6 +13,11 @@
 const lsprog_t* lsparse_file_nullable(const char* filename);
 const lsprog_t* lsparse_file(const char* filename);
 
+static int debug_enabled(void) {
+  const char* d = getenv("LAZYSCRIPT_DEBUG");
+  return d && *d;
+}
+
 static const lsprog_t* ls_require_resolve(const char* path) {
   const lsprog_t* prog = lsparse_file_nullable(path);
   if (prog) return prog;
@@ -63,26 +68,45 @@ lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void
   return ls_make_unit();
 }
 
-// Pure-style require: returns the program's resulting value without mutating the current env.
-// This intentionally allows being called in a pure context; any effectful code inside the
-// module will still fail at call sites (e.g., println) due to their own guards.
-lsthunk_t* lsbuiltin_prelude_require_pure(lssize_t argc, lsthunk_t* const* args, void* data) {
+// include: evaluate another file and return its resulting value without mutating the
+// current environment.  Loading errors are treated as fatal.
+lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
-  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return ls_make_err("requirePure: no env");
-  lsthunk_t* pathv = ls_eval_arg(args[0], "requirePure: path");
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) { return ls_make_err("include: no env"); }
+  lsthunk_t* pathv = ls_eval_arg(args[0], "include: path");
   if (lsthunk_is_err(pathv)) return pathv;
-  if (!pathv) return ls_make_err("requirePure: path eval");
+  if (!pathv) { return ls_make_err("include: path eval"); }
   if (lsthunk_get_type(pathv) != LSTTYPE_STR) {
-    return ls_make_err("requirePure: expected string path");
+    return ls_make_err("include: expected string path");
   }
   size_t n=0; char* buf=NULL; FILE* fp=lsopen_memstream_gc(&buf,&n);
   lsstr_print_bare(fp, LSPREC_LOWEST, 0, lsthunk_get_str(pathv)); fclose(fp);
   const char* path = buf;
   const lsprog_t* prog = ls_require_resolve(path);
-  if (!prog) return ls_make_err("requirePure: not found");
+  if (!prog) { return ls_make_err("include: not found"); }
   // Evaluate in an isolated child environment with the current env as parent.
   lstenv_t* child = lstenv_new(tenv);
+  if (debug_enabled()) {
+    lsprintf(stderr, 0, "DBG: include: begin eval path=");
+    lsprintf(stderr, 0, "%s\n", path);
+  }
   // Do NOT enable effects here; pure modules will work, effectful ones will raise at call sites.
   lsthunk_t* ret = lsprog_eval(prog, child);
-  return ret ? ret : ls_make_err("requirePure: eval");
+  if (debug_enabled()) {
+    const char* rt = ret ? (lsthunk_is_err(ret) ? "#err" :
+      (lsthunk_get_type(ret) == LSTTYPE_ALGE ? "alge" :
+       lsthunk_get_type(ret) == LSTTYPE_APPL ? "appl" :
+       lsthunk_get_type(ret) == LSTTYPE_LAMBDA ? "lambda" :
+       lsthunk_get_type(ret) == LSTTYPE_REF ? "ref" :
+       lsthunk_get_type(ret) == LSTTYPE_INT ? "int" :
+       lsthunk_get_type(ret) == LSTTYPE_STR ? "str" :
+       lsthunk_get_type(ret) == LSTTYPE_SYMBOL ? "symbol" :
+       lsthunk_get_type(ret) == LSTTYPE_BUILTIN ? "builtin" :
+       lsthunk_get_type(ret) == LSTTYPE_CHOICE ? "choice" : "?")) : "NULL";
+    lsprintf(stderr, 0, "DBG: include: end eval ret=%p type=%s\n", (void*)ret, rt);
+  }
+  if (!ret) { return ls_make_err("include: eval"); }
+  return ret;
 }
+
+// requirePure removed: use include instead

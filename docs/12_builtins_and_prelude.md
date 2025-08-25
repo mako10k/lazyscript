@@ -1,69 +1,73 @@
-# Builtins, Prelude, and Namespace Introspection
+# Builtins と Prelude（最新仕様）
 
-この文書は、ビルトイン名前空間ローディング（`~~builtin`）、暗黙プリリュード注入、デバッグ用名前空間列挙（`~~nsMembers`）の仕様をまとめます。現状の実装仕様に基づき記述し、将来の拡張余地も明記します。
+この文書は「ビルトインの提供方法」と「Prelude の構造」を最新アーキテクチャに沿って説明します。
 
-## 目的と方針
-- グローバルに `~add` のようなビルトイン直載せを避け、名前空間へ整理する。
-- 外部共有ライブラリ（.so）をモジュール単位で動的ロードして提供する。
-- プリリュードはその仕組みの一例として実行開始時に暗黙注入する。
-- デバッグ容易化のため、名前空間メンバーを列挙できるプリミティブを提供する。
+要点
+- コアビルトインは外部プラグイン `core_builtins.so` で提供します。
+- `~builtins` と `~internal` は Prelude 評価中のみホストから注入され、ユーザコードからは見えません。
+- `~prelude` は「値」です。起動時に `include("lib/Prelude.ls")` の結果で束縛されます。
+- ユーザは `~~sym`（純粋 API）と `!sym`（環境 API）経由で Prelude を使います。
 
-## `~~builtin`: ビルトイン名前空間ローダー
+## 提供コンポーネント
 
-- 構文: `~~builtin "basename"` → レコード値（名前空間）
-- 例: `~arith = ~~builtin "arith"; ~arith add 1 2;`
-- パス解決（優先順）:
-  1) `LAZYSCRIPT_BUILTIN_PATH`（コロン区切り）
-  2) 実行ファイル相対 `builtins/` または `plugins/`
-  3) `/usr/local/lib/lazyscript:/usr/lib/lazyscript`
-  - 絶対パスも可（`"/abs/path/foo.so"`）。
-- キャッシュ: `basename` ごとに 1 回ロード。`dlclose` はしない（プロセス終了まで有効）。
-- 共有ライブラリ ABI（提案）:
-  - `dlsym("lazyscript_builtin_init")` を呼び、モジュール記述子を取得。
-  - 記述子: `abi_version`, `module_name`, `module_version`,
-    `functions: [{ name, arity, fn, effects?, doc? }]`（`fn` は `lstbuiltin_func_t` 互換）。
-- エラー: 見つからない/ABI不一致/重複名 → `#err`（理由を含めて報告）。
-- 並行性: 初回ロードと登録はミューテックス保護。
-- トレース: 擬似 loc `builtin:basename#name` を JSONL に記録（スタックにも反映）。
+- core_builtins プラグイン（純粋/基本操作）
+  - to_str, print, println, seq, add, sub, lt, eq
+  - 制御系: chain, bind, return
+  - 名前空間: nsMembers, nsSelf
+- Prelude.ls（ユーザ面の窓口）
+  - 上記の純粋 API を再エクスポート（`~~sym` で参照可能）。
+  - `.env` 名前空間を持ち、環境操作 API をここから露出。
+- internal（環境 API 実体）
+  - require, include, import, withImport, def, nsnew/nsdef/nsnew0/nsdefv など。
+  - これらは `~internal` として Prelude 評価時のみ利用でき、`Prelude.ls` 内の `.env` にブリッジされます。
 
-## Prelude: 暗黙注入されるビルトイン名前空間
+## スコープと可視性
 
-- 実行開始時、ルート環境に暗黙注入: `~prelude = <BuiltinLoader> "prelude"`。
-- `<BuiltinLoader>` は実行環境が提供（ユーザは記述不要）。
-- 糖衣 `~~sym` は既定で `(~prelude sym)` に展開（CLI/ENV で上書き可）。
-- 構成案: `--no-prelude` / `LAZYSCRIPT_NO_PRELUDE=1` で無効化、`LAZYSCRIPT_PRELUDE` で別モジュール指定。
-- 互換: 既存のトップレベル `~add` などは当面維持、推奨は `~prelude` 経由。
+- ホストは Prelude を評価する直前に一時的に `~builtins` と `~internal` を注入します。
+- Prelude の評価が終わると、`~prelude` にその値を束縛し、`~builtins/~internal` は破棄します。
+- 実行時のユーザコードからは `~prelude` のみが見えます（値）。
 
-## `~~nsMembers`: 名前空間メンバー列挙（デバッグ用）
+## 使い方（ユーザ視点）
 
-- 構文: `~~nsMembers nsValue` → `list<symbol>`
-- 振る舞い:
-  - 名前空間（名前付き/無名/ビルトイン含む）のシンボルキーを列挙。
-  - キーは評価不要なシンボルとして保持され、値は評価しない（非評価）。
-  - 返却順は安定ソート。シンボル名の辞書順。
-- エラー: 非NS → `#err "nsMembers: not a namespace"`。
-- トレース: 擬似 loc `introspect:nsMembers` を JSONL に記録。
+- 純粋 API: `~~sym` → `(~prelude sym)` に展開
+  - 例: `((!println) "hello")`
+- 環境 API: `!sym` → `(~prelude .env .sym)` に展開
+  - 例: `!require "lib/Foo.ls"`
+- do ブロック: `!{ ... }` は `chain/bind/return` で順序を明示
+  - 例: `!{ !require "lib.x"; !println "ok" }`
 
-## 将来拡張
-- `~~nsHas`, `~~nsDescribe`（メタ列挙）、ビルトイン署名検証とバージョンピン留め（`arith@1`）、
-  効果型連携（`effects` メタの型検査反映）、署名/サンドボックス等の強化。
+## 注意点
 
-## 備考（シンボル vs 文字列）
-- `.symbol` リテラル（例: `.name`）は実装済み。インターンされ `==` 比較が O(1)。
+- 互換のため古い記述 `~add` 等が残っていても、推奨は `~~add` または `!` 系の使用です。
+- bash の `!` 履歴展開に注意。`-e` で与える際はクォートしてください。
 
-## シンボルリテラル `.symbol` と名前空間キー
+## 名前空間のイントロスペクション
 
-糖衣は導入せず、`.name` は「シンボル型（Symbol）のリテラル」を表します。シンボルはインターンされ、`==` による同値比較が O(1) で可能です。
+- `~~nsMembers ns` は `list<symbol>` を返します（値は非評価）。
+- `~~nsSelf` はレコード内から自分自身を参照する際に使えます（`{ .A = (~nsSelf .B); .B = 1 }` など）。
 
-- 型: `Symbol`（例: `.concat`, `.builtin`）
-- リテラル規則（概要）: `'.' IDENT` を 1 トークンとして読み取る（浮動小数点は未採用のため衝突なし）。
-- インターン: 実行系で一意化（同名は同一値）。`to_string` 表示は `".name"` 風を想定。
+## 参考: 実装の流れ（ホスト側）
 
-### 名前空間の定義と参照
+1) `~builtins` と `~internal` を一時注入し、`Prelude.ls` を評価
+2) 評価結果を `~prelude` に束縛（値）
+3) `~builtins/~internal` を除去（ユーザには見えない）
 
-- レコード（名前空間）定義は「シンボルキーのマップ」:
-  - 例: `{ .add = value; .println = value }`
-  - 参照は「関数適用」スタイルで統一:
-  - `(~NS sym)` で対応する値を取得（キーは `==` で一致判定）。
-  - 例: `~list = (~prelude .builtin) "list"; (~list .concat) [1,2] [3,4]`
-  - 注意: 将来、パターンをキーに拡張する余地はあるが、`nsMembers` が取得不能になるため現段階はシンボルに限定。
+## 代表的なエクスポート一覧（Prelude）
+
+- 純粋: println, print, to_str, eq, lt, add, sub, seq, chain, bind, return, nsMembers, nsSelf, include
+- 環境: `.env` 配下に require, import, withImport, def, nsnew/nsdef/nsnew0/nsdefv など
+ 
+### include の注意
+
+`include` は別ファイルを評価してその結果の値を返す純粋なロード機能です。循環参照の検出は行わないため、ファイルが互いに `include` を繰り返すと無限ループに陥る可能性があります。
+
+相互参照が必要な場合は、呼び出し側で変数を束縛しそれを各ファイルから参照させるパターンを用いてください。
+
+```
+!{
+  A = (~prelude include) "lib/A.ls";
+  B = ((~prelude include) "lib/B.ls"; ~A = A);
+}
+```
+
+呼び出し側クロージャで値を共有することで、循環的な `include` を避けつつ相互参照を実現できます。

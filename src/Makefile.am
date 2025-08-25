@@ -36,7 +36,6 @@ lazyscript_SOURCES = \
     builtins/builtin_loader.c \
     builtins/require.c \
     builtins/ns.c \
-    builtins/prelude.c \
     lazyscript.h \
     lstypes.h
 

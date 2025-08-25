@@ -11,6 +11,7 @@
 #include "expr/ealge.h"
 #include "expr/eappl.h"
 #include "expr/elambda.h"
+#include "expr/enslit.h"
 #include "common/ref.h"
 #include "common/int.h"
 #include "common/str.h"
@@ -89,6 +90,7 @@ static void print_value_like(FILE* fp, int indent, const lsexpr_t* expr) {
   }
   case LSETYPE_CHOICE:
   case LSETYPE_CLOSURE:
+  case LSETYPE_NSLIT:
     lsexpr_print(fp, LSPREC_LOWEST, indent, expr);
     return;
   }
@@ -127,6 +129,16 @@ static const lscir_value_t* mk_val_lam(const char* param, const lscir_expr_t* bo
   x->kind          = LCIR_VAL_LAM;
   x->lam.param     = param;
   x->lam.body      = body;
+  return x;
+}
+
+static const lscir_value_t* mk_val_nslit(int n, const char* const* names,
+                                        const lscir_value_t* const* vals) {
+  lscir_value_t* x = lsmalloc(sizeof(*x));
+  x->kind          = LCIR_VAL_NSLIT;
+  x->nslit.count   = n;
+  x->nslit.names   = names;
+  x->nslit.vals    = vals;
   return x;
 }
 
@@ -249,6 +261,26 @@ static const lscir_value_t* lower_value(const lsexpr_t* e) {
     if (be)
       return mk_val_lam(param, be);
     return NULL;
+  }
+  case LSETYPE_NSLIT: {
+    const lsenslit_t* ns = lsexpr_get_nslit(e);
+    lssize_t          n  = lsenslit_get_count(ns);
+    const char**      names = NULL;
+    const lscir_value_t** vals = NULL;
+    if (n > 0) {
+      names = lsmalloc(sizeof(char*) * (size_t)n);
+      vals  = lsmalloc(sizeof(lscir_value_t*) * (size_t)n);
+      for (lssize_t i = 0; i < n; i++) {
+        const char* nb = lsstr_get_buf(lsenslit_get_name(ns, i));
+        if (nb && nb[0] == '.') nb++;
+        names[i] = nb;
+        const lscir_value_t* vi = lower_value(lsenslit_get_expr(ns, i));
+        if (!vi)
+          return NULL;
+        ((const lscir_value_t**)vals)[i] = vi;
+      }
+    }
+    return mk_val_nslit((int)n, names, vals);
   }
   default:
     return NULL;
@@ -506,6 +538,17 @@ static void cir_print_val(FILE* ofp, int ind, const lscir_value_t* v) {
     cir_print_expr(ofp, 0, v->lam.body);
     fputc(')', ofp);
     return;
+  case LCIR_VAL_NSLIT: {
+    lsprintf(ofp, ind, "(nslit");
+    for (int i = 0; i < v->nslit.count; i++) {
+      fputc(' ', ofp);
+      lsprintf(ofp, 0, "(%s ", v->nslit.names[i]);
+      cir_print_val(ofp, 0, v->nslit.vals[i]);
+      fputc(')', ofp);
+    }
+    fputc(')', ofp);
+    return;
+  }
   }
 }
 

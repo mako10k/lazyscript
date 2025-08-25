@@ -6,3 +6,6 @@ t05_let_without_keyword
 # runtime self-hosting
 t15_runtime_require
 t16_runtime_def
+
+# new sugar tests
+t78_bang_env_sugar

@@ -34,18 +34,30 @@ static void cir_val_repr(char* buf, size_t n, const lscir_value_t* v) {
   case LCIR_VAL_LAM:
     snprintf(buf, n, "lam %s", v->lam.param ? v->lam.param : "_");
     return;
+  case LCIR_VAL_NSLIT:
+    snprintf(buf, n, "nslit{...}");
+    return;
   }
   snprintf(buf, n, "<val>");
 }
 
 static int cir_validate_val(FILE* efp, const lscir_value_t* v, eff_scope_t sc) {
-  (void)efp;
-  (void)sc;
-  if (v && v->kind == LCIR_VAL_LAM) {
+  if (!v)
+    return 0;
+  switch (v->kind) {
+  case LCIR_VAL_LAM: {
     eff_scope_t inner = (eff_scope_t){ 0 };
     return cir_validate_expr(efp, v->lam.body, inner);
   }
-  return 0;
+  case LCIR_VAL_NSLIT: {
+    int errs = 0;
+    for (int i = 0; i < v->nslit.count; i++)
+      errs += cir_validate_val(efp, v->nslit.vals[i], sc);
+    return errs;
+  }
+  default:
+    return 0;
+  }
 }
 
 static int cir_validate_expr(FILE* efp, const lscir_expr_t* e, eff_scope_t sc) {

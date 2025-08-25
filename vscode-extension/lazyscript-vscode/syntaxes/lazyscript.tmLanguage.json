@@ -1,0 +1,68 @@
+{
+  "name": "LazyScript",
+  "scopeName": "source.lazyscript",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+  { "include": "#numbers" },
+  { "include": "#dotSymbols" },
+  { "include": "#identifiers" },
+    { "include": "#refs" },
+    { "include": "#punct" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.number-sign.lazyscript", "match": "#.*$" },
+        { "name": "comment.block.lazyscript", "begin": "\\{-", "end": "-\\}" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.lazyscript",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [ { "name": "constant.character.escape.lazyscript", "match": "\\\\.|\\\"" } ]
+        },
+        {
+          "name": "string.quoted.single.identifier.lazyscript",
+          "begin": "'",
+          "end": "'",
+          "patterns": [ { "name": "constant.character.escape.lazyscript", "match": "\\\\.|\\'" } ]
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.lazyscript",
+      "match": "\\b[0-9]+\\b"
+    },
+    "dotSymbols": {
+      "name": "entity.name.tag.member.lazyscript",
+      "match": "\\.[A-Za-z_][A-Za-z0-9_]*"
+    },
+    "refs": {
+      "name": "variable.language.reference.lazyscript",
+      "match": "~[A-Za-z_][A-Za-z0-9_]*|~'[^']*'"
+    },
+    "identifiers": {
+      "name": "identifier.lazyscript",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b|\\'[^']*\\'"
+    },
+    "punct": {
+      "patterns": [
+        { "name": "keyword.operator.arrow.lazyscript", "match": "->" },
+        { "name": "keyword.operator.pipe.lazyscript", "match": "\\|" },
+        { "name": "keyword.operator.colon.lazyscript", "match": ":" },
+        { "name": "punctuation.section.braces.begin.lazyscript", "match": "\\{" },
+        { "name": "punctuation.section.braces.end.lazyscript", "match": "\\}" },
+        { "name": "punctuation.section.parens.begin.lazyscript", "match": "\\(" },
+        { "name": "punctuation.section.parens.end.lazyscript", "match": "\\)" },
+        { "name": "punctuation.section.brackets.begin.lazyscript", "match": "\\[" },
+        { "name": "punctuation.section.brackets.end.lazyscript", "match": "\\]" },
+        { "name": "punctuation.separator.comma.lazyscript", "match": "," },
+        { "name": "punctuation.terminator.statement.lazyscript", "match": ";" }
+      ]
+    }
+  }
+}

@@ -1,58 +1,102 @@
 {
-  .nil   = [];
-  .cons  = \~x -> \~xs -> (~x : ~xs);
+  .nil = [];
+  .cons = \~x -> \~xs -> (~x : ~xs);
 
-  .foldl = (
-    (\~self -> \~f -> \~acc -> \~xs -> (
-      \[] -> ~acc |
-      \(~h : ~t) -> (((~self ~self) ~f ((~f ~acc) ~h) ~t))
-    ) ~xs)
-    (\~self -> \~f -> \~acc -> \~xs -> (
-      \[] -> ~acc |
-      \(~h : ~t) -> (((~self ~self) ~f ((~f ~acc) ~h) ~t))
-    ) ~xs)
+  .map = \~f -> \~xs -> (
+    (
+      (\~self -> \~f -> \~xs ->
+        (((\[] -> [])
+          || (\(~h : ~t) -> (~f ~h) : (((~self ~self) ~f ~t))))
+         ~xs))
+      (\~self -> \~f -> \~xs ->
+        (((\[] -> [])
+          || (\(~h : ~t) -> (~f ~h) : (((~self ~self) ~f ~t))))
+         ~xs))
+      ~f ~xs
+    )
   );
 
-  .foldr = (
-    (\~self -> \~f -> \~xs -> \~z -> (
-      \[] -> ~z |
-      \(~h : ~t) -> ((~f ~h) (((~self ~self) ~f ~t ~z)))
-    ) ~xs)
-    (\~self -> \~f -> \~xs -> \~z -> (
-      \[] -> ~z |
-      \(~h : ~t) -> ((~f ~h) (((~self ~self) ~f ~t ~z)))
-    ) ~xs)
+  .filter = \~p -> \~xs -> (
+    (
+      (\~self -> \~p -> \~xs ->
+        (((\[] -> [])
+          || (\(~h : ~t) ->
+               (((\true  -> (~h : (((~self ~self) ~p ~t))))
+                 | (\false -> (((~self ~self) ~p ~t))))
+                ((~p ~h)))))
+         ~xs))
+      (\~self -> \~p -> \~xs ->
+        (((\[] -> [])
+          || (\(~h : ~t) ->
+               (((\true  -> (~h : (((~self ~self) ~p ~t))))
+                 | (\false -> (((~self ~self) ~p ~t))))
+                ((~p ~h)))))
+         ~xs))
+      ~p ~xs
+    )
   );
 
-  .map = (\~f -> ((.foldr) (\~x -> \~acc -> ((~f ~x) : ~acc)) []));
-
-  .filter = (
-    (\~self -> \~p -> \~xs -> (
-      \[] -> [] |
-      \(~h : ~t) -> (
-        ((~p ~h) : (((~self ~self) ~p ~t))) | (((~self ~self) ~p ~t))
-      )
-    ) ~xs)
-    (\~self -> \~p -> \~xs -> (
-      \[] -> [] |
-      \(~h : ~t) -> (
-        ((~p ~h) : (((~self ~self) ~p ~t))) | (((~self ~self) ~p ~t))
-      )
-    ) ~xs)
+  .append = \~xs -> \~ys -> (
+    (
+      (\~self -> \~xs -> \~ys ->
+        (((\[] -> ~ys)
+          || (\(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))))
+         ~xs))
+      (\~self -> \~xs -> \~ys ->
+        (((\[] -> ~ys)
+          || (\(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))))
+         ~xs))
+      ~xs ~ys
+    )
   );
 
-  .append = (
-    (\~self -> \~xs -> \~ys -> (
-      \[] -> ~ys |
-      \(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))
-    ) ~xs)
-    (\~self -> \~xs -> \~ys -> (
-      \[] -> ~ys |
-      \(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))
-    ) ~xs)
+  .reverse = \~xs -> (
+    (
+      (\~self -> \~acc -> \~zs ->
+        (((\[] -> ~acc)
+          || (\(~h : ~t) -> (((~self ~self) (~h : ~acc) ~t))))
+         ~zs))
+      (\~self -> \~acc -> \~zs ->
+        (((\[] -> ~acc)
+          || (\(~h : ~t) -> (((~self ~self) (~h : ~acc) ~t))))
+         ~zs))
+      [] ~xs
+    )
   );
 
-  .reverse = (((.foldl) (\~acc -> \~x -> (~x : ~acc)) []));
-
-  .flatMap = (\~f -> ((.foldr) (\~x -> \~acc -> ((.append) (~f ~x) ~acc)) []));
+  .flatMap = \~f -> \~xs -> (
+    (
+      (\~self -> \~f -> \~xs ->
+        (((\[] -> [])
+          | (\(~h : ~t) ->
+               (
+                 ( (\~apSelf -> \~as -> \~bs ->
+                       ((((\[] -> ~bs)
+                          || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
+                        ) ~as))
+                   (\~apSelf -> \~as -> \~bs ->
+                       ((((\[] -> ~bs)
+                          || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
+                        ) ~as))
+                 ) ((~f ~h)) (((~self ~self) ~f ~t))
+               )))
+         ~xs))
+      (\~self -> \~f -> \~xs ->
+        (((\[] -> [])
+          | (\(~h : ~t) ->
+               (
+                 ( (\~apSelf -> \~as -> \~bs ->
+                       ((((\[] -> ~bs)
+                          || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
+                        ) ~as))
+                   (\~apSelf -> \~as -> \~bs ->
+                       ((((\[] -> ~bs)
+                          || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
+                        ) ~as))
+                 ) ((~f ~h)) (((~self ~self) ~f ~t))
+               )))
+         ~xs))
+      ~f ~xs
+    )
+  )
 };

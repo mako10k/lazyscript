@@ -9,12 +9,14 @@
 - すべての「通常モジュール」は純粋なリテラル `{ .name = expr; ... }` を返す。
   - 中で参照だけ行うのは可（例: `(~prelude nsMembers)` への参照）。
   - 環境更新（nsnew/nsdef/def など副作用）は行わない。
-- 依存は `requirePure "lib/…"` を基本とし、効果のある `require` はデモ/互換用途に限る。
+- 依存は `include "lib/…"` を基本とし、効果のある `require` はデモ/互換用途に限る。
+- `include` には循環参照の検出がないため再帰的な読み込みは無限ループになる恐れがある。
+- 相互参照が必要な場合は、呼び出し側で変数を束縛し各ファイルからそれを参照するパターンを用いる。
 - 公開 API は記号キー `.name` のみ（シンボルキー限定）。
 
 読み込みの推奨形
-- 直接: `(~prelude requirePure) "lib/option.ls"` など。
-- 集約（新設）: `(~prelude requirePure) "lib/std.ls"` 経由で主要モジュールを取得。
+- 直接: `(~prelude include) "lib/option.ls"` など。
+- 集約（新設）: `(~prelude include) "lib/std.ls"` 経由で主要モジュールを取得。
 
 現状モジュール一覧（2025-08）
 - List.ls（純）: リスト操作（foldl/foldr/map/filter/append/reverse/flatMap）。

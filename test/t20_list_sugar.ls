@@ -1,1 +1,1 @@
-!{ (~~println [1, "a"]); (~~println (1 : [])) };
+!{ (!println [1, "a"]); (!println (1 : [])) };

@@ -1,0 +1,56 @@
+{
+  "name": "lazyscript-vscode",
+  "displayName": "LazyScript",
+  "description": "Syntax highlighting, diagnostics, and formatting for LazyScript (.ls)",
+  "version": "0.1.0",
+  "publisher": "local-dev",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages", "Formatters"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "lazyscript",
+        "aliases": ["LazyScript", "lazyscript"],
+        "extensions": [".ls"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lazyscript",
+        "scopeName": "source.lazyscript",
+        "path": "./syntaxes/lazyscript.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "LazyScript",
+      "properties": {
+        "lazyscript.lazyscriptPath": {
+          "type": "string",
+          "default": "lazyscript",
+          "description": "Path to lazyscript executable (for error diagnostics)."
+        },
+        "lazyscript.formatterPath": {
+          "type": "string",
+          "default": "lazyscript_format",
+          "description": "Path to lazyscript_format executable (for formatting)."
+        },
+        "lazyscript.diagnostics.debounceMs": {
+          "type": "number",
+          "default": 300,
+          "minimum": 50,
+          "description": "Debounce time (ms) before running diagnostics on change."
+        }
+      }
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mako10k/lazyscript"
+  }
+}
