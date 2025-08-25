@@ -72,10 +72,10 @@ lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void
 // current environment.  Loading errors are treated as fatal.
 lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
-  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) { lsprintf(stderr, 0, "F: include: no env\n"); return NULL; }
+  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) { return ls_make_err("include: no env"); }
   lsthunk_t* pathv = ls_eval_arg(args[0], "include: path");
   if (lsthunk_is_err(pathv)) return pathv;
-  if (!pathv) { lsprintf(stderr, 0, "F: include: path eval\n"); return NULL; }
+  if (!pathv) { return ls_make_err("include: path eval"); }
   if (lsthunk_get_type(pathv) != LSTTYPE_STR) {
     return ls_make_err("include: expected string path");
   }
@@ -83,7 +83,7 @@ lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void
   lsstr_print_bare(fp, LSPREC_LOWEST, 0, lsthunk_get_str(pathv)); fclose(fp);
   const char* path = buf;
   const lsprog_t* prog = ls_require_resolve(path);
-  if (!prog) { lsprintf(stderr, 0, "F: include: not found\n"); return NULL; }
+  if (!prog) { return ls_make_err("include: not found"); }
   // Evaluate in an isolated child environment with the current env as parent.
   lstenv_t* child = lstenv_new(tenv);
   if (debug_enabled()) {
@@ -105,7 +105,7 @@ lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void
        lsthunk_get_type(ret) == LSTTYPE_CHOICE ? "choice" : "?")) : "NULL";
     lsprintf(stderr, 0, "DBG: include: end eval ret=%p type=%s\n", (void*)ret, rt);
   }
-  if (!ret) { lsprintf(stderr, 0, "F: include: eval\n"); return NULL; }
+  if (!ret) { return ls_make_err("include: eval"); }
   return ret;
 }
 
