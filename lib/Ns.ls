@@ -1,43 +1,29 @@
 {
   .nsMembers = (~~nsMembers);
 
+  # nsHas: メンバー列に対する構造的再帰（prelude.fix を使用）
   .nsHas = \~ns -> \~k -> (
-    (
-      \~self -> \~xs ->
+    ((~~fix)
+      (\~rec -> \~xs ->
         ((\[] -> false)
-          || (\(~h : ~t) ->
+          | (\(~h : ~t) ->
                 (((\true -> true)
-                  | (\false -> (~self ~self ~t)))
+                  | (\false -> (~rec ~t)))
                  ((~~eq) ~h ~k))))
-        ~xs
-    )
-    (\~self -> \~xs ->
-        ((\[] -> false)
-          || (\(~h : ~t) ->
-                (((\true -> true)
-                  | (\false -> (~self ~self ~t)))
-                 ((~~eq) ~h ~k))))
-        ~xs)
-  ((~~nsMembers) ~ns)
+        ~xs))
+    ((~~nsMembers) ~ns)
   );
 
+  # nsGetOr: 見つかれば (~ns ~k)、なければデフォルト ~d
   .nsGetOr = \~ns -> \~k -> \~d -> (
-    (
-      \~self -> \~xs ->
+    ((~~fix)
+      (\~rec -> \~xs ->
         ((\[] -> ~d)
-          || (\(~h : ~t) ->
+          | (\(~h : ~t) ->
                 (((\true  -> (~ns ~k))
-                  | (\false -> (~self ~self ~t)))
+                  | (\false -> (~rec ~t)))
                  ((~~eq) ~h ~k))))
-        ~xs
-    )
-    (\~self -> \~xs ->
-        ((\[] -> ~d)
-          || (\(~h : ~t) ->
-                (((\true  -> (~ns ~k))
-                  | (\false -> (~self ~self ~t)))
-                 ((~~eq) ~h ~k))))
-        ~xs)
-  ((~~nsMembers) ~ns)
+        ~xs))
+    ((~~nsMembers) ~ns)
   );
 };
