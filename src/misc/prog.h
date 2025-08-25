@@ -34,3 +34,20 @@ const char* lsscan_get_sugar_ns(const lsscan_t* scanner);
 void            lsscan_add_comment(lsscan_t* scanner, lsloc_t loc, const lsstr_t* text);
 // Transfer ownership of accumulated comments to caller, resetting internal storage
 const lsarray_t* lsscan_take_comments(lsscan_t* scanner);
+
+// Comment weaving API (used by formatter):
+// Enable interleaving of source comments during printing. When active,
+// printers may call lsfmt_flush_comments_up_to to emit comments whose
+// original line is <= the given line.
+void lsfmt_set_comment_stream(const lsarray_t* comments);
+void lsfmt_flush_comments_up_to(FILE* fp, int line, int indent);
+void lsfmt_clear_comment_stream(void);
+int  lsfmt_is_active(void);
+
+// Peek the next comment without consuming; returns NULL if none.
+const lscomment_t* lsfmt_peek_next_comment(void);
+// Consume the next comment (advance index) if any.
+void lsfmt_consume_next_comment(void);
+// Hold EOL comments on a specific source line so nested printers don't emit them.
+void lsfmt_set_hold_line(int line);
+void lsfmt_clear_hold_line(void);

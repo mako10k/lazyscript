@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <string.h>
 #include <getopt.h>
+#include "misc/prog.h"
 
 // Local parse helper (duplicated from lazyscript.c)
 static const char*     g_sugar_ns = NULL;
@@ -44,38 +45,25 @@ static int format_stream_to(const char* filename, FILE* in_fp, FILE* out_fp) {
     fprintf(stderr, "Parse error in %s\n", filename);
     return 2;
   }
-  // Reproduce all source comments (best-effort) before the formatted output
-  const lsarray_t* cs  = lsprog_get_comments(prog);
-  int printed_any = 0;
-  if (cs) {
-    lssize_t n = lsarray_get_size(cs);
-    const void* const* pv = lsarray_get(cs);
-    for (lssize_t i = 0; i < n; i++) {
-      const lscomment_t* c = (const lscomment_t*)pv[i];
-      if (!c || !c->lc_text) continue;
-      const char* s = lsstr_get_buf(c->lc_text);
-      if (s && s[0]) {
-        fputs(s, out_fp);
-        fputc('\n', out_fp);
-        printed_any = 1;
+  const char* dbg = getenv("LAZYFMT_DEBUG");
+  if (dbg && dbg[0]) {
+    const lsarray_t* cs = lsprog_get_comments(prog);
+    lssize_t n = cs ? lsarray_get_size(cs) : 0;
+    fprintf(stderr, "[lazyscript_format] captured comments: %ld\n", (long)n);
+    if (dbg[0] == '2') {
+      const void* const* pv = cs ? lsarray_get(cs) : NULL;
+      for (lssize_t i = 0; i < n; i++) {
+        const lscomment_t* c = (const lscomment_t*)pv[i];
+        int ln = c ? c->lc_loc.first_line : -1;
+        const char* s = (c && c->lc_text) ? lsstr_get_buf(c->lc_text) : "";
+        fprintf(stderr, "  [c%ld] line=%d text='%s'\n", (long)i, ln, s);
       }
     }
   }
-  if (!printed_any && filename && strcmp(filename, "<stdin>") != 0 && strcmp(filename, "/dev/stdin") != 0) {
-    // Fallback: scan the file and echo comment lines that start with '#'
-    FILE* fp2 = fopen(filename, "r");
-    if (fp2) {
-      char*  line = NULL; size_t cap = 0; ssize_t len;
-      while ((len = getline(&line, &cap, fp2)) != -1) {
-        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) line[--len] = '\0';
-        size_t i = 0; while (line[i] == ' ' || line[i] == '\t') i++;
-        if (line[i] == '#') { fputs(line + i, out_fp); fputc('\n', out_fp); }
-      }
-      if (line) free(line);
-      fclose(fp2);
-    }
-  }
+  // Enable comment weaving so comments are interleaved by source position
+  lsfmt_set_comment_stream(lsprog_get_comments(prog));
   lsprog_print(out_fp, LSPREC_LOWEST, 0, prog);
+  lsfmt_clear_comment_stream();
   return 0;
 }
 
@@ -89,39 +77,24 @@ static int format_buffer_to(const char* name, const char* buf, size_t len, FILE*
     fprintf(stderr, "Parse error in %s\n", name);
     return 2;
   }
-  // Print comments from AST if any
-  const lsarray_t* cs  = lsprog_get_comments(prog);
-  int printed_any = 0;
-  if (cs) {
-    lssize_t n = lsarray_get_size(cs);
-    const void* const* pv = lsarray_get(cs);
-    for (lssize_t i = 0; i < n; i++) {
-      const lscomment_t* c = (const lscomment_t*)pv[i];
-      if (!c || !c->lc_text) continue;
-      const char* s = lsstr_get_buf(c->lc_text);
-      if (s && s[0]) { fputs(s, out_fp); fputc('\n', out_fp); printed_any = 1; }
-    }
-  }
-  if (!printed_any) {
-    // Fallback: scan buffer for leading '#' comments per line
-    size_t i = 0;
-    while (i < len) {
-      // find line end
-      size_t start = i;
-      while (i < len && buf[i] != '\n' && buf[i] != '\r') i++;
-      size_t end = i;
-      // skip CRLF
-      while (i < len && (buf[i] == '\n' || buf[i] == '\r')) i++;
-      // trim leading spaces/tabs
-      size_t j = start;
-      while (j < end && (buf[j] == ' ' || buf[j] == '\t')) j++;
-      if (j < end && buf[j] == '#') {
-        fwrite(buf + j, 1, end - j, out_fp);
-        fputc('\n', out_fp);
+  const char* dbg = getenv("LAZYFMT_DEBUG");
+  if (dbg && dbg[0]) {
+    const lsarray_t* cs = lsprog_get_comments(prog);
+    lssize_t n = cs ? lsarray_get_size(cs) : 0;
+    fprintf(stderr, "[lazyscript_format] captured comments: %ld\n", (long)n);
+    if (dbg[0] == '2') {
+      const void* const* pv = cs ? lsarray_get(cs) : NULL;
+      for (lssize_t i = 0; i < n; i++) {
+        const lscomment_t* c = (const lscomment_t*)pv[i];
+        int ln = c ? c->lc_loc.first_line : -1;
+        const char* s = (c && c->lc_text) ? lsstr_get_buf(c->lc_text) : "";
+        fprintf(stderr, "  [c%ld] line=%d text='%s'\n", (long)i, ln, s);
       }
     }
   }
+  lsfmt_set_comment_stream(lsprog_get_comments(prog));
   lsprog_print(out_fp, LSPREC_LOWEST, 0, prog);
+  lsfmt_clear_comment_stream();
   return 0;
 }
 

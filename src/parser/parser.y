@@ -208,7 +208,7 @@ ealge:
 
 expr5:
       efact { $$ = $1; }
-  | LSTSYMBOL { $$ = lsexpr_new_alge(lsealge_new($1, 0, NULL)); }
+  | LSTSYMBOL { $$ = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @$); }
   | LSTDOTSYMBOL { $$ = lsexpr_with_loc(lsexpr_new_symbol($1), @$); }
     
     ;

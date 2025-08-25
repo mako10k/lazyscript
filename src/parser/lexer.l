@@ -90,20 +90,13 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 %x COMMENT
 
 %%
-^#.*                {
-	/* beginning-of-line line comment */
-	lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_parse(yytext, yyleng));
-}
-[ ]*#.*            {
-	/* capture line comment starting with # to end-of-line */
-	/* Trim leading spaces to preserve common formatting */
-	const char* s = yytext; int len = yyleng;
-	while (len > 0 && (*s == ' ' || *s == '\t')) { s++; len--; }
-	lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_parse(s, len));
+#[^\n]*          {
+	/* line/EOL comment starting with '#' anywhere on the line */
+	lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_new(yytext, yyleng));
 }
 \{-[^-]*       { /* begin block comment */ BEGIN(COMMENT); lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_cstr("{-")); }
 <COMMENT>.*-\} { /* end block comment */ lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_cstr("-}")); BEGIN(INITIAL); }
-<COMMENT>.*    { /* accumulate block comment lines */ lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_parse(yytext, yyleng)); }
+<COMMENT>.*    { /* accumulate block comment lines */ lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_new(yytext, yyleng)); }
 [ \t\n]+    { /* ignore whitespace */ }
 [0-9]+      { yylval->intval = lsint_new(atoi(yytext)); return LSTINT; }
 [_]         { return LSTWILDCARD; }

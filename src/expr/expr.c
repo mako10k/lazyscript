@@ -10,6 +10,7 @@
 #include "expr/elambda.h"
 #include "expr/enslit.h"
 #include <assert.h>
+#include "misc/prog.h"
 
 struct lsexpr {
   lsetype_t le_type;
@@ -150,6 +151,15 @@ const lsechoice_t* lsexpr_get_choice(const lsexpr_t* expr) {
 }
 
 void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr) {
+  // Emit pending comments, with special handling for NSLIT to keep same-line EOL with '{' inside.
+  if (lsfmt_is_active()) {
+    if (expr->le_type == LSETYPE_NSLIT) {
+      int line = expr->le_loc.first_line;
+      if (line > 0) lsfmt_flush_comments_up_to(fp, line - 1, indent);
+    } else {
+      lsfmt_flush_comments_up_to(fp, expr->le_loc.first_line, indent);
+    }
+  }
   switch (expr->le_type) {
   case LSETYPE_ALGE:
     lsealge_print(fp, prec, indent, expr->le_alge);
@@ -176,11 +186,11 @@ void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr) {
     lsechoice_print(fp, prec, indent, expr->le_choice);
     return;
   case LSETYPE_NSLIT:
-    lsenslit_print(fp, prec, indent, expr->le_nslit);
+    lsenslit_print(fp, prec, indent, expr->le_nslit, expr->le_loc);
     return;
   case LSETYPE_SYMBOL:
-    // print symbol as its literal (e.g., .name)
-    lsstr_print(fp, prec, indent, expr->le_symbol);
+  // print symbol as bare (no quotes), literal includes the leading dot
+  lsstr_print_bare(fp, prec, indent, expr->le_symbol);
     return;
   }
   lsprintf(fp, indent, "Unknown expression type %d\n", expr->le_type);

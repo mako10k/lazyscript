@@ -54,6 +54,9 @@ void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eap
     lsexpr_print(stream, prec, indent, eappl->lea_func);
     return;
   }
+  if (lsfmt_is_active()) {
+    lsfmt_flush_comments_up_to(stream, lsexpr_get_loc(eappl->lea_func).first_line, indent);
+  }
   if (prec > LSPREC_APPL)
     lsprintf(stream, indent, "(");
   // Print callee: if the callee itself is an application, keep the same precedence
@@ -80,6 +83,9 @@ void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eap
           if (cb && cb[0] == '.') omit_space = 1;
         }
       }
+    }
+    if (lsfmt_is_active()) {
+      lsfmt_flush_comments_up_to(stream, lsexpr_get_loc(arg).first_line, indent);
     }
     if (!omit_space)
       lsprintf(stream, indent, " ");
