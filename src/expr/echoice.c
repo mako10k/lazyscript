@@ -39,31 +39,46 @@ void            lsechoice_print(FILE* fp, lsprec_t prec, int indent, const lsech
   indent++;
              lsprintf(fp, indent, "\n");
              while (1) {
-               // Print the left side; avoid wrapping nested choices in parens by delegating with same precedence
-               if (lsexpr_get_type(echoice->lec_left) == LSETYPE_CHOICE)
-      lsechoice_print(fp, LSPREC_CHOICE, indent, lsexpr_get_choice(echoice->lec_left));
-               else
-      lsexpr_print(fp, LSPREC_CHOICE + 1, indent, echoice->lec_left);
-
-               // Determine adjacent pair around the boundary to pick an operator.
+               // Determine adjacent pair around the boundary to pick operator and paren policy
                const lsexpr_t* left_adj = (lsexpr_get_type(echoice->lec_left) == LSETYPE_CHOICE)
                                               ? choice_rightmost_term(lsexpr_get_choice(echoice->lec_left))
                                               : echoice->lec_left;
                const lsexpr_t* right_adj = (lsexpr_get_type(echoice->lec_right) == LSETYPE_CHOICE)
                                                ? choice_leftmost_term(lsexpr_get_choice(echoice->lec_right))
                                                : echoice->lec_right;
-               const char* op_sym = (lsexpr_get_type(left_adj) == LSETYPE_LAMBDA &&
-                                     lsexpr_get_type(right_adj) == LSETYPE_LAMBDA)
-                                        ? " |\n"
-                                        : " ||\n";
+               const int both_lambda = (lsexpr_get_type(left_adj) == LSETYPE_LAMBDA &&
+                                        lsexpr_get_type(right_adj) == LSETYPE_LAMBDA);
+
+               // Print the left side; avoid wrapping nested choices; parenthesize lambda if op is '||'
+               if (lsexpr_get_type(echoice->lec_left) == LSETYPE_CHOICE) {
+      lsechoice_print(fp, LSPREC_CHOICE, indent, lsexpr_get_choice(echoice->lec_left));
+               } else {
+      lsprec_t child_prec = (!both_lambda && lsexpr_get_type(echoice->lec_left) == LSETYPE_LAMBDA)
+                                ? (LSPREC_LAMBDA + 1)
+                                : (LSPREC_CHOICE + 1);
+      lsexpr_print(fp, child_prec, indent, echoice->lec_left);
+               }
+
+               const char* op_sym = both_lambda ? " |\n" : " ||\n";
                lsprintf(fp, indent, "%s", op_sym);
 
                if (lsexpr_get_type(echoice->lec_right) != LSETYPE_CHOICE)
       break;
     echoice = lsexpr_get_choice(echoice->lec_right);
   }
-             // Print the final right term
-             lsexpr_print(fp, LSPREC_CHOICE, indent, echoice->lec_right);
+             // Print the final right term with same paren policy
+             {
+               const lsexpr_t* left_adj = (lsexpr_get_type(echoice->lec_left) == LSETYPE_CHOICE)
+                                              ? choice_rightmost_term(lsexpr_get_choice(echoice->lec_left))
+                                              : echoice->lec_left;
+               const lsexpr_t* right_adj = echoice->lec_right;
+               const int both_lambda = (lsexpr_get_type(left_adj) == LSETYPE_LAMBDA &&
+                                        lsexpr_get_type(right_adj) == LSETYPE_LAMBDA);
+               lsprec_t child_prec = (!both_lambda && lsexpr_get_type(echoice->lec_right) == LSETYPE_LAMBDA)
+                                         ? (LSPREC_LAMBDA + 1)
+                                         : (LSPREC_CHOICE);
+               lsexpr_print(fp, child_prec, indent, echoice->lec_right);
+             }
              indent--;
              if (prec > LSPREC_CHOICE)
     lsprintf(fp, indent, "\n)");
