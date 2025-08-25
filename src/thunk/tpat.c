@@ -98,13 +98,17 @@ static lstpat_t* lstpat_from_lspalge(const lspalge_t* palge, lstenv_t* tenv,
   (void)tenv;
   (void)origin;
   lssize_t  argc = lspalge_get_argc(palge);
-  lstpat_t* args[argc];
-  for (lssize_t i = 0; i < argc; i++) {
-    args[i] = lstpat_new_pat(lspalge_get_arg(palge, i), tenv, origin);
-    if (args[i] == NULL)
-      return NULL;
+  if (argc == 0) {
+    return lstpat_new_alge_internal(lspalge_get_constr(palge), 0, NULL);
+  } else {
+    lstpat_t* args[argc];
+    for (lssize_t i = 0; i < argc; i++) {
+      args[i] = lstpat_new_pat(lspalge_get_arg(palge, i), tenv, origin);
+      if (args[i] == NULL)
+        return NULL;
+    }
+    return lstpat_new_alge_internal(lspalge_get_constr(palge), argc, args);
   }
-  return lstpat_new_alge_internal(lspalge_get_constr(palge), argc, args);
 }
 
 static lstpat_t* lstpat_from_lspas(const lspas_t* pas, lstenv_t* tenv,
@@ -310,11 +314,15 @@ void             lstpat_clear_binds(lstpat_t* pat) { lstpat_clear_binds_internal
 static lstpat_t* lstpat_clone_internal(const lstpat_t* pat) {
   switch (pat->ltp_type) {
   case LSPTYPE_ALGE: {
-    lssize_t  argc = pat->alge.argc;
-    lstpat_t* args[argc];
-    for (lssize_t i = 0; i < argc; i++)
-      args[i] = lstpat_clone_internal(pat->alge.args[i]);
-    return lstpat_new_alge_internal(pat->alge.constr, argc, args);
+    lssize_t argc = pat->alge.argc;
+    if (argc == 0) {
+      return lstpat_new_alge_internal(pat->alge.constr, 0, NULL);
+    } else {
+      lstpat_t* args[argc];
+      for (lssize_t i = 0; i < argc; i++)
+        args[i] = lstpat_clone_internal(pat->alge.args[i]);
+      return lstpat_new_alge_internal(pat->alge.constr, argc, args);
+    }
   }
   case LSPTYPE_AS: {
     lstpat_t* pref    = lstpat_clone_internal(pat->as.ref);
@@ -513,13 +521,17 @@ static lstpat_t* lstpat_new_pat_reuse_only(const lspat_t* pat, lstenv_t* tenv,
   case LSPTYPE_ALGE: {
     const lspalge_t* pa   = lspat_get_alge(pat);
     lssize_t         argc = lspalge_get_argc(pa);
-    lstpat_t*        args[argc];
-    for (lssize_t i = 0; i < argc; i++) {
-      args[i] = lstpat_new_pat_reuse_only(lspalge_get_arg(pa, i), tenv, origin);
-      if (!args[i])
-        return NULL;
+    if (argc == 0) {
+      return lstpat_new_alge_internal(lspalge_get_constr(pa), 0, NULL);
+    } else {
+      lstpat_t* args[argc];
+      for (lssize_t i = 0; i < argc; i++) {
+        args[i] = lstpat_new_pat_reuse_only(lspalge_get_arg(pa, i), tenv, origin);
+        if (!args[i])
+          return NULL;
+      }
+      return lstpat_new_alge_internal(lspalge_get_constr(pa), argc, args);
     }
-    return lstpat_new_alge_internal(lspalge_get_constr(pa), argc, args);
   }
   case LSPTYPE_AS: {
     const lspas_t*   pa       = lspat_get_as(pat);
