@@ -11,6 +11,13 @@
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>
+ #include "expr/enslit.h"
+ #include "expr/eappl.h"
+ #include "expr/ealge.h"
+ #include "expr/eclosure.h"
+ #include "misc/bind.h"
+ #include "pat/pat.h"
+ #include "common/array.h"
 
 // Debug tracing for thunk evaluation (off by default). Enable with -DLS_TRACE=1
 #ifndef LS_TRACE
@@ -262,6 +269,43 @@ lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
     return lsthunk_new_ref(lsexpr_get_ref(expr), tenv);
   case LSETYPE_STR:
     return lsthunk_new_str(lsexpr_get_str(expr));
+  case LSETYPE_NSLIT: {
+    // Evaluate AST-level nslit by delegating to builtin nslit implementation.
+    // Build (~prelude nslit$2N) '.a a '.b b ... and thunk it in current env.
+    const lsenslit_t* ns = lsexpr_get_nslit(expr);
+    lssize_t ec = lsenslit_get_count(ns);
+    // Build prelude reference and symbol nslit$2N
+    const lsexpr_t* prelude = lsexpr_new_ref(lsref_new(lsstr_cstr("prelude"), lsexpr_get_loc(expr)));
+    char buf[32]; snprintf(buf, sizeof(buf), "nslit$%ld", (long)(ec * 2));
+    const lsexpr_t* sym = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
+    const lsexpr_t* call = lsexpr_new_appl(lseappl_new(prelude, 1, &sym));
+    // Build args: '.name ref(name) pairs ...
+    lssize_t argc = ec * 2;
+    const lsexpr_t** args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
+    for (lssize_t i = 0; i < ec; i++) {
+      const lsstr_t* name = lsenslit_get_name(ns, i);
+      const lsexpr_t* symi = lsexpr_new_alge(lsealge_new(name, 0, NULL));
+      args[2*i] = symi;
+      const lsref_t* r = lsref_new(name, lsexpr_get_loc(expr));
+      args[2*i + 1] = lsexpr_new_ref(r);
+    }
+    const lsexpr_t* base = lsexpr_new_appl(lseappl_new(call, argc, args));
+    if (ec == 0) return lsthunk_new_expr(base, tenv);
+    // Wrap with closure binds: \a -> \b -> base then apply e1 e2 ...
+  const lsarray_t* binds = NULL;
+    for (lssize_t i = 0; i < ec; i++) {
+      const lsstr_t* name = lsenslit_get_name(ns, i);
+      const lsexpr_t* rhs = lsenslit_get_expr(ns, i);
+      const lsref_t* r = lsref_new(name, lsexpr_get_loc(expr));
+      const lspat_t* p = lspat_new_ref(r);
+      const lsbind_t* b = lsbind_new(p, rhs);
+      binds = lsarray_push((lsarray_t*)binds, (void*)b);
+    }
+    lssize_t bc = lsarray_get_size(binds);
+    const lsbind_t* const* bs = (const lsbind_t* const*)lsarray_get(binds);
+    const lseclosure_t* cl = lseclosure_new(base, bc, bs);
+    return lsthunk_new_eclosure(cl, tenv);
+  }
   }
   assert(0);
 }

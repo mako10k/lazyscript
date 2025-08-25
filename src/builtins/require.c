@@ -13,6 +13,11 @@
 const lsprog_t* lsparse_file_nullable(const char* filename);
 const lsprog_t* lsparse_file(const char* filename);
 
+static int debug_enabled(void) {
+  const char* d = getenv("LAZYSCRIPT_DEBUG");
+  return d && *d;
+}
+
 static const lsprog_t* ls_require_resolve(const char* path) {
   const lsprog_t* prog = lsparse_file_nullable(path);
   if (prog) return prog;
@@ -81,8 +86,25 @@ lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void
   if (!prog) { lsprintf(stderr, 0, "F: include: not found\n"); return NULL; }
   // Evaluate in an isolated child environment with the current env as parent.
   lstenv_t* child = lstenv_new(tenv);
+  if (debug_enabled()) {
+    lsprintf(stderr, 0, "DBG: include: begin eval path=");
+    lsprintf(stderr, 0, "%s\n", path);
+  }
   // Do NOT enable effects here; pure modules will work, effectful ones will raise at call sites.
   lsthunk_t* ret = lsprog_eval(prog, child);
+  if (debug_enabled()) {
+    const char* rt = ret ? (lsthunk_is_err(ret) ? "#err" :
+      (lsthunk_get_type(ret) == LSTTYPE_ALGE ? "alge" :
+       lsthunk_get_type(ret) == LSTTYPE_APPL ? "appl" :
+       lsthunk_get_type(ret) == LSTTYPE_LAMBDA ? "lambda" :
+       lsthunk_get_type(ret) == LSTTYPE_REF ? "ref" :
+       lsthunk_get_type(ret) == LSTTYPE_INT ? "int" :
+       lsthunk_get_type(ret) == LSTTYPE_STR ? "str" :
+       lsthunk_get_type(ret) == LSTTYPE_SYMBOL ? "symbol" :
+       lsthunk_get_type(ret) == LSTTYPE_BUILTIN ? "builtin" :
+       lsthunk_get_type(ret) == LSTTYPE_CHOICE ? "choice" : "?")) : "NULL";
+    lsprintf(stderr, 0, "DBG: include: end eval ret=%p type=%s\n", (void*)ret, rt);
+  }
   if (!ret) { lsprintf(stderr, 0, "F: include: eval\n"); return NULL; }
   return ret;
 }

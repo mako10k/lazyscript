@@ -15,6 +15,7 @@ typedef struct lsexpr lsexpr_t;
 #include "expr/echoice.h"
 #include "expr/eclosure.h"
 #include "expr/elambda.h"
+#include "expr/enslit.h"
 
 /** Expression type. */
 typedef enum {
@@ -26,6 +27,7 @@ typedef enum {
   LSETYPE_STR,
   LSETYPE_CLOSURE,
   LSETYPE_CHOICE,
+  LSETYPE_NSLIT,
 } lsetype_t;
 
 #define lsapi_expr_new lsapi_nn1 lsapi_wur
@@ -38,6 +40,7 @@ lsapi_expr_new const lsexpr_t* lsexpr_new_str(const lsstr_t* str);
 lsapi_expr_new const lsexpr_t* lsexpr_new_lambda(const lselambda_t* elambda);
 lsapi_expr_new const lsexpr_t* lsexpr_new_closure(const lseclosure_t* eclosure);
 lsapi_expr_new const lsexpr_t* lsexpr_new_choice(const lsechoice_t* echoice);
+lsapi_expr_new const lsexpr_t* lsexpr_new_nslit(const lsenslit_t* ens);
 lsapi_get lsetype_t            lsexpr_get_type(const lsexpr_t* expr);
 lsapi_get const lsealge_t*     lsexpr_get_alge(const lsexpr_t* expr);
 lsapi_get const lseappl_t*     lsexpr_get_appl(const lsexpr_t* expr);
@@ -47,6 +50,7 @@ lsapi_get const lsstr_t*       lsexpr_get_str(const lsexpr_t* expr);
 lsapi_get const lselambda_t*   lsexpr_get_lambda(const lsexpr_t* expr);
 lsapi_get const lseclosure_t*  lsexpr_get_closure(const lsexpr_t* expr);
 lsapi_get const lsechoice_t*   lsexpr_get_choice(const lsexpr_t* expr);
+lsapi_get const lsenslit_t*    lsexpr_get_nslit(const lsexpr_t* expr);
 lsapi_print void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr);
 
 // Location helpers

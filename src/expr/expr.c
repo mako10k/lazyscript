@@ -8,6 +8,7 @@
 #include "expr/echoice.h"
 #include "expr/eclosure.h"
 #include "expr/elambda.h"
+#include "expr/enslit.h"
 #include <assert.h>
 
 struct lsexpr {
@@ -22,6 +23,7 @@ struct lsexpr {
     const lsechoice_t*  le_choice;
     const lsint_t*      le_intval;
     const lsstr_t*      le_strval;
+  const lsenslit_t*   le_nslit;
   };
 };
 
@@ -33,6 +35,13 @@ const lsexpr_t* lsexpr_new_alge(const lsealge_t* ealge) {
   return expr;
 }
 
+const lsexpr_t* lsexpr_new_nslit(const lsenslit_t* ens) {
+  lsexpr_t* expr   = lsmalloc(sizeof(lsexpr_t));
+  expr->le_type    = LSETYPE_NSLIT;
+  expr->le_loc     = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_nslit   = ens;
+  return expr;
+}
 const lsexpr_t* lsexpr_new_appl(const lseappl_t* eappl) {
   lsexpr_t* expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type  = LSETYPE_APPL;
@@ -157,6 +166,9 @@ void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr) {
   case LSETYPE_CHOICE:
     lsechoice_print(fp, prec, indent, expr->le_choice);
     return;
+  case LSETYPE_NSLIT:
+    lsenslit_print(fp, prec, indent, expr->le_nslit);
+    return;
   }
   lsprintf(fp, indent, "Unknown expression type %d\n", expr->le_type);
 }
@@ -165,6 +177,10 @@ lsloc_t lsexpr_get_loc(const lsexpr_t* expr) {
   return expr->le_loc;
 }
 
+const lsenslit_t* lsexpr_get_nslit(const lsexpr_t* expr) {
+  assert(expr->le_type == LSETYPE_NSLIT);
+  return expr->le_nslit;
+}
 const lsexpr_t* lsexpr_with_loc(const lsexpr_t* expr_in, lsloc_t loc) {
   // cast away const for internal mutation; API returns same pointer as const
   lsexpr_t* expr = (lsexpr_t*)expr_in;

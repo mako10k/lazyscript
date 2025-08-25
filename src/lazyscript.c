@@ -52,7 +52,7 @@ const lsprog_t*    lsparse_stream(const char* filename, FILE* in_str) {
   if (g_sugar_ns && g_sugar_ns[0])
     lsscan_set_sugar_ns(lsscan, g_sugar_ns);
   int             ret  = yyparse(yyscanner);
-     const lsprog_t* prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
+  const lsprog_t* prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
      yylex_destroy(yyscanner);
      return prog;
 }
@@ -414,22 +414,27 @@ static void ls_bind_prelude_value(lstenv_t* tenv) {
   if (ls_effects_get_strict()) ls_effects_end();
     if (core_ns) {
       lstenv_put_builtin(tenv, lsstr_cstr("builtins"), 0, lsbuiltin_getter0_local, core_ns);
+      if (g_debug) lsprintf(stderr, 0, "DBG: prelude-bind: injected ~builtins\n");
     }
   }
   // 1.5) Inject ~internal into this env for Prelude evaluation
   {
     lsthunk_t* internal_ns = lsthunk_new_builtin(lsstr_cstr("prelude.internal"), 1, lsbuiltin_prelude_internal_dispatch, tenv);
     lstenv_put_builtin(tenv, lsstr_cstr("internal"), 0, lsbuiltin_getter0_local, internal_ns);
+    if (g_debug) lsprintf(stderr, 0, "DBG: prelude-bind: injected ~internal\n");
   }
   // 2) Evaluate Prelude.ls in a child env via include and capture the returned namespace value
+  if (g_debug) lsprintf(stderr, 0, "DBG: prelude-bind: include Prelude.ls begin\n");
   lsthunk_t* parg = lsthunk_new_str(lsstr_cstr("lib/Prelude.ls"));
   lsthunk_t* pargv[1] = { parg };
   lsthunk_t* pval = lsbuiltin_prelude_include(1, pargv, tenv);
+  if (g_debug) lsprintf(stderr, 0, "DBG: prelude-bind: include Prelude.ls end pval=%p\n", (void*)pval);
   if (!pval) return;
   // 3) Rebind name "prelude" to a MUX that preserves special builtins
   prelude_mux_t* data = (prelude_mux_t*)lsmalloc(sizeof(prelude_mux_t));
   data->pval = pval; data->tenv = tenv;
   lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, lsbuiltin_prelude_mux, data);
+  if (g_debug) lsprintf(stderr, 0, "DBG: prelude-bind: bound prelude mux\n");
   // 3.5) Sugar nslit$N continues to hit the builtin dispatcher via the plugin-registered
   // prelude$builtin alias. The plugin registers both "prelude" and "prelude$builtin".
 }
@@ -539,8 +544,20 @@ int main(int argc, char** argv) {
         g_run_main         = 0; // -e は従来通り：最終値を出力
         // Optional: begin trace dump for this evaluation
         if (g_trace_dump_path && g_trace_dump_path[0]) lstrace_begin_dump(g_trace_dump_path);
+        if (g_debug) lsprintf(stderr, 0, "DBG: eval(-e) begin\n");
         lsthunk_t* ret     = lsprog_eval(prog, tenv);
+        if (g_debug) lsprintf(stderr, 0, "DBG: eval(-e) end ret=%p\n", (void*)ret);
         if (ret != NULL) {
+          if (g_debug) {
+            const char* rt = "?";
+            if (lsthunk_is_err(ret)) rt = "#err"; else switch (lsthunk_get_type(ret)) {
+              case LSTTYPE_ALGE: rt = "alge"; break; case LSTTYPE_APPL: rt = "appl"; break;
+              case LSTTYPE_LAMBDA: rt = "lambda"; break; case LSTTYPE_REF: rt = "ref"; break;
+              case LSTTYPE_INT: rt = "int"; break; case LSTTYPE_STR: rt = "str"; break;
+              case LSTTYPE_SYMBOL: rt = "symbol"; break; case LSTTYPE_BUILTIN: rt = "builtin"; break;
+              case LSTTYPE_CHOICE: rt = "choice"; break; }
+            lsprintf(stderr, 0, "DBG: eval(-e) ret-type=%s\n", rt);
+          }
           if (lsthunk_is_err(ret)) {
             lsprintf(stderr, 0, "E: ");
             lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
@@ -548,8 +565,10 @@ int main(int argc, char** argv) {
               lstrace_print_stack(stderr, g_trace_stack_depth);
             lsprintf(stderr, 0, "\n");
           } else {
+            if (g_debug) lsprintf(stderr, 0, "DBG: print ret begin\n");
             lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
             lsprintf(stdout, 0, "\n");
+            if (g_debug) lsprintf(stderr, 0, "DBG: print ret end\n");
           }
         }
         g_run_main = saved_run_main;

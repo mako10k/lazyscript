@@ -89,6 +89,7 @@ static void print_value_like(FILE* fp, int indent, const lsexpr_t* expr) {
   }
   case LSETYPE_CHOICE:
   case LSETYPE_CLOSURE:
+  case LSETYPE_NSLIT:
     lsexpr_print(fp, LSPREC_LOWEST, indent, expr);
     return;
   }

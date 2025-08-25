@@ -195,7 +195,9 @@ lssize_t         lsarray_get_size(const lsarray_t* ary) { return ary == NULL ? 0
 
 const lsarray_t* lsarray_push(const lsarray_t* ary, const void* val) {
   if (ary == NULL || ary->la_size == 0)
-    return lsarray_new(1, &val);
+  // BUGFIX: pass val itself, not &val. Using &val stores the address of the local
+  // parameter variable which becomes dangling after return, leading to crashes.
+  return lsarray_new(1, val);
   lsarray_t* new_ary = lsmalloc(sizeof(lsarray_t));
   new_ary->la_values = lsa_push(ary->la_size, ary->la_values, val);
   new_ary->la_size   = lsarray_get_size(ary) + 1;

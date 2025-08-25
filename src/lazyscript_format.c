@@ -43,6 +43,25 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Parse error in %s\n", filename);
     return 2;
   }
+  // Reproduce leading comments before the program expression
+  const lsexpr_t* expr = lsprog_get_expr(prog);
+  lsloc_t         eloc = lsexpr_get_loc(expr);
+  const lsarray_t* cs  = lsprog_get_comments(prog);
+  if (cs) {
+    lssize_t n = lsarray_get_size(cs);
+    const void* const* pv = lsarray_get(cs);
+    for (lssize_t i = 0; i < n; i++) {
+      const lscomment_t* c = (const lscomment_t*)pv[i];
+      if (!c || !c->lc_text) continue;
+      if (c->lc_loc.first_line < eloc.first_line) {
+        const char* s = lsstr_get_buf(c->lc_text);
+        if (s && s[0]) {
+          fputs(s, stdout);
+          fputc('\n', stdout);
+        }
+      }
+    }
+  }
   lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
   return 0;
 }

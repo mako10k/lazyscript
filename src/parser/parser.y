@@ -131,8 +131,8 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %%
 
 prog:
-      expr ';' { $$ = lsprog_new($1); lsscan_set_prog(yyget_extra(yyscanner), $$); }
-    | expr     { $$ = lsprog_new($1); lsscan_set_prog(yyget_extra(yyscanner), $$); }
+      expr ';' { $$ = lsprog_new($1, lsscan_take_comments(yyget_extra(yyscanner))); lsscan_set_prog(yyget_extra(yyscanner), $$); }
+    | expr     { $$ = lsprog_new($1, lsscan_take_comments(yyget_extra(yyscanner))); lsscan_set_prog(yyget_extra(yyscanner), $$); }
     ;
 
 bind:
@@ -298,95 +298,34 @@ efact:
       }
   | '!' '{' dostmts '}' { $$ = $3; }
     | '!' '!' '{' nsentries '}' {
-        // Immutable namespace literal sugar (effect-safe):
-        // !!{ a = e1; b = e2; } =>
-        //   (\a -> \b -> (~prelude nslit$4) 'a a 'b b) e1 e2
-        const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
-        const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
+        // Build AST-level immutable namespace literal (!!{ ... })
         lssize_t ec = $4 ? lsarray_get_size($4) : 0;
-        lssize_t argc = ec * 2;
-        char buf[32]; snprintf(buf, sizeof(buf), "nslit$%ld", (long)argc);
-        const lsexpr_t *sym_nslit = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
-        const lsexpr_t *fn_nslit = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_nslit));
-        const lsexpr_t **args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
-        // Fill symbol and ref pairs
+        const lsstr_t** names = ec ? lsmalloc(sizeof(lsstr_t*) * ec) : NULL;
+        const lsexpr_t** exprs = ec ? lsmalloc(sizeof(lsexpr_t*) * ec) : NULL;
         for (lssize_t i = 0; i < ec; i++) {
           const lsarray_t *ent = (const lsarray_t*)lsarray_get($4)[i];
           const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[0];
-          args[2*i] = sym;
-          lsloc_t loc = lsexpr_get_loc(sym);
           const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
-          const lsref_t *r = lsref_new(sname, loc);
-          args[2*i+1] = lsexpr_with_loc(lsexpr_new_ref(r), loc);
+          names[i] = sname;
+          exprs[i] = (const lsexpr_t*)lsarray_get(ent)[1];
         }
-        const lsexpr_t *base_ns = lsexpr_new_appl(lseappl_new(fn_nslit, argc, args));
-        if (ec == 0) { $$ = base_ns; }
-        else {
-          // Build closure binds for each member name = rhs
-          const lsarray_t *binds = NULL;
-          for (lssize_t i = 0; i < ec; i++) {
-            const lsarray_t *ent = (const lsarray_t*)lsarray_get($4)[i];
-            const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[0];
-            lsloc_t loc = lsexpr_get_loc(sym);
-            const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
-            const lsref_t *r = lsref_new(sname, loc);
-            const lspat_t *p = lspat_new_ref(r);
-            const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[1];
-            const lsbind_t *b = lsbind_new(p, rhs);
-            if (!binds) binds = lsarray_new(1, b);
-            else binds = lsarray_push((lsarray_t*)binds, (void*)b);
-          }
-          lssize_t bc = lsarray_get_size(binds);
-          const lsbind_t *const *bs = (const lsbind_t *const *)lsarray_get(binds);
-          const lseclosure_t *cl = lseclosure_new(base_ns, bc, bs);
-          $$ = lsexpr_with_loc(lsexpr_new_closure(cl), @$);
-        }
+        const lsenslit_t *ns = lsenslit_new(ec, names, exprs);
+        $$ = lsexpr_with_loc(lsexpr_new_nslit(ns), @$);
       }
     | '{' nslit_entries '}' {
-          // Pure namespace literal sugar (members only):
-          // { .a = e1; .b = e2; } =>
-          //   let base = (~prelude nslit$4) '.a a '.b b in
-          //   (\a -> \b -> base) e1 e2
-          const char *nsname = lsscan_get_sugar_ns(yyget_extra(yyscanner));
-          const lsexpr_t *prelude = lsexpr_new_ref(lsref_new(lsstr_cstr(nsname), @$));
+          // Build AST-level pure namespace literal ({ ... })
           lssize_t ec = $2 ? lsarray_get_size($2) : 0;
-          lssize_t argc = ec * 2;
-          char buf[32];
-          snprintf(buf, sizeof(buf), "nslit$%ld", (long)argc);
-          const lsexpr_t *sym_nslit = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
-          const lsexpr_t *fn_nslit = lsexpr_new_appl(lseappl_new(prelude, 1, &sym_nslit));
-          const lsexpr_t **args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
+          const lsstr_t** names = ec ? lsmalloc(sizeof(lsstr_t*) * ec) : NULL;
+          const lsexpr_t** exprs = ec ? lsmalloc(sizeof(lsexpr_t*) * ec) : NULL;
           for (lssize_t i = 0; i < ec; i++) {
             const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
             const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
-            args[2*i] = sym;
-            lsloc_t loc = lsexpr_get_loc(sym);
             const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
-            const lsref_t *r = lsref_new(sname, loc);
-            args[2*i+1] = lsexpr_with_loc(lsexpr_new_ref(r), loc);
+            names[i] = sname;
+            exprs[i] = (const lsexpr_t*)lsarray_get(ent)[2];
           }
-          const lsexpr_t *base_ns = lsexpr_new_appl(lseappl_new(fn_nslit, argc, args));
-          if (ec == 0) { $$ = base_ns; }
-          else {
-            // Build closure binds for each member name = rhs (from entries)
-            const lsarray_t *binds = NULL;
-            for (lssize_t i = 0; i < ec; i++) {
-              const lsarray_t *ent = (const lsarray_t*)lsarray_get($2)[i];
-              const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[1];
-              lsloc_t loc = lsexpr_get_loc(sym);
-              const lsstr_t *sname = lsealge_get_constr(lsexpr_get_alge(sym));
-              const lsref_t *r = lsref_new(sname, loc);
-              const lspat_t *p = lspat_new_ref(r);
-              const lsexpr_t *rhs = (const lsexpr_t*)lsarray_get(ent)[2];
-              const lsbind_t *b = lsbind_new(p, rhs);
-              if (!binds) binds = lsarray_new(1, b);
-              else binds = lsarray_push((lsarray_t*)binds, (void*)b);
-            }
-            lssize_t bc = lsarray_get_size(binds);
-            const lsbind_t *const *bs = (const lsbind_t *const *)lsarray_get(binds);
-            const lseclosure_t *cl = lseclosure_new(base_ns, bc, bs);
-            $$ = lsexpr_with_loc(lsexpr_new_closure(cl), @$);
-          }
+          const lsenslit_t *ns = lsenslit_new(ec, names, exprs);
+          $$ = lsexpr_with_loc(lsexpr_new_nslit(ns), @$);
         }
     ;
 
