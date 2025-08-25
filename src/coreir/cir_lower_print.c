@@ -91,6 +91,7 @@ static void print_value_like(FILE* fp, int indent, const lsexpr_t* expr) {
   case LSETYPE_CHOICE:
   case LSETYPE_CLOSURE:
   case LSETYPE_NSLIT:
+  case LSETYPE_SYMBOL:
     lsexpr_print(fp, LSPREC_LOWEST, indent, expr);
     return;
   }
@@ -512,6 +513,10 @@ static void cir_print_val(FILE* ofp, int ind, const lscir_value_t* v);
 static void cir_print_expr(FILE* ofp, int ind, const lscir_expr_t* e2);
 
 static void cir_print_val(FILE* ofp, int ind, const lscir_value_t* v) {
+  if (!v) {
+    fprintf(ofp, "<null-val>");
+    return;
+  }
   switch (v->kind) {
   case LCIR_VAL_INT:
     fprintf(ofp, "(int %lld)", v->ival);
@@ -553,6 +558,10 @@ static void cir_print_val(FILE* ofp, int ind, const lscir_value_t* v) {
 }
 
 static void cir_print_expr(FILE* ofp, int ind, const lscir_expr_t* e2) {
+  if (!e2) {
+    fprintf(ofp, "<null-expr>");
+    return;
+  }
   switch (e2->kind) {
   case LCIR_EXP_VAL:
     cir_print_val(ofp, ind, e2->v);
