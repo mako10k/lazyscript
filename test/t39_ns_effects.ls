@@ -1,3 +1,3 @@
 !{
-  !println (~~to_str (~~nsMembers (!!{ .a = 1 })));
+  !println (~~to_str (~~nsMembers ({ .a = 1 })));
 };

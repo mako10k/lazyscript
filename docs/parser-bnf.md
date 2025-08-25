@@ -73,25 +73,16 @@
          | <closure>
          | <elambda>
          | '!' '{' <dostmts> '}'
-         | '!' '!' '{' <nsentries> '}'
          | '{' <nslit_entries> '}'
 
-/* nsentries: !!{ ... } の項目 */
-<nsentries> ::= ε
-              | <nsentry>
-              | <nsentries> ';' <nsentry>
-              | <nsentries> ';'
-
-<nsentry> ::= LSTSYMBOL '=' <expr>
-
-/* nslit_entries: 純粋な名前空間リテラル (メンバとローカルを混在可) */
+/* nslit_entries: 純粋な名前空間リテラル (メンバのみ) */
 <nslit_entries> ::= ε
                   | <nslit_entry>
                   | <nslit_entries> ';' <nslit_entry>
                   | <nslit_entries> ';'
 
-<nslit_entry> ::= LSTSYMBOL '=' <expr>
-                | <pat> LSTLEFTARROW <expr>
+<nslit_entry> ::= LSTDOTSYMBOL '=' <expr>
+                | LSTDOTSYMBOL <lamparams> '=' <expr>
 
 /* do-block スタイル（dostmt: 中間ノード） */
 <dostmts> ::= ε

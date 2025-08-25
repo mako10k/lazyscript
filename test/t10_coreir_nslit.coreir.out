@@ -1,0 +1,2 @@
+; CoreIR dump (temporary)
+(nslit (a (int 1)) (b (int 2)))
