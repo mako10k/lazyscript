@@ -43,23 +43,40 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Parse error in %s\n", filename);
     return 2;
   }
-  // Reproduce leading comments before the program expression
-  const lsexpr_t* expr = lsprog_get_expr(prog);
-  lsloc_t         eloc = lsexpr_get_loc(expr);
+  // Reproduce all source comments (best-effort) before the formatted output
   const lsarray_t* cs  = lsprog_get_comments(prog);
+  int printed_any = 0;
   if (cs) {
     lssize_t n = lsarray_get_size(cs);
     const void* const* pv = lsarray_get(cs);
     for (lssize_t i = 0; i < n; i++) {
       const lscomment_t* c = (const lscomment_t*)pv[i];
       if (!c || !c->lc_text) continue;
-      if (c->lc_loc.first_line < eloc.first_line) {
-        const char* s = lsstr_get_buf(c->lc_text);
-        if (s && s[0]) {
-          fputs(s, stdout);
-          fputc('\n', stdout);
-        }
+      const char* s = lsstr_get_buf(c->lc_text);
+      if (s && s[0]) {
+        fputs(s, stdout);
+        fputc('\n', stdout);
+        printed_any = 1;
       }
+    }
+  }
+  if (!printed_any) {
+    // Fallback: scan the file and echo comment lines
+    FILE* fp2 = fopen(filename, "r");
+    if (fp2) {
+      char*  line = NULL; size_t cap = 0; ssize_t len;
+      while ((len = getline(&line, &cap, fp2)) != -1) {
+        // Trim trailing '\n'
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) line[--len] = '\0';
+        // Detect leading spaces + '#'
+        size_t i = 0; while (line[i] == ' ' || line[i] == '\t') i++;
+        if (line[i] == '#') {
+          fputs(line + i, stdout); fputc('\n', stdout);
+        }
+        // TODO: Optionally handle block comments {- -} if needed
+      }
+      if (line) free(line);
+      fclose(fp2);
     }
   }
   lsprog_print(stdout, LSPREC_LOWEST, 0, prog);

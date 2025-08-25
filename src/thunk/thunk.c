@@ -279,15 +279,16 @@ lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
     char buf[32]; snprintf(buf, sizeof(buf), "nslit$%ld", (long)(ec * 2));
     const lsexpr_t* sym = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
     const lsexpr_t* call = lsexpr_new_appl(lseappl_new(prelude, 1, &sym));
-    // Build args: '.name ref(name) pairs ...
+    // Build args: '.name value pairs ... (value is the original expression thunk)
     lssize_t argc = ec * 2;
     const lsexpr_t** args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
     for (lssize_t i = 0; i < ec; i++) {
       const lsstr_t* name = lsenslit_get_name(ns, i);
       const lsexpr_t* symi = lsexpr_new_alge(lsealge_new(name, 0, NULL));
       args[2*i] = symi;
-      const lsref_t* r = lsref_new(name, lsexpr_get_loc(expr));
-      args[2*i + 1] = lsexpr_new_ref(r);
+      // Use the original member expression as the value; wrapping and nsSelf
+      // handling are performed in lsbuiltin_nslit via member wrappers.
+      args[2*i + 1] = lsenslit_get_expr(ns, i);
     }
     const lsexpr_t* base = lsexpr_new_appl(lseappl_new(call, argc, args));
   // No implicit closure-binds for member names; rely on explicit (~prelude .nsSelf)

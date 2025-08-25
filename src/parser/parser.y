@@ -360,6 +360,18 @@ nslit_entry:
     const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @1);
     $$ = lsarray_new(3, tag, sym, $3);
   }
+  | LSTSYMBOL lamparams '=' expr {
+    // .sym p1 p2 ... = body  ==>  .sym = \p1 -> \p2 -> ... -> body
+    const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
+    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @1);
+    lssize_t argc = lsarray_get_size($2);
+    const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
+    const lsexpr_t *b = $4;
+    for (lssize_t i = argc; i > 0; i--) {
+      b = lsexpr_new_lambda(lselambda_new(ps[i - 1], b));
+    }
+    $$ = lsarray_new(3, tag, sym, b);
+  }
   ;
 
 // do-block style sugar inside braces

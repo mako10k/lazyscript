@@ -44,9 +44,28 @@ void lsenslit_print(FILE* fp, lsprec_t prec, int indent, const lsenslit_t* ns) {
     if (!(nb && nb[0] == '.'))
       lsprintf(fp, 0, ".");
     lsstr_print_bare(fp, LSPREC_LOWEST, 0, name);
-    lsprintf(fp, 0, " = ");
-    // Print expression; allow nested printers to indent relative to current level
-    lsexpr_print(fp, LSPREC_LOWEST, indent + 1, ns->exprs[i]);
+    // If RHS is a lambda-chain, print in sugared form: .sym p1 p2 = body
+    const lsexpr_t* rhs = ns->exprs[i];
+    if (lsexpr_typeof(rhs) == LSEQ_LAMBDA) {
+      const lsexpr_t* body = rhs;
+      const lspat_t* params[64];
+      int pc = 0;
+      while (lsexpr_typeof(body) == LSEQ_LAMBDA && pc < 64) {
+        const lselambda_t* lam = lsexpr_get_lambda(body);
+        params[pc++] = lselambda_get_param(lam);
+        body = lselambda_get_body(lam);
+      }
+      for (int j = 0; j < pc; j++) {
+        lsprintf(fp, 0, " ");
+        lspat_print(fp, LSPREC_APPL + 1, indent + 1, params[j]);
+      }
+      lsprintf(fp, 0, " = ");
+      lsexpr_print(fp, LSPREC_LOWEST, indent + 1, body);
+    } else {
+      lsprintf(fp, 0, " = ");
+      // Print expression; allow nested printers to indent relative to current level
+      lsexpr_print(fp, LSPREC_LOWEST, indent + 1, rhs);
+    }
     // End entry and set indentation for next line
     if (i + 1 < n)
       lsprintf(fp, indent + 1, ";\n");
