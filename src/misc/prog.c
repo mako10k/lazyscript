@@ -14,6 +14,8 @@ struct lsscan {
   const char*      ls_filename;
   const char*      ls_sugar_ns;
   const lsarray_t* ls_comments; // array of lscomment_t*
+  int              ls_seen_token; // have we emitted any token yet?
+  int              ls_tight_since_last; // no whitespace since last token
 };
 
 const lsprog_t* lsprog_new(const lsexpr_t* expr, const lsarray_t* comments) {
@@ -49,6 +51,8 @@ lsscan_t* lsscan_new(const char* filename) {
   scanner->ls_filename = filename;
   scanner->ls_sugar_ns = "prelude";
   scanner->ls_comments = NULL;
+  scanner->ls_seen_token = 0;
+  scanner->ls_tight_since_last = 0;
   return scanner;
 }
 
@@ -82,6 +86,20 @@ const lsarray_t* lsscan_take_comments(lsscan_t* scanner) {
   const lsarray_t* out = scanner ? scanner->ls_comments : NULL;
   if (scanner) scanner->ls_comments = NULL;
   return out;
+}
+
+void lsscan_note_ws(lsscan_t* scanner) {
+  if (!scanner) return;
+  scanner->ls_tight_since_last = 0;
+}
+
+int lsscan_consume_tight(lsscan_t* scanner) {
+  if (!scanner) return 0;
+  int tight = (scanner->ls_seen_token && scanner->ls_tight_since_last) ? 1 : 0;
+  // After consuming, mark that next token will consider adjacency anew
+  scanner->ls_seen_token = 1;
+  scanner->ls_tight_since_last = 1; // assume tight until whitespace noted
+  return tight;
 }
 
 // --- Comment weaving runtime (simplistic, global state for formatter run) ---

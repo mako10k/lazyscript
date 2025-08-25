@@ -35,6 +35,12 @@ void            lsscan_add_comment(lsscan_t* scanner, lsloc_t loc, const lsstr_t
 // Transfer ownership of accumulated comments to caller, resetting internal storage
 const lsarray_t* lsscan_take_comments(lsscan_t* scanner);
 
+// --- Scanner whitespace/tight-adjacency helpers ---
+// Mark that whitespace was seen since the last token.
+void lsscan_note_ws(lsscan_t* scanner);
+// Consume and return current tight-adjacency flag (1 when no whitespace since previous token and at least one token was produced).
+int  lsscan_consume_tight(lsscan_t* scanner);
+
 // Comment weaving API (used by formatter):
 // Enable interleaving of source comments during printing. When active,
 // printers may call lsfmt_flush_comments_up_to to emit comments whose

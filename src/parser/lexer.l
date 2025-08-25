@@ -97,7 +97,7 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 \{-[^-]*       { /* begin block comment */ BEGIN(COMMENT); lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_cstr("{-")); }
 <COMMENT>.*-\} { /* end block comment */ lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_cstr("-}")); BEGIN(INITIAL); }
 <COMMENT>.*    { /* accumulate block comment lines */ lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_new(yytext, yyleng)); }
-[ \t\n]+    { /* ignore whitespace */ }
+[ \t\n]+    { /* whitespace resets tight-adjacency */ lsscan_note_ws(yyget_extra(yyscanner)); }
 [0-9]+      { yylval->intval = lsint_new(atoi(yytext)); return LSTINT; }
 [_]         { return LSTWILDCARD; }
 [.][\']([^\\\']|\\.)*[\'] {
