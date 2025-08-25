@@ -290,21 +290,9 @@ lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
       args[2*i + 1] = lsexpr_new_ref(r);
     }
     const lsexpr_t* base = lsexpr_new_appl(lseappl_new(call, argc, args));
-    if (ec == 0) return lsthunk_new_expr(base, tenv);
-    // Wrap with closure binds: \a -> \b -> base then apply e1 e2 ...
-  const lsarray_t* binds = NULL;
-    for (lssize_t i = 0; i < ec; i++) {
-      const lsstr_t* name = lsenslit_get_name(ns, i);
-      const lsexpr_t* rhs = lsenslit_get_expr(ns, i);
-      const lsref_t* r = lsref_new(name, lsexpr_get_loc(expr));
-      const lspat_t* p = lspat_new_ref(r);
-      const lsbind_t* b = lsbind_new(p, rhs);
-      binds = lsarray_push((lsarray_t*)binds, (void*)b);
-    }
-    lssize_t bc = lsarray_get_size(binds);
-    const lsbind_t* const* bs = (const lsbind_t* const*)lsarray_get(binds);
-    const lseclosure_t* cl = lseclosure_new(base, bc, bs);
-    return lsthunk_new_eclosure(cl, tenv);
+  // No implicit closure-binds for member names; rely on explicit (~prelude .nsSelf)
+  // or user-provided closures for mutual references.
+  return lsthunk_new_expr(base, tenv);
   }
   }
   assert(0);
