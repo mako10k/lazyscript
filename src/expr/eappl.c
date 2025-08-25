@@ -63,6 +63,65 @@ static int is_dot_symbol_or_ctor(const lsexpr_t* e) {
   return 0;
 }
 
+// Return 1 if e is a dot-symbol exactly named dotName (e.g., ".env"), supporting
+// both symbol literal (preferred) and zero-arity algebraic constructor fallback.
+static int is_dot_symbol_named(const lsexpr_t* e, const char* dotName) {
+  if (!e || !dotName) return 0;
+  lsexpr_type_query_t t = lsexpr_typeof(e);
+  if (t == LSEQ_SYMBOL) {
+    const lsstr_t* s = lsexpr_get_symbol(e);
+    const char*    b = s ? lsstr_get_buf(s) : NULL;
+    return b && strcmp(b, dotName) == 0;
+  }
+  if (t == LSEQ_ALGE) {
+    const lsealge_t* a = lsexpr_get_alge(e);
+    if (lsealge_get_argc(a) != 0) return 0;
+    const lsstr_t* cn = lsealge_get_constr(a);
+    const char*    cb = cn ? lsstr_get_buf(cn) : NULL;
+    return cb && strcmp(cb, dotName) == 0;
+  }
+  return 0;
+}
+
+// Detect (~prelude .env .sym) application shape at this level:
+//   ap(argc=1, arg0 = .sym, func = ap(argc=1, arg0 = .env, func = ref prelude))
+// If matched, returns 1 and sets *out_sym_no_dot to symbol name without leading '.'.
+static int match_prelude_env_sym(const lseappl_t* ap, const char** out_sym_no_dot) {
+  if (!ap) return 0;
+  if (lseappl_get_argc(ap) != 1) return 0;
+  const lsexpr_t* sym = lseappl_get_args(ap)[0];
+  // Ensure rightmost arg is a dot-symbol like .println
+  const char* symbuf = NULL;
+  if (sym && lsexpr_typeof(sym) == LSEQ_SYMBOL) {
+    const lsstr_t* s = lsexpr_get_symbol(sym);
+    symbuf = s ? lsstr_get_buf(s) : NULL;
+  } else if (sym && lsexpr_typeof(sym) == LSEQ_ALGE) {
+    const lsealge_t* a = lsexpr_get_alge(sym);
+    if (lsealge_get_argc(a) != 0) return 0;
+    const lsstr_t* cn = lsealge_get_constr(a);
+    symbuf = cn ? lsstr_get_buf(cn) : NULL;
+  } else {
+    return 0;
+  }
+  if (!symbuf || symbuf[0] != '.') return 0;
+
+  const lsexpr_t* f = lseappl_get_func(ap);
+  if (!f || lsexpr_typeof(f) != LSEQ_APPL) return 0;
+  const lseappl_t* ap2 = lsexpr_get_appl(f);
+  if (lseappl_get_argc(ap2) != 1) return 0;
+  const lsexpr_t* envarg = lseappl_get_args(ap2)[0];
+  if (!is_dot_symbol_named(envarg, ".env")) return 0;
+  const lsexpr_t* f2 = lseappl_get_func(ap2);
+  if (!f2 || lsexpr_typeof(f2) != LSEQ_REF) return 0;
+  const lsref_t* r = lsexpr_get_ref(f2);
+  const lsstr_t* rn = lsref_get_name(r);
+  const char*    rb = rn ? lsstr_get_buf(rn) : NULL;
+  if (!rb || strcmp(rb, "prelude") != 0) return 0;
+
+  if (out_sym_no_dot) *out_sym_no_dot = symbuf + 1; // skip leading '.'
+  return 1;
+}
+
 // Try to print an application that is a pure dot-chain without parentheses.
 // Pattern: ((...(left .d1) .d2) ... .dn). If 'e' matches this pattern, prints
 //   left d1 d2 ... dn (concatenated without spaces) and returns 1.
@@ -92,6 +151,15 @@ static int try_print_pure_dot_chain_arg(FILE* stream, int indent, const lsexpr_t
 void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eappl) {
   lssize_t argc = eappl->lea_argc;
   const lsexpr_t* func = eappl->lea_func;
+  if (lsfmt_is_active()) {
+    // Re-sugar env operator: (~prelude .env .sym) => !sym
+    const char* sym = NULL;
+    if (match_prelude_env_sym(eappl, &sym)) {
+      // Print as an atom regardless of precedence
+      lsprintf(stream, indent, "!%s", sym ? sym : "");
+      return;
+    }
+  }
   if (argc == 0) {
     lsexpr_print(stream, prec, indent, func);
     return;

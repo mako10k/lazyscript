@@ -106,23 +106,29 @@ int lsscan_consume_tight(lsscan_t* scanner) {
 static const lsarray_t* g_fmt_comments = NULL; // array of lscomment_t*
 static lssize_t         g_fmt_index    = 0;
 static int              g_fmt_hold_line = 0;
+// Formatter activation flag (decoupled from presence of comments). When true,
+// printers may apply formatter-specific behavior even if there are no comments.
+static int              g_fmt_active    = 0;
 
 void lsfmt_set_comment_stream(const lsarray_t* comments) {
   g_fmt_comments = comments;
   g_fmt_index    = 0;
   g_fmt_hold_line = 0;
+  g_fmt_active   = 1;
 }
 
 void lsfmt_clear_comment_stream(void) {
   g_fmt_comments = NULL;
   g_fmt_index    = 0;
   g_fmt_hold_line = 0;
+  g_fmt_active   = 0;
 }
 
-int lsfmt_is_active(void) { return g_fmt_comments != NULL; }
+int lsfmt_is_active(void) { return g_fmt_active; }
 
 void lsfmt_flush_comments_up_to(FILE* fp, int line, int indent) {
-  if (!g_fmt_comments) return;
+  if (!g_fmt_active) return;
+  if (!g_fmt_comments) return; // active but no comments to flush
   const void* const* pv = lsarray_get(g_fmt_comments);
   lssize_t n = lsarray_get_size(g_fmt_comments);
   while (g_fmt_index < n) {
