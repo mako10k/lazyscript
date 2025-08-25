@@ -187,3 +187,7 @@ const lsexpr_t* lsexpr_with_loc(const lsexpr_t* expr_in, lsloc_t loc) {
   expr->le_loc = loc;
   return expr_in;
 }
+
+lsexpr_type_query_t lsexpr_typeof(const lsexpr_t* expr) {
+  return (lsexpr_type_query_t)expr->le_type;
+}

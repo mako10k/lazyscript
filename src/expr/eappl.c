@@ -56,10 +56,30 @@ void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eap
   }
   if (prec > LSPREC_APPL)
     lsprintf(stream, indent, "(");
-  lsexpr_print(stream, LSPREC_APPL + 1, indent, eappl->lea_func);
-  for (size_t i = 0; i < argc; i++) {
-    lsprintf(stream, indent, " ");
-    lsexpr_print(stream, LSPREC_APPL + 1, indent, eappl->lea_args[i]);
+  // Print callee: if the callee itself is an application, keep the same precedence
+  // to preserve left associativity without extra parentheses.
+  const lsexpr_t* func = eappl->lea_func;
+  if (func && lsexpr_typeof(func) == LSEQ_APPL)
+    lsexpr_print(stream, LSPREC_APPL, indent, func);
+  else
+    lsexpr_print(stream, LSPREC_APPL + 1, indent, func);
+
+  for (size_t i = 0; i < (size_t)argc; i++) {
+    const lsexpr_t* arg = eappl->lea_args[i];
+    int omit_space = 0;
+    // If first argument is a zero-arity algebraic constructor starting with '.',
+    // print it immediately after callee (e.g., ~internal.include)
+    if (i == 0 && arg && lsexpr_typeof(arg) == LSEQ_ALGE) {
+      const lsealge_t* a = lsexpr_get_alge(arg);
+      if (lsealge_get_argc(a) == 0) {
+        const lsstr_t* cname = lsealge_get_constr(a);
+        const char*    cb    = cname ? lsstr_get_buf(cname) : NULL;
+        if (cb && cb[0] == '.') omit_space = 1;
+      }
+    }
+    if (!omit_space)
+      lsprintf(stream, indent, " ");
+    lsexpr_print(stream, LSPREC_APPL + 1, indent, arg);
   }
   if (prec > LSPREC_APPL)
     lsprintf(stream, indent, ")");
