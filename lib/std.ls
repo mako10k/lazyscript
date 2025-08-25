@@ -1,4 +1,4 @@
-!!{
+{
   # 集約モジュール（純）: 主要 lib を include（pure）で提供
   .List   = (~~include "lib/List.ls");
   .Option = (~~include "lib/Option.ls");

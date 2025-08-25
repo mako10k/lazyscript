@@ -65,10 +65,10 @@
     - ブリッジ/置換ガイド
        - 1行置換: 名前付き → 匿名NS値＋受け渡し
           - Before: `~~nsnew 'Foo; ~~nsdef 'Foo .Bar v;`
-          - After: `!{ ~ns <- !!{ .Bar = v }; ... }`
+          - After: `!{ ~ns <- { .Bar = v }; ... }`
        - 連鎖定義
           - Before: `~~nsnew 'M; ~~nsdef 'M .A a; ~~nsdef 'M .B b; use 'M ...`
-          - After: `!{ ~ns <- !!{ .A = a; .B = b }; use ~ns ... }`
+          - After: `!{ ~ns <- { .A = a; .B = b }; use ~ns ... }`
        - 値としての受け渡し
           - Before: 名前で共有
           - After: 関数引数/戻り値で NS 値を渡す
@@ -95,7 +95,7 @@
 ## エラーモデル（実装反映）
 - 不変 NS に対する set/nsdefv → `#err "namespace: immutable"` / `#err "nsdefv: immutable namespace"`。
 - キーが const でない → `#err "...: const expected"`。
-- 名前付き系（旧）の未登録 → 非推奨期は警告、撤廃後は `#err "nsdef: named namespaces are removed; use !!{ ... } or nsnew0+nsdefv"`。
+- 名前付き系（旧）の未登録 → 非推奨期は警告、撤廃後は `#err "nsdef: named namespaces are removed; use { ... } or nsnew0+nsdefv"`。
 - strict-effects 有効時のミューテーション（nsnew/nsdef/nsdefv/__set）→ 純粋文脈では stderr にメッセージを出し `null`（実装互換）。
 
 ## リスク/対策

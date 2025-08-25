@@ -1,5 +1,5 @@
 !{
-  ~ns <- !!{ .map = (\~f -> \~opt -> (\None -> None | \(Some ~x) -> Some (~f ~x)) ~opt)
+  ~ns <- { .map = (\~f -> \~opt -> (\None -> None | \(Some ~x) -> Some (~f ~x)) ~opt)
            ; .seed = (Some 1)
            };
   # 2段適用

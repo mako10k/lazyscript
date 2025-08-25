@@ -102,8 +102,6 @@ int yylex(YYSTYPE *yysval, YYLTYPE *yylloc, yyscan_t yyscanner);
 %nterm <bind> bind_single
 %nterm <ref> funlhs
 %nterm <eclosure> closure
-%nterm <array> nsentries
-%nterm <array> nsentry
 %nterm <array> nslit_entries
 %nterm <array> nslit_entry
 
@@ -354,24 +352,6 @@ efact:
         }
       }
   | '!' '{' dostmts '}' { $$ = $3; }
-    | '!' '!' '{' nsentries '}' {
-        // Build AST-level immutable namespace literal (!!{ ... })
-        lssize_t ec = $4 ? lsarray_get_size($4) : 0;
-        const lsstr_t** names = ec ? lsmalloc(sizeof(lsstr_t*) * ec) : NULL;
-        const lsexpr_t** exprs = ec ? lsmalloc(sizeof(lsexpr_t*) * ec) : NULL;
-        for (lssize_t i = 0; i < ec; i++) {
-          const lsarray_t *ent = (const lsarray_t*)lsarray_get($4)[i];
-          const lsexpr_t *sym = (const lsexpr_t*)lsarray_get(ent)[0];
-          const lsstr_t *sname = NULL;
-          if (lsexpr_typeof(sym) == LSEQ_SYMBOL) sname = lsexpr_get_symbol(sym);
-          else if (lsexpr_typeof(sym) == LSEQ_ALGE && lsealge_get_argc(lsexpr_get_alge(sym)) == 0)
-            sname = lsealge_get_constr(lsexpr_get_alge(sym));
-          names[i] = sname;
-          exprs[i] = (const lsexpr_t*)lsarray_get(ent)[1];
-        }
-        const lsenslit_t *ns = lsenslit_new(ec, names, exprs);
-        $$ = lsexpr_with_loc(lsexpr_new_nslit(ns), @$);
-      }
     | '{' nslit_entries '}' {
           // Build AST-level pure namespace literal ({ ... })
           lssize_t ec = $2 ? lsarray_get_size($2) : 0;
@@ -390,31 +370,6 @@ efact:
           const lsenslit_t *ns = lsenslit_new(ec, names, exprs);
           $$ = lsexpr_with_loc(lsexpr_new_nslit(ns), @$);
         }
-    ;
-
-// !!{ .a = e; .b = e2; } entries (deprecated form still supported via !!)
-nsentries:
-  /* empty */ { $$ = NULL; }
-    | nsentry { $$ = lsarray_new(1, $1); }
-    | nsentries ';' nsentry { $$ = lsarray_push($1, $3); }
-    | nsentries ';' { $$ = $1; }
-    ;
-
-nsentry:
-      LSTDOTSYMBOL '=' expr {
-        const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @1);
-        $$ = lsarray_new(2, sym, $3);
-      }
-    | LSTSYMBOL '=' expr {
-        // Support legacy !!{ a = e } by converting to .a symbol
-        const char* id = lsstr_get_buf($1);
-        lssize_t    n  = lsstr_get_len($1);
-        char* buf = lsmalloc((size_t)n + 2);
-        buf[0] = '.'; for (lssize_t i = 0; i < n; ++i) buf[1 + i] = id[i]; buf[n + 1] = '\0';
-        const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol(lsstr_new(buf, n + 1)), @1);
-        lsfree(buf);
-        $$ = lsarray_new(2, sym, $3);
-      }
     ;
 
 // Pure nslit entries: members only (locals within ns literal are deprecated)
