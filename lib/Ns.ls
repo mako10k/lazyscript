@@ -1,29 +1,18 @@
 {
   .nsMembers = (~~nsMembers);
 
-  # nsHas: メンバー列に対する構造的再帰（prelude.fix を使用）
+  # nsHas: 直接ルックアップで #err 判定（値は評価しない）
+  #   (~ns ~k) が undefined なら #err を返す仕様を利用
   .nsHas = \~ns -> \~k -> (
-    ((~~fix)
-      (\~rec -> \~xs ->
-        ((\[] -> false)
-          | (\(~h : ~t) ->
-                (((\true -> true)
-                  | (\false -> (~rec ~t)))
-                 ((~~eq) ~h ~k))))
-        ~xs))
-    ((~~nsMembers) ~ns)
+    (((\#err ~_ -> false)
+      || (\_        -> true))
+     ((~ns ~k)))
   );
 
-  # nsGetOr: 見つかれば (~ns ~k)、なければデフォルト ~d
+  # nsGetOr: 見つかれば値（未評価のまま）、なければデフォルト ~d
   .nsGetOr = \~ns -> \~k -> \~d -> (
-    ((~~fix)
-      (\~rec -> \~xs ->
-        ((\[] -> ~d)
-          | (\(~h : ~t) ->
-                (((\true  -> (~ns ~k))
-                  | (\false -> (~rec ~t)))
-                 ((~~eq) ~h ~k))))
-        ~xs))
-    ((~~nsMembers) ~ns)
+    (((\#err ~_ -> ~d)
+      || (\~v       -> ~v))
+     ((~ns ~k)))
   );
 };
