@@ -141,6 +141,15 @@ LAZYSCRIPT_PRELUDE_SO=/path/to/liblazyscript_prelude.so ./src/lazyscript -e '...
 - プラグインからは `thunk/thunk.h`, `thunk/tenv.h`, `expr/ealge.h`, `common/str.h`, `common/io.h` を参照します。
 - ホストバイナリのシンボルを解決するため、`lazyscript` は `-export-dynamic` でリンクされています。
 
+### プレリュード実装の方針（復活防止）
+
+- Prelude はプラグイン実装のみ（`src/plugins/prelude_plugin.c`）。`src/builtins/prelude.{c,h}` は禁止です。
+- 再追加防止のため、次を用意しています。
+  - CI ガード: `.github/workflows/forbid-prelude-host.yml`（存在/追跡を検知すると失敗）
+  - pre-commit フック（任意・ローカル）:
+    - `ln -sf ../../scripts/git-hooks/pre-commit .git/hooks/pre-commit`
+    - これにより `src/builtins/prelude.{c,h}` をステージするとコミットがブロックされます。
+
 ## ランタイム拡張（自己ホストの土台）
 
 起動時に初期化スクリプトを読み込む/実行時にスクリプトをロードすることで、言語自身での拡張を可能にします。

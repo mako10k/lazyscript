@@ -1,0 +1,37 @@
+name: forbid-host-prelude
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fail if legacy host prelude exists
+        run: |
+          set -euo pipefail
+          bad=0
+          for f in src/builtins/prelude.c src/builtins/prelude.h; do
+            if [ -e "$f" ]; then
+              echo "ERROR: Forbidden file present: $f" >&2
+              bad=1
+            fi
+          done
+          if git ls-files --error-unmatch src/builtins/prelude.c >/dev/null 2>&1; then
+            echo "ERROR: File is tracked in git: src/builtins/prelude.c" >&2
+            bad=1
+          fi
+          if git ls-files --error-unmatch src/builtins/prelude.h >/dev/null 2>&1; then
+            echo "ERROR: File is tracked in git: src/builtins/prelude.h" >&2
+            bad=1
+          fi
+          if [ $bad -ne 0 ]; then
+            echo "Legacy host prelude must not exist. Use src/plugins/prelude_plugin.c only." >&2
+            exit 1
+          fi
+          echo "OK: no legacy host prelude files found."

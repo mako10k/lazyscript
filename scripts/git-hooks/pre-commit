@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Block committing legacy host prelude files. Install by symlinking into .git/hooks/pre-commit
+#   ln -sf ../../scripts/git-hooks/pre-commit .git/hooks/pre-commit
+
+forbidden=(
+  "src/builtins/prelude.c"
+  "src/builtins/prelude.h"
+)
+
+fail=0
+for f in "${forbidden[@]}"; do
+  if git diff --cached --name-only | grep -Fxq "$f"; then
+    echo "[pre-commit] ERROR: committing forbidden file: $f" >&2
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo "[pre-commit] Legacy host prelude is deprecated. Use src/plugins/prelude_plugin.c only." >&2
+  exit 1
+fi
+
+exit 0
