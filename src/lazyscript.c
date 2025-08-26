@@ -145,7 +145,7 @@ lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void
 // arithmetic builtins are in builtins/arith.c
 lsthunk_t* lsbuiltin_lt(lssize_t argc, lsthunk_t* const* args, void* data);
 
-// moved to builtins/prelude.c: ls_register_builtin_prelude
+// Prelude is provided via plugin: see src/plugins/prelude_plugin.c
 
 typedef int (*ls_prelude_register_fn)(lstenv_t*);
 
