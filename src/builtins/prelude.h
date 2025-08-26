@@ -1,7 +1,6 @@
 #pragma once
-
-#include "thunk/tenv.h"
-#include "thunk/thunk.h"
-
-// Prelude related builtins (host/runtime側で提供)
-lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void* data);
+/*
+  Deprecated: do not include. Prelude lives in src/plugins/prelude_plugin.c.
+  This header is a stub retained only to satisfy stale includes in downstream environments.
+*/
+// no declarations
