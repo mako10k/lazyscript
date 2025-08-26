@@ -71,3 +71,8 @@ logs/
 **/.dirstamp
 
 
+# Forbid legacy host prelude (plugin-only policy)
+src/builtins/prelude.c
+src/builtins/prelude.h
+
+
