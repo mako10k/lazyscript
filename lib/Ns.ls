@@ -1,18 +1,45 @@
 {
   .nsMembers = (~~nsMembers);
 
-  # nsHas: 直接ルックアップで #err 判定（値は評価しない）
-  #   (~ns ~k) が undefined なら #err を返す仕様を利用
+  # nsHas: nsMembers を走査して一致を判定（List.ls と同型の自己適用再帰）
   .nsHas = \~ns -> \~k -> (
-    (((\#err ~_ -> false)
-      || (\_        -> true))
-     ((~ns ~k)))
+    (
+      (\~self -> \~xs ->
+         (((\[] -> false)
+           || (\(~h : ~t) ->
+                 ( ((\true  -> true)
+                    | (\false -> ((~self ~self) ~t)))
+                   ((~~eq) ~h ~k) )))
+          ~xs))
+      (\~self -> \~xs ->
+         (((\[] -> false)
+           || (\(~h : ~t) ->
+                 ( ((\true  -> true)
+                    | (\false -> ((~self ~self) ~t)))
+                   ((~~eq) ~h ~k) )))
+          ~xs))
+      ((~~nsMembers) ~ns)
+    )
   );
 
-  # nsGetOr: 見つかれば値（未評価のまま）、なければデフォルト ~d
+  # nsGetOr: 見つかれば (~ns ~k)、無ければ ~d（自己適用再帰）
   .nsGetOr = \~ns -> \~k -> \~d -> (
-    (((\#err ~_ -> ~d)
-      || (\~v       -> ~v))
-     ((~ns ~k)))
+    (
+      (\~self -> \~xs ->
+         (((\[] -> ~d)
+           || (\(~h : ~t) ->
+                 ( ((\true  -> (~ns ~k))
+                    | (\false -> ((~self ~self) ~t)))
+                   ((~~eq) ~h ~k) )))
+          ~xs))
+      (\~self -> \~xs ->
+         (((\[] -> ~d)
+           || (\(~h : ~t) ->
+                 ( ((\true  -> (~ns ~k))
+                    | (\false -> ((~self ~self) ~t)))
+                   ((~~eq) ~h ~k) )))
+          ~xs))
+      ((~~nsMembers) ~ns)
+    )
   );
 };

@@ -308,6 +308,18 @@ static lsthunk_t* lsbuiltin_prelude_import(lssize_t argc, lsthunk_t* const* args
   return ls_make_unit();
 }
 
+// Option-wrapped import: returns Some () on success, None on invalid namespace
+static lsthunk_t* lsbuiltin_prelude_import_opt(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc; lsthunk_t* unit = NULL; (void)unit;
+  lstenv_t* tenv = (lstenv_t*)data;
+  if (!ls_effects_allowed()) { lsprintf(stderr, 0, "E: importOpt: effect used in pure context (enable seq/chain)\n"); return NULL; }
+  if (!tenv) return NULL;
+  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (nsv == NULL) return NULL;
+  if (!lsns_foreach_member(nsv, lsbuiltin_prelude_import_cb, tenv))
+    return lsthunk_new_ealge(lsealge_new(lsstr_cstr("None"), 0, NULL), NULL);
+  const lsexpr_t* args1[1] = { lsexpr_new_alge(lsealge_new(lsstr_cstr("()"), 0, NULL)) };
+  return lsthunk_new_ealge(lsealge_new(lsstr_cstr("Some"), 1, args1), NULL);
+}
 static lsthunk_t* lsbuiltin_prelude_withImport(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; lstenv_t* tenv = (lstenv_t*)data;
   if (!ls_effects_allowed()) { lsprintf(stderr, 0, "E: withImport: effect used in pure context (enable seq/chain)\n"); return NULL; }
@@ -328,11 +340,16 @@ static lsthunk_t* lsbuiltin_prelude_internal_dispatch(lssize_t argc, lsthunk_t* 
   const lsstr_t* s = lsthunk_get_symbol(keyv);
   if (lsstrcmp(s, lsstr_cstr(".require")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.require"), 1, lsbuiltin_prelude_require, tenv);
+  if (lsstrcmp(s, lsstr_cstr(".requireOpt")) == 0)
+    return lsthunk_new_builtin(lsstr_cstr("prelude.requireOpt"), 1, lsbuiltin_prelude_require_opt, tenv);
   if (lsstrcmp(s, lsstr_cstr(".include")) == 0) {
     return lsthunk_new_builtin(lsstr_cstr("prelude.include"), 1, lsbuiltin_prelude_include, tenv);
   }
   if (lsstrcmp(s, lsstr_cstr(".import")) == 0) {
     return lsthunk_new_builtin(lsstr_cstr("prelude.import"), 1, lsbuiltin_prelude_import, tenv);
+  }
+  if (lsstrcmp(s, lsstr_cstr(".importOpt")) == 0) {
+    return lsthunk_new_builtin(lsstr_cstr("prelude.importOpt"), 1, lsbuiltin_prelude_import_opt, tenv);
   }
   if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.withImport"), 2, lsbuiltin_prelude_withImport, tenv);

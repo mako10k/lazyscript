@@ -26,9 +26,11 @@
   # 環境を変更する内部 API（Prelude 評価時のみ有効な ~internal から引き出し）
   .env = {
   .require     = (~internal .require);
+  .requireOpt  = (~internal .requireOpt);
   .println     = (~builtins .println);
   .print       = (~builtins .print);
   .import      = (~internal .import);
+  .importOpt   = (~internal .importOpt);
   .withImport  = (~internal .withImport);
     .def         = (~internal .def);
   # 可変名前空間 API は削除済みのため未公開
