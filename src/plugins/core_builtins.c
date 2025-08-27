@@ -23,14 +23,17 @@ static lsthunk_t* cb_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
 	(void)argc; (void)data;
 	lsthunk_t* a = lsthunk_eval0(args[0]); if (!a) return NULL;
 	lsthunk_t* b = lsthunk_eval0(args[1]); if (!b) return NULL;
+	int do_log = 0; { const char* v = getenv("LAZYSCRIPT_ENABLE_TRACE"); do_log = (v && v[0] && v[0] != '0'); }
 	if (lsthunk_get_type(a) == LSTTYPE_INT && lsthunk_get_type(b) == LSTTYPE_INT) {
 		int eq = lsint_eq(lsthunk_get_int(a), lsthunk_get_int(b));
+		if (do_log) { lsprintf(stderr, 0, "[core.eq:int] "); lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a); lsprintf(stderr, 0, " == "); lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b); lsprintf(stderr, 0, " -> %s\n", eq ? "true" : "false"); }
 		return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
 	}
 	if (lsthunk_get_type(a) == LSTTYPE_SYMBOL && lsthunk_get_type(b) == LSTTYPE_SYMBOL) {
 		const lsstr_t* sa = lsthunk_get_symbol(a);
 		const lsstr_t* sb = lsthunk_get_symbol(b);
 		int eq = (lsstrcmp(sa, sb) == 0);
+		if (do_log) { lsprintf(stderr, 0, "[core.eq:sym] "); lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a); lsprintf(stderr, 0, " == "); lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b); lsprintf(stderr, 0, " -> %s\n", eq ? "true" : "false"); }
 		return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
 	}
 	if (lsthunk_get_type(a) == LSTTYPE_ALGE && lsthunk_get_argc(a) == 0 &&
@@ -38,8 +41,10 @@ static lsthunk_t* cb_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
 		const lsstr_t* ca = lsthunk_get_constr(a);
 		const lsstr_t* cb = lsthunk_get_constr(b);
 		int eq = (lsstrcmp(ca, cb) == 0);
+		if (do_log) { lsprintf(stderr, 0, "[core.eq:alge0] "); lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a); lsprintf(stderr, 0, " == "); lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b); lsprintf(stderr, 0, " -> %s\n", eq ? "true" : "false"); }
 		return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
 	}
+	if (do_log) { lsprintf(stderr, 0, "[core.eq:other] "); lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a); lsprintf(stderr, 0, " == "); lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b); lsprintf(stderr, 0, " -> false\n"); }
 	return lsthunk_new_ealge(lsealge_new(lsstr_cstr("false"), 0, NULL), NULL);
 }
 

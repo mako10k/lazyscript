@@ -14,6 +14,7 @@
 #include <assert.h>
 #include "runtime/error.h"
 #include "runtime/trace.h"
+#include "runtime/unit.h"
 
 // forward decls used by pl_internal_dispatch
 static lsthunk_t* pl_require(lssize_t argc, lsthunk_t* const* args, void* data);
@@ -24,11 +25,6 @@ static lsthunk_t* pl_withImport(lssize_t argc, lsthunk_t* const* args, void* dat
 static lsthunk_t* pl_def(lssize_t argc, lsthunk_t* const* args, void* data);
 // forward for callback
 static void pl_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data);
-
-static lsthunk_t* ls_make_unit(void) {
-  const lsealge_t* eunit = lsealge_new(lsstr_cstr("()"), 0, NULL);
-  return lsthunk_new_ealge(eunit, NULL);
-}
 
 static lsthunk_t* pl_getter0(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc; (void)args; return (lsthunk_t*)data;
@@ -43,7 +39,6 @@ static lsthunk_t* pl_def(lssize_t argc, lsthunk_t* const* args, void* data) {
     return NULL;
   }
   if (!tenv) {
-    lsprintf(stderr, 0, "E: def: no env\n");
     return NULL;
   }
   lsthunk_t* namev = lsthunk_eval0(args[0]);
@@ -237,33 +232,7 @@ static lsthunk_t* pl_return(lssize_t argc, lsthunk_t* const* args, void* data) {
 }
 
 // eq: simple equality for common types (int, symbol/algebraic 0-arity)
-static lsthunk_t* pl_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)data;
-  // Evaluate both arguments (pure)
-  lsthunk_t* a = lsthunk_eval0(args[0]); if (a == NULL) return NULL;
-  lsthunk_t* b = lsthunk_eval0(args[1]); if (b == NULL) return NULL;
-  // int equality
-  if (lsthunk_get_type(a) == LSTTYPE_INT && lsthunk_get_type(b) == LSTTYPE_INT) {
-    int eq = lsint_eq(lsthunk_get_int(a), lsthunk_get_int(b));
-    return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
-  }
-  // symbol equality (explicit symbol kind)
-  if (lsthunk_get_type(a) == LSTTYPE_SYMBOL && lsthunk_get_type(b) == LSTTYPE_SYMBOL) {
-    const lsstr_t* sa = lsthunk_get_symbol(a);
-    const lsstr_t* sb = lsthunk_get_symbol(b);
-    int eq = (lsstrcmp(sa, sb) == 0);
-    return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
-  }
-  // algebraic 0-arity constructors (e.g., .a style)
-  if (lsthunk_get_type(a) == LSTTYPE_ALGE && lsthunk_get_argc(a) == 0 &&
-      lsthunk_get_type(b) == LSTTYPE_ALGE && lsthunk_get_argc(b) == 0) {
-    const lsstr_t* ca = lsthunk_get_constr(a);
-    const lsstr_t* cb = lsthunk_get_constr(b);
-    int eq = (lsstrcmp(ca, cb) == 0);
-    return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL), NULL);
-  }
-  return lsthunk_new_ealge(lsealge_new(lsstr_cstr("false"), 0, NULL), NULL);
-}
+// Note: equality is provided by core builtins and forwarded via prelude.dispatch("eq").
 
 // import/withImport for plugin prelude
 static void pl_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data) {

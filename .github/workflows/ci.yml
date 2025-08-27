@@ -30,6 +30,12 @@ jobs:
             build-essential autoconf automake libtool pkg-config \
             flex bison libgc-dev
 
+      - name: Install QA tools (cppcheck, lizard)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cppcheck python3-pip
+          python3 -m pip install --user --upgrade lizard
+
       - name: Bootstrap (autotools)
         run: |
           ./autogen.sh || true
@@ -95,6 +101,11 @@ jobs:
           ASAN_OPTIONS: ${{ env.ASAN_OPTIONS }}
         run: |
           test/run-tests.sh
+
+      - name: Static analysis (cppcheck/lizard)
+        run: |
+          # Run cppcheck and lizard via Makefile QA target; never fail build on lint
+          make qa || true
 
       - name: If failed, rerun under gdb to capture backtrace (GC only)
         if: failure()
