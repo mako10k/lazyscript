@@ -16,6 +16,7 @@
 #include "common/array.h"
 #include "common/int.h"
 #include "common/io.h"
+#include <string.h>
 #include "common/loc.h"
 #include "common/str.h"
 #include "expr/expr.h"
@@ -143,6 +144,67 @@ static inline const lspalge_t *build_palge_list_from_array(lssize_t argc, const 
   }
   return chain;
 }
+
+// Build tuple for expressions: (e1, e2, ..., en) => "," constructor with n args
+static inline const lsealge_t *build_ealge_tuple_from_array(lssize_t argc, const lsexpr_t *const *args) {
+  return lsealge_new(lsstr_cstr(","), argc, args);
+}
+
+// Build tuple for patterns
+static inline const lspalge_t *build_palge_tuple_from_array(lssize_t argc, const lspat_t *const *args) {
+  return lspalge_new(lsstr_cstr(","), argc, args);
+}
+
+// --- Tiny primitives for common constructors ---
+static inline const lsealge_t *mk_econs2(const lsexpr_t *a, const lsexpr_t *b) {
+  const lsexpr_t *args2[] = { a, b };
+  return lsealge_new(lsstr_cstr(":"), 2, args2);
+}
+static inline const lspalge_t *mk_pcons2(const lspat_t *a, const lspat_t *b) {
+  const lspat_t *args2[] = { a, b };
+  return lspalge_new(lsstr_cstr(":"), 2, args2);
+}
+static inline const lsexpr_t *mk_constr0_expr_sym(const lsstr_t *sym) {
+  return lsexpr_new_alge(lsealge_new(sym, 0, NULL));
+}
+static inline const lsexpr_t *mk_member_tag_expr(void) {
+  return lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
+}
+static inline const lsexpr_t *mk_unit_expr(void) {
+  return lsexpr_new_alge(lsealge_new(lsstr_cstr(","), 0, NULL));
+}
+
+// --- Helpers for do-block sugar ---
+static inline const lsexpr_t *mk_prelude_return(yyscan_t yyscanner, lsloc_t loc) {
+  return mk_prelude_func(yyscanner, loc, "return");
+}
+static inline const lsexpr_t *mk_prelude_bind(yyscan_t yyscanner, lsloc_t loc) {
+  return mk_prelude_func(yyscanner, loc, "bind");
+}
+static inline const lsexpr_t *mk_prelude_chain(yyscan_t yyscanner, lsloc_t loc) {
+  return mk_prelude_func(yyscanner, loc, "chain");
+}
+// bind A (x -> body)
+static inline const lsexpr_t *mk_bind_with_ref_body(yyscan_t yyscanner, lsloc_t loc, const lsexpr_t *xexpr, const lsexpr_t *ae, const lsexpr_t *body) {
+  const lsexpr_t *bind = mk_prelude_bind(yyscanner, loc);
+  const lsref_t *x = lsexpr_get_ref(xexpr);
+  const lspat_t *pat = lspat_new_ref(x);
+  const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(pat, body));
+  const lsexpr_t *args2[] = { ae, lam };
+  return lsexpr_new_appl(lseappl_new(bind, 2, args2));
+}
+// chain A (_ -> body)
+static inline const lsexpr_t *mk_chain_ignore(yyscan_t yyscanner, lsloc_t loc, const lsexpr_t *ae, const lsexpr_t *body) {
+  const lsexpr_t *chain = mk_prelude_chain(yyscanner, loc);
+  const lspat_t *argpat = lspat_new_wild();
+  const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(argpat, body));
+  const lsexpr_t *args2[] = { ae, lam };
+  return lsexpr_new_appl(lseappl_new(chain, 2, args2));
+}
+// return x
+static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const lsexpr_t *xexpr) {
+  return mk_call1(mk_prelude_return(yyscanner, loc), loc, xexpr);
+}
 }
 
 %define api.pure full
@@ -250,8 +312,7 @@ expr2:
 
 econs:
       expr1 ':' expr3 {
-        const lsexpr_t *args[] = { $1, $3 };
-        $$ = lsealge_new(lsstr_cstr(":"), 2, args);
+  $$ = mk_econs2($1, $3);
       }
     ;
 
@@ -326,7 +387,7 @@ ealge:
 
 expr5:
       efact { $$ = $1; }
-  | LSTSYMBOL { $$ = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @$); }
+  | LSTSYMBOL { $$ = lsexpr_with_loc(mk_constr0_expr_sym($1), @$); }
   | LSTDOTSYMBOL { $$ = lsexpr_with_loc(lsexpr_new_symbol($1), @$); }
     
     ;
@@ -337,20 +398,20 @@ efact:
   | LSTREFSYM { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($1, @$)), @$); }
   | LSTNSDEFV expr5 LSTSYMBOL expr5 {
   const lsexpr_t *fn_defv = mk_prelude_func(yyscanner, @$, "nsdefv");
-  const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($3, 0, NULL));
+  const lsexpr_t *sym = mk_constr0_expr_sym($3);
   const lsexpr_t *args[] = { $2, sym, $4 };
   $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn_defv, 3, args)), @$);
       }
   | LSTNSDEF LSTSYMBOL LSTSYMBOL expr5 {
   const lsexpr_t *fn_def = mk_prelude_func(yyscanner, @$, "nsdef");
-        const lsexpr_t *nsname = lsexpr_new_alge(lsealge_new($2, 0, NULL));
-        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($3, 0, NULL));
+        const lsexpr_t *nsname = mk_constr0_expr_sym($2);
+        const lsexpr_t *sym = mk_constr0_expr_sym($3);
         const lsexpr_t *args[] = { nsname, sym, $4 };
         $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn_def, 3, args)), @$);
       }
     | LSTPRELUDE_CONSTR {
         // ~~constr => (~<ns> constr)
-        const lsexpr_t *sym = lsexpr_new_alge(lsealge_new($1, 0, NULL));
+  const lsexpr_t *sym = mk_constr0_expr_sym($1);
   $$ = mk_prelude_call1(yyscanner, @$, sym);
       }
   | LSTPRELUDE_SYMBOL {
@@ -377,21 +438,16 @@ efact:
   | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
   | elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
   | LSTENVOP {
-        // !ident => (~<ns> .env .ident)
-  const lsexpr_t *call_env = mk_prelude_func_sym(yyscanner, @$, ".env");
-        // build .ident symbol
-        char buf[256];
-        const char* id = lsstr_get_buf($1);
-        size_t idlen = (size_t)lsstr_get_len($1);
-        if (idlen + 1 >= sizeof(buf)) {
-          // fallback without dot if too long (unlikely)
-          const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @$);
-          $$ = mk_call1(call_env, @$, sym);
-        } else {
-          buf[0] = '.'; for (size_t i = 0; i < idlen; ++i) buf[i+1] = id[i]; buf[idlen+1] = '\0';
-          const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol(lsstr_cstr(buf)), @$);
-          $$ = mk_call1(call_env, @$, sym);
-        }
+  // !ident => (~<ns> .env .ident)
+  // CoreIR 降ろしは (~prelude .env .println) も認識する（cir_lower_print.c 側で対応）
+  const char* id = lsstr_get_buf($1);
+  // Build (~<ns> .env)
+  const lsexpr_t *env = mk_prelude_func_sym(yyscanner, @$, ".env");
+  // Build dot symbol .ident
+  char* buf = NULL; size_t bl = 0; if (id) { bl = strlen(id) + 2; buf = lsmalloc(bl); buf[0] = '.'; memcpy(buf + 1, id, strlen(id) + 1); }
+  const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol(lsstr_new(buf ? buf : ".", (lssize_t)(buf ? (bl - 1) : 1))), @$);
+  if (buf) lsfree(buf);
+  $$ = mk_call1(env, @$, sym);
       }
   | '!' '{' dostmts '}' { $$ = $3; }
     | '{' nslit_entries '}' {
@@ -425,13 +481,13 @@ nslit_entries:
 nslit_entry:
   // member: .symbol '=' expr
   LSTDOTSYMBOL '=' expr {
-    const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
+  const lsexpr_t *tag = mk_member_tag_expr();
     const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @1);
     $$ = lsarray_new(3, tag, sym, $3);
   }
   | LSTDOTSYMBOL lamparams '=' expr {
     // .sym p1 p2 ... = body  ==>  .sym = \p1 -> \p2 -> ... -> body
-    const lsexpr_t *tag = lsexpr_new_alge(lsealge_new(lsstr_cstr("member"), 0, NULL));
+  const lsexpr_t *tag = mk_member_tag_expr();
     const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @1);
     lssize_t argc = lsarray_get_size($2);
     const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
@@ -448,60 +504,37 @@ nslit_entry:
 dostmts:
       /* empty */ {
         // Empty do-block yields unit: return ()
-        const lsexpr_t *ret = mk_prelude_func(yyscanner, @$, "return");
-        const lsexpr_t *unit = lsexpr_new_alge(lsealge_new(lsstr_cstr(","), 0, NULL));
-        $$ = mk_call1(ret, @$, unit);
+        $$ = mk_call1(mk_prelude_return(yyscanner, @$), @$, mk_unit_expr());
       }
   | dostmt {
-        const lsexpr_t *ret = mk_prelude_func(yyscanner, @$, "return");
         lssize_t sz = lsarray_get_size($1);
         if (sz == 1) {
           // Final single statement: evaluate in effects and return its value
-          // bind A (x -> return x)
-          const lsexpr_t *bind = mk_prelude_func(yyscanner, @$, "bind");
           const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[0];
-          // Use a fresh wildcard ref name by patterning on a synthetic ref; here reuse '?x' via a new ref is non-trivial.
-          // Instead, build \x -> (~prelude return) x using a new lambda param pattern.
+          // bind A (x -> return x)
           const lsref_t *xr = lsref_new(lsstr_cstr("x"), @$);
-          const lspat_t *xpat = lspat_new_ref(xr);
           const lsexpr_t *xexpr = lsexpr_new_ref(xr);
-          const lsexpr_t *ret_x = mk_call1(ret, @$, xexpr);
-          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(xpat, ret_x));
-          const lsexpr_t *args2[] = { ae, lam };
-          $$ = lsexpr_new_appl(lseappl_new(bind, 2, args2));
+          const lsexpr_t *ret_x = mk_return_x(yyscanner, @$, xexpr);
+          $$ = mk_bind_with_ref_body(yyscanner, @$, xexpr, ae, ret_x);
         } else {
           // Final tail bind: desugar to bind A (x -> return x)
           const lsexpr_t *xexpr = (const lsexpr_t *)lsarray_get($1)[0];
           const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[1];
-          const lsexpr_t *bind = mk_prelude_func(yyscanner, @$, "bind");
-          const lsref_t *x = lsexpr_get_ref(xexpr);
-          const lspat_t *pat = lspat_new_ref(x);
-          const lsexpr_t *ret_x = mk_call1(ret, @$, xexpr);
-          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(pat, ret_x));
-          const lsexpr_t *args2[] = { ae, lam };
-          $$ = lsexpr_new_appl(lseappl_new(bind, 2, args2));
+          const lsexpr_t *ret_x = mk_return_x(yyscanner, @$, xexpr);
+          $$ = mk_bind_with_ref_body(yyscanner, @$, xexpr, ae, ret_x);
         }
       }
     | dostmt ';' dostmts {
         lssize_t sz = lsarray_get_size($1);
         if (sz == 1) {
           // chain A (_ -> rest)
-          const lsexpr_t *chain = mk_prelude_func(yyscanner, @$, "chain");
-          const lspat_t *argpat = lspat_new_wild();
-          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(argpat, $3));
           const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[0];
-          const lsexpr_t *args2[] = { ae, lam };
-          $$ = lsexpr_new_appl(lseappl_new(chain, 2, args2));
+          $$ = mk_chain_ignore(yyscanner, @$, ae, $3);
         } else {
           // bind A (x -> rest)
-          const lsexpr_t *bind = mk_prelude_func(yyscanner, @$, "bind");
           const lsexpr_t *xexpr = (const lsexpr_t *)lsarray_get($1)[0];
           const lsexpr_t *ae = (const lsexpr_t *)lsarray_get($1)[1];
-          const lsref_t *x = lsexpr_get_ref(xexpr);
-          const lspat_t *pat = lspat_new_ref(x);
-          const lsexpr_t *lam = lsexpr_new_lambda(lselambda_new(pat, $3));
-          const lsexpr_t *args2[] = { ae, lam };
-          $$ = lsexpr_new_appl(lseappl_new(bind, 2, args2));
+          $$ = mk_bind_with_ref_body(yyscanner, @$, xexpr, ae, $3);
         }
       }
     ;
@@ -529,9 +562,9 @@ closure:
 etuple:
       '(' ')' { $$ = lsealge_new(lsstr_cstr(","), 0, NULL); }
     | '(' earray ')' {
-        lssize_t argc = lsarray_get_size($2);
-        const lsexpr_t *const *args = (const lsexpr_t *const *)lsarray_get($2);
-        $$ = lsealge_new(lsstr_cstr(","), argc, args); }
+  lssize_t argc = lsarray_get_size($2);
+  const lsexpr_t *const *args = (const lsexpr_t *const *)lsarray_get($2);
+  $$ = build_ealge_tuple_from_array(argc, args); }
     ;
 
 earray:
@@ -583,8 +616,7 @@ pat:
 
 pcons:
       pat ':' pat {
-        const lspat_t *args[] = { $1, $3 };
-        $$ = lspalge_new(lsstr_cstr(":"), 2, args); }
+  $$ = mk_pcons2($1, $3); }
     ;
 
 pat1:
@@ -619,9 +651,9 @@ pref:
 ptuple:
       '(' ')' { $$ = lspalge_new(lsstr_cstr(","), 0, NULL); }
     | '(' parray ')' {
-      lssize_t argc = lsarray_get_size($2);
-      const lspat_t *const *args = (const lspat_t *const *)lsarray_get($2);
-      $$ = lspalge_new(lsstr_cstr(","), argc, args); }
+  lssize_t argc = lsarray_get_size($2);
+  const lspat_t *const *args = (const lspat_t *const *)lsarray_get($2);
+  $$ = build_palge_tuple_from_array(argc, args); }
     ;
 
 parray:

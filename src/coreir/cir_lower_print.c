@@ -300,9 +300,9 @@ static const lscir_expr_t* lower_closure(const lseclosure_t* cl) {
     const lspat_t*  lhs = lsbind_get_lhs(b);
     if (!lhs || lspat_get_type(lhs) != LSPTYPE_REF)
       return NULL;
-    const char*         vname   = lsstr_get_buf(lsref_get_name(lspat_get_ref(lhs)));
-    const lsexpr_t*     rhs_ast = lsbind_get_rhs(b);
-    const lscir_expr_t* rhs     = lower_expr(rhs_ast);
+    const char*         vname = lsstr_get_buf(lsref_get_name(lspat_get_ref(lhs)));
+    const lsexpr_t*     rhs_a = lsbind_get_rhs(b);
+    const lscir_expr_t* rhs   = lower_expr(rhs_a);
     if (!rhs)
       return NULL;
     body = mk_exp_let(vname, rhs, body);
@@ -322,16 +322,16 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
     if (lsexpr_get_type(func_e) == LSETYPE_REF) {
       const char* fname = extract_ref_name(lsexpr_get_ref(func_e));
       if (fname && strcmp(fname, "ifthenelse") == 0 && argc == 3) {
-        const lsexpr_t*      cond_e   = eargs[0];
-        const lsexpr_t*      then_ast = eargs[1];
-        const lsexpr_t*      else_ast = eargs[2];
-        const lscir_value_t* cv       = lower_value(cond_e);
-        const char*          cn       = NULL;
+        const lsexpr_t*      cond_e = eargs[0];
+        const lsexpr_t*      then_a = eargs[1];
+        const lsexpr_t*      else_a = eargs[2];
+        const lscir_value_t* cv     = lower_value(cond_e);
+        const char*          cn     = NULL;
         if (!cv) {
           cn = cir_gensym("c$");
           cv = mk_val_var(cn);
         }
-        const lscir_expr_t* core = mk_exp_if(cv, lower_expr(then_ast), lower_expr(else_ast));
+        const lscir_expr_t* core = mk_exp_if(cv, lower_expr(then_a), lower_expr(else_a));
         if (cn)
           core = mk_exp_let(cn, lower_expr(cond_e), core);
         return core;
@@ -345,12 +345,54 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
         if ((int)lseappl_get_argc(ap2) == 1) {
           const lsexpr_t* a0  = lseappl_get_args(ap2)[0];
           const char*     sym = NULL;
-          if (lsexpr_get_type(a0) == LSETYPE_REF)
+          if (lsexpr_get_type(a0) == LSETYPE_REF) {
             sym = extract_ref_name(lsexpr_get_ref(a0));
-          else if (lsexpr_get_type(a0) == LSETYPE_ALGE) {
+          } else if (lsexpr_get_type(a0) == LSETYPE_ALGE) {
             const lsealge_t* al = lsexpr_get_alge(a0);
             if (lsealge_get_argc(al) == 0)
               sym = lsstr_get_buf(lsealge_get_constr(al));
+          } else if (lsexpr_get_type(a0) == LSETYPE_APPL) {
+            // Support (~prelude .env .sym)
+            const lseappl_t* ap3 = lsexpr_get_appl(a0);
+            if ((int)lseappl_get_argc(ap3) == 1) {
+              const lsexpr_t* envfn  = lseappl_get_func(ap3);
+              const lsexpr_t* symarg = lseappl_get_args(ap3)[0];
+              if (lsexpr_get_type(envfn) == LSETYPE_APPL) {
+                const lseappl_t* ap_env = lsexpr_get_appl(envfn);
+                if ((int)lseappl_get_argc(ap_env) == 1) {
+                  const lsexpr_t* envkey = lseappl_get_args(ap_env)[0];
+                  int             is_env = 0;
+                  if (lsexpr_get_type(envkey) == LSETYPE_SYMBOL) {
+                    const char* k = lsstr_get_buf(lsexpr_get_symbol(envkey));
+                    is_env        = (k && strcmp(k, ".env") == 0);
+                  } else if (lsexpr_get_type(envkey) == LSETYPE_ALGE) {
+                    const lsealge_t* al2 = lsexpr_get_alge(envkey);
+                    if (lsealge_get_argc(al2) == 0) {
+                      const char* k = lsstr_get_buf(lsealge_get_constr(al2));
+                      is_env        = (k && strcmp(k, ".env") == 0);
+                    }
+                  }
+                  if (is_env) {
+                    if (lsexpr_get_type(symarg) == LSETYPE_SYMBOL) {
+                      const char* s = lsstr_get_buf(lsexpr_get_symbol(symarg));
+                      if (s && s[0] == '.')
+                        sym = s + 1;
+                      else
+                        sym = s;
+                    } else if (lsexpr_get_type(symarg) == LSETYPE_ALGE) {
+                      const lsealge_t* al3 = lsexpr_get_alge(symarg);
+                      if (lsealge_get_argc(al3) == 0) {
+                        const char* s = lsstr_get_buf(lsealge_get_constr(al3));
+                        if (s && s[0] == '.')
+                          sym = s + 1;
+                        else
+                          sym = s;
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
           if (sym && (strcmp(sym, "println") == 0 || strcmp(sym, "exit") == 0)) {
             const lscir_value_t** vals   = NULL;
@@ -364,7 +406,7 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
               if (vi) {
                 vals[i] = vi;
               } else {
-                const char* tn      = cir_gensym("a$");
+                const char*      tn = cir_gensym("a$");
                 vals[i]             = mk_val_var(tn);
                 const char**     nn = lsmalloc(sizeof(const char*) * (letc + 1));
                 const lsexpr_t** ee = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
@@ -388,7 +430,6 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
             core = mk_exp_let(tokn, mk_exp_token(), core);
             return core;
           }
-          // General prelude symbol: (~prelude sym) arg1 .. argN => (app (var sym) arg1 .. argN)
           if (sym) {
             const lscir_value_t** vals   = NULL;
             const char**          lnames = NULL;
@@ -401,10 +442,10 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
               if (vi) {
                 vals[i] = vi;
               } else {
-                const char* tmpv    = cir_gensym("a$");
-                vals[i]             = mk_val_var(tmpv);
-                const char**     nn = lsmalloc(sizeof(const char*) * (letc + 1));
-                const lsexpr_t** ee = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
+                const char*      tmpv = cir_gensym("a$");
+                vals[i]                 = mk_val_var(tmpv);
+                const char**     nn   = lsmalloc(sizeof(const char*) * (letc + 1));
+                const lsexpr_t** ee   = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
                 for (int k = 0; k < letc; k++) {
                   nn[k] = lnames[k];
                   ee[k] = lexprs[k];
@@ -424,6 +465,7 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
         }
       }
     }
+    // Generic application lowering with let-introduction
     const lscir_value_t** vals      = NULL;
     const char**          let_names = NULL;
     const lsexpr_t**      let_exprs = NULL;
@@ -435,19 +477,19 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
       if (vi) {
         vals[i] = vi;
       } else {
-        const char* tmpv    = cir_gensym("a$");
-        vals[i]             = mk_val_var(tmpv);
-        const char**     nn = lsmalloc(sizeof(const char*) * (letc + 1));
-        const lsexpr_t** ee = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
+        const char*      tmpv = cir_gensym("a$");
+        vals[i]                 = mk_val_var(tmpv);
+        const char**     nn   = lsmalloc(sizeof(const char*) * (letc + 1));
+        const lsexpr_t** ee   = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
         for (int k = 0; k < letc; k++) {
           nn[k] = let_names[k];
           ee[k] = let_exprs[k];
         }
-        nn[letc] = tmpv;
-        ee[letc] = eargs[i];
+        nn[letc]     = tmpv;
+        ee[letc]     = eargs[i];
         letc++;
-        let_names = nn;
-        let_exprs = ee;
+        let_names    = nn;
+        let_exprs    = ee;
       }
     }
     const lscir_value_t* fv    = lower_value(func_e);
