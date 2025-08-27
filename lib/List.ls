@@ -6,11 +6,11 @@
     (
       (\~self -> \~f -> \~xs ->
         (((\[] -> [])
-          || (\(~h : ~t) -> (~f ~h) : (((~self ~self) ~f ~t))))
+          || (\(~h : ~rest) -> (~f ~h) : (((~self ~self) ~f ~rest))))
          ~xs))
       (\~self -> \~f -> \~xs ->
         (((\[] -> [])
-          || (\(~h : ~t) -> (~f ~h) : (((~self ~self) ~f ~t))))
+          || (\(~h : ~rest) -> (~f ~h) : (((~self ~self) ~f ~rest))))
          ~xs))
       ~f ~xs
     )
@@ -20,16 +20,16 @@
     (
       (\~self -> \~p -> \~xs ->
         (((\[] -> [])
-          || (\(~h : ~t) ->
-               (((\true  -> (~h : (((~self ~self) ~p ~t))))
-                 | (\false -> (((~self ~self) ~p ~t))))
+          || (\(~h : ~rest) ->
+               (((\true  -> (~h : (((~self ~self) ~p ~rest))))
+                 | (\false -> (((~self ~self) ~p ~rest))))
                 ((~p ~h)))))
          ~xs))
       (\~self -> \~p -> \~xs ->
         (((\[] -> [])
-          || (\(~h : ~t) ->
-               (((\true  -> (~h : (((~self ~self) ~p ~t))))
-                 | (\false -> (((~self ~self) ~p ~t))))
+          || (\(~h : ~rest) ->
+               (((\true  -> (~h : (((~self ~self) ~p ~rest))))
+                 | (\false -> (((~self ~self) ~p ~rest))))
                 ((~p ~h)))))
          ~xs))
       ~p ~xs
@@ -40,11 +40,11 @@
     (
       (\~self -> \~xs -> \~ys ->
         (((\[] -> ~ys)
-          || (\(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))))
+          || (\(~h : ~rest) -> (~h : (((~self ~self) ~rest ~ys)))))
          ~xs))
       (\~self -> \~xs -> \~ys ->
         (((\[] -> ~ys)
-          || (\(~h : ~t) -> (~h : (((~self ~self) ~t ~ys)))))
+          || (\(~h : ~rest) -> (~h : (((~self ~self) ~rest ~ys)))))
          ~xs))
       ~xs ~ys
     )
@@ -54,11 +54,11 @@
     (
       (\~self -> \~acc -> \~zs ->
         (((\[] -> ~acc)
-          || (\(~h : ~t) -> (((~self ~self) (~h : ~acc) ~t))))
+          || (\(~h : ~rest) -> (((~self ~self) (~h : ~acc) ~rest))))
          ~zs))
       (\~self -> \~acc -> \~zs ->
         (((\[] -> ~acc)
-          || (\(~h : ~t) -> (((~self ~self) (~h : ~acc) ~t))))
+          || (\(~h : ~rest) -> (((~self ~self) (~h : ~acc) ~rest))))
          ~zs))
       [] ~xs
     )
@@ -68,7 +68,7 @@
     (
       (\~self -> \~f -> \~xs ->
         (((\[] -> [])
-          | (\(~h : ~t) ->
+          | (\(~h : ~rest) ->
                (
                  ( (\~apSelf -> \~as -> \~bs ->
                        ((((\[] -> ~bs)
@@ -78,12 +78,12 @@
                        ((((\[] -> ~bs)
                           || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
                         ) ~as))
-                 ) ((~f ~h)) (((~self ~self) ~f ~t))
+                 ) ((~f ~h)) (((~self ~self) ~f ~rest))
                )))
          ~xs))
       (\~self -> \~f -> \~xs ->
         (((\[] -> [])
-          | (\(~h : ~t) ->
+          | (\(~h : ~rest) ->
                (
                  ( (\~apSelf -> \~as -> \~bs ->
                        ((((\[] -> ~bs)
@@ -93,7 +93,7 @@
                        ((((\[] -> ~bs)
                           || (\(~h1 : ~t1) -> (~h1 : (((~apSelf ~apSelf) ~t1 ~bs)))))
                         ) ~as))
-                 ) ((~f ~h)) (((~self ~self) ~f ~t))
+                 ) ((~f ~h)) (((~self ~self) ~f ~rest))
                )))
          ~xs))
       ~f ~xs
