@@ -240,11 +240,11 @@ const lsarray_t* lsarray_concat(const lsarray_t* ary1, const lsarray_t* ary2);
  * @param ary Array.
  * @param start Start index.
  * @param end End index.
- * @param size Size to insert
+ * @param insize Size to insert
  * @param ap Values to insert.
  * @return Spliced array.
  */
-const lsarray_t* lsarray_splicev(const lsarray_t* ary, lssize_t start, lssize_t end, lssize_t size,
+const lsarray_t* lsarray_splicev(const lsarray_t* ary, lssize_t start, lssize_t end, lssize_t insize,
                                  va_list ap);
 
 /**
@@ -252,7 +252,7 @@ const lsarray_t* lsarray_splicev(const lsarray_t* ary, lssize_t start, lssize_t 
  * @param ary Array.
  * @param start Start index.
  * @param end End index.
- * @param ary2 Values to insert.
+ * @param ins Values to insert.
  * @return Spliced array.
  */
 const lsarray_t* lsarray_splicea(const lsarray_t* ary, lssize_t start, lssize_t end,

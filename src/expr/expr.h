@@ -37,10 +37,10 @@ typedef enum {
 lsapi_expr_new const lsexpr_t* lsexpr_new_alge(const lsealge_t* ealge);
 lsapi_expr_new const lsexpr_t* lsexpr_new_appl(const lseappl_t* eappl);
 lsapi_expr_new const lsexpr_t* lsexpr_new_ref(const lsref_t* ref);
-lsapi_expr_new const lsexpr_t* lsexpr_new_int(const lsint_t* eint);
-lsapi_expr_new const lsexpr_t* lsexpr_new_str(const lsstr_t* str);
-lsapi_expr_new const lsexpr_t* lsexpr_new_lambda(const lselambda_t* elambda);
-lsapi_expr_new const lsexpr_t* lsexpr_new_closure(const lseclosure_t* eclosure);
+lsapi_expr_new const lsexpr_t* lsexpr_new_int(const lsint_t* intval);
+lsapi_expr_new const lsexpr_t* lsexpr_new_str(const lsstr_t* strval);
+lsapi_expr_new const lsexpr_t* lsexpr_new_lambda(const lselambda_t* lambda);
+lsapi_expr_new const lsexpr_t* lsexpr_new_closure(const lseclosure_t* closure);
 lsapi_expr_new const lsexpr_t* lsexpr_new_choice(const lsechoice_t* echoice);
 lsapi_expr_new const lsexpr_t* lsexpr_new_nslit(const lsenslit_t* ens);
 // Create a new expression for a dot-prefixed symbol (e.g., .name)

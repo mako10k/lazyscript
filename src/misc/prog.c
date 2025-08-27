@@ -138,13 +138,8 @@ void lsfmt_flush_comments_up_to(FILE* fp, int line, int indent) {
     if (c->lc_text) {
       const char* s = lsstr_get_buf(c->lc_text);
       if (s && s[0]) {
-        // print as-is with given indent if not starting with '#'
-        if (s[0] == '#') {
-          lsprintf(fp, indent, "%s\n", s);
-        } else {
-          // block comment or raw fragment
-          lsprintf(fp, indent, "%s\n", s);
-        }
+        // print as-is with given indent (line begins with '#' or not)
+        lsprintf(fp, indent, "%s\n", s);
       }
     }
     g_fmt_index++;
@@ -161,7 +156,6 @@ const lscomment_t* lsfmt_peek_next_comment(void) {
 
 void lsfmt_consume_next_comment(void) {
   if (!g_fmt_comments) return;
-  const void* const* pv = lsarray_get(g_fmt_comments);
   lssize_t n = lsarray_get_size(g_fmt_comments);
   if (g_fmt_index < n) g_fmt_index++;
 }

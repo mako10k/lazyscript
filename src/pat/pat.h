@@ -17,10 +17,10 @@ typedef enum lsptype {
 #include "pat/palge.h"
 #include "pat/pas.h"
 
-const lspat_t*   lspat_new_alge(const lspalge_t* alge);
-const lspat_t*   lspat_new_as(const lspas_t* as);
-const lspat_t*   lspat_new_int(const lsint_t* intval);
-const lspat_t*   lspat_new_str(const lsstr_t* strval);
+const lspat_t*   lspat_new_alge(const lspalge_t* palge);
+const lspat_t*   lspat_new_as(const lspas_t* pas);
+const lspat_t*   lspat_new_int(const lsint_t* val);
+const lspat_t*   lspat_new_str(const lsstr_t* val);
 const lspat_t*   lspat_new_ref(const lsref_t* ref);
 const lspat_t*   lspat_new_wild(void);
 const lspat_t*   lspat_new_or(const lspat_t* left, const lspat_t* right);

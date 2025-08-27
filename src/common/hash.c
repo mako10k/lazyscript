@@ -171,15 +171,15 @@ int lshash_put(lshash_t* hash, const lsstr_t* key, lshash_data_t value, lshash_d
                         hash->lh_capacity, &hash->lh_size, key, value, old_value);
 }
 
-int lshash_remove(lshash_t* hash, const lsstr_t* key, lshash_data_t* value) {
+int lshash_remove(lshash_t* hash, const lsstr_t* key, lshash_data_t* pvalue) {
   assert(hash != NULL);
   assert(key != NULL);
   int              hash_value = lsstr_calc_hash(key) % hash->lh_capacity;
   lshash_entry_t** pentry     = &hash->lh_entries[hash_value];
   while (*pentry != NULL) {
     if (lsstrcmp((*pentry)->lhe_key, key) == 0) {
-      if (value != NULL)
-        *value = (*pentry)->lhe_value;
+      if (pvalue != NULL)
+        *pvalue = (*pentry)->lhe_value;
       lshash_entry_t* entry = *pentry;
       *pentry               = entry->lhe_next;
       lsfree((void*)entry->lhe_key);
