@@ -17,6 +17,7 @@ fi
 export LAZYSCRIPT_PATH="${LAZYSCRIPT_PATH:-$DIR:$ROOT}"
 
 # Default allocator: prefer libc for stable tests unless the caller/CI explicitly sets it.
+# Note: This is a test harness setting only. It MUST NOT drive changes to product defaults.
 # CI matrix can set LAZYSCRIPT_USE_LIBC_ALLOC=0 to enable GC jobs.
 export LAZYSCRIPT_USE_LIBC_ALLOC="${LAZYSCRIPT_USE_LIBC_ALLOC:-1}"
 

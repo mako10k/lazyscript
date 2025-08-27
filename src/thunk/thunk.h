@@ -148,12 +148,6 @@ lsttype_t lsthunk_get_type(const lsthunk_t* thunk);
  */
 const lsstr_t* lsthunk_get_constr(const lsthunk_t* thunk);
 
-/**
- * Get the function of a thunk
- * @param thunk The thunk
- * @return The function
- */
-lsthunk_t* lsthunk_get_func(const lsthunk_t* thunk);
 
 /**
  * Get the arguments of a thunk
@@ -194,15 +188,18 @@ lssize_t          lsthunk_get_argc(const lsthunk_t* thunk);
 
 lsthunk_t* const* lsthunk_get_args(const lsthunk_t* thunk);
 
-lsthunk_t*        lsthunk_get_left(const lsthunk_t* thunk);
+// removed: lsthunk_get_left (unused)
 
-lsthunk_t*        lsthunk_get_right(const lsthunk_t* thunk);
+// removed: lsthunk_get_right (unused)
 
 lstpat_t*         lsthunk_get_param(const lsthunk_t* thunk);
 
 lsthunk_t*        lsthunk_get_body(const lsthunk_t* thunk);
 
-lstref_target_t*  lsthunk_get_ref_target(const lsthunk_t* thunk);
+// removed: lsthunk_get_ref_target (unused)
+
+// Substitute occurrences of lambda parameter inside a thunk with its bound value
+lsthunk_t* lsthunk_subst_param(lsthunk_t* thunk, lstpat_t* param);
 
 /**
  * Associate a thunk with an algebraic pattern

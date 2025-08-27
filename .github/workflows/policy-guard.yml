@@ -1,0 +1,69 @@
+name: Policy Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [ main ]
+
+jobs:
+  default-policy-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine base
+        id: base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref_type=pr" >> $GITHUB_OUTPUT
+            echo "base_sha=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "ref_type=push" >> $GITHUB_OUTPUT
+            echo "base_sha=$(git rev-parse HEAD~1)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Detect sensitive changes
+        id: detect
+        run: |
+          set -euo pipefail
+          BASE="${{ steps.base.outputs.base_sha }}"
+          git diff --name-only "$BASE"...HEAD | tee changed.txt
+          sensitive_files=$(cat <<'EOF'
+          src/lazyscript.c
+          src/common/malloc.c
+          src/common/malloc.h
+          src/common/str.c
+          EOF
+          )
+          hit=0
+          for f in $sensitive_files; do
+            if grep -qx "$f" changed.txt; then hit=1; fi
+          done
+          echo "hit=$hit" >> $GITHUB_OUTPUT
+
+      - name: Enforce override for sensitive changes
+        if: steps.detect.outputs.hit == '1'
+        run: |
+          set -euo pipefail
+          allow=0
+          if [ "${{ steps.base.outputs.ref_type }}" = "pr" ]; then
+            title="${{ github.event.pull_request.title }}"
+            body="${{ github.event.pull_request.body }}"
+            if printf "%s\n%s" "$title" "$body" | grep -qiE '\[allow-default-change\]|ALLOW_DEFAULT_BEHAVIOR_CHANGE'; then
+              allow=1
+            fi
+          else
+            msg=$(git log -1 --pretty=%B)
+            if echo "$msg" | grep -qiE '\[allow-default-change\]|ALLOW_DEFAULT_BEHAVIOR_CHANGE'; then
+              allow=1
+            fi
+          fi
+          if [ $allow -ne 1 ]; then
+            echo 'Sensitive default-behavior files changed without explicit override.' >&2
+            echo 'Add [allow-default-change] to PR title/body (or commit message for push) to proceed.' >&2
+            exit 1
+          fi

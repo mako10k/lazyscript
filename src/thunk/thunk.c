@@ -14,7 +14,7 @@
  #include "expr/enslit.h"
  #include "expr/eappl.h"
  #include "expr/ealge.h"
- #include "expr/eclosure.h"
+ // removed duplicate: #include "expr/eclosure.h"
  #include "misc/bind.h"
  #include "pat/pat.h"
  #include "common/array.h"
@@ -301,10 +301,7 @@ const lsstr_t* lsthunk_get_constr(const lsthunk_t* thunk) {
   return thunk->lt_alge.lta_constr;
 }
 
-lsthunk_t* lsthunk_get_func(const lsthunk_t* thunk) {
-  assert(thunk->lt_type == LSTTYPE_APPL);
-  return thunk->lt_appl.lta_func;
-}
+// removed: lsthunk_get_func (unused)
 
 lssize_t lsthunk_get_argc(const lsthunk_t* thunk) {
   assert(thunk->lt_type == LSTTYPE_ALGE || thunk->lt_type == LSTTYPE_APPL);
@@ -316,15 +313,9 @@ lsthunk_t* const* lsthunk_get_args(const lsthunk_t* thunk) {
   return thunk->lt_type == LSTTYPE_ALGE ? thunk->lt_alge.lta_args : thunk->lt_appl.lta_args;
 }
 
-lsthunk_t* lsthunk_get_left(const lsthunk_t* thunk) {
-  assert(thunk->lt_type == LSTTYPE_CHOICE);
-  return thunk->lt_choice.ltc_left;
-}
+// removed: lsthunk_get_left (unused)
 
-lsthunk_t* lsthunk_get_right(const lsthunk_t* thunk) {
-  assert(thunk->lt_type == LSTTYPE_CHOICE);
-  return thunk->lt_choice.ltc_right;
-}
+// removed: lsthunk_get_right (unused)
 
 lstpat_t* lsthunk_get_param(const lsthunk_t* thunk) {
   assert(thunk->lt_type == LSTTYPE_LAMBDA);
@@ -336,10 +327,7 @@ lsthunk_t* lsthunk_get_body(const lsthunk_t* thunk) {
   return thunk->lt_lambda.ltl_body;
 }
 
-lstref_target_t* lsthunk_get_ref_target(const lsthunk_t* thunk) {
-  assert(thunk->lt_type == LSTTYPE_REF);
-  return thunk->lt_ref.ltr_target;
-}
+// removed: lsthunk_get_ref_target (unused)
 
 const lsint_t* lsthunk_get_int(const lsthunk_t* thunk) {
   assert(thunk->lt_type == LSTTYPE_INT);
@@ -544,7 +532,6 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   // substituting any references to the parameter with the bound thunk. This
   // prevents subsequent applications of the same lambda from mutating the
   // shared parameter pattern and affecting already-produced values.
-  extern lsthunk_t* lsthunk_subst_param(lsthunk_t* thunk, lstpat_t* param);
   ret = lsthunk_subst_param(ret, param);
   // Clear the parameter bindings now that the value has captured them.
   lstpat_clear_binds(param);
