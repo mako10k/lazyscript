@@ -119,6 +119,30 @@ static inline const lsexpr_t *curry_lambdas(const lspat_t *const *ps, lssize_t a
   }
   return body;
 }
+
+// Build list as nested cons for expressions: [e1,...,en] => :(e1, :(e2, ...(:(en, []))))
+static inline const lsealge_t *build_ealge_list_from_array(lssize_t argc, const lsexpr_t *const *es) {
+  const lsealge_t *chain = lsealge_new(lsstr_cstr("[]"), 0, NULL);
+  for (lssize_t i = argc; i > 0; --i) {
+    const lsexpr_t *args2[2];
+    args2[0] = es[i - 1];
+    args2[1] = lsexpr_new_alge(chain);
+    chain    = lsealge_new(lsstr_cstr(":"), 2, args2);
+  }
+  return chain;
+}
+
+// Build list as nested cons for patterns
+static inline const lspalge_t *build_palge_list_from_array(lssize_t argc, const lspat_t *const *ps) {
+  const lspalge_t *chain = lspalge_new(lsstr_cstr("[]"), 0, NULL);
+  for (lssize_t i = argc; i > 0; --i) {
+    const lspat_t *args2[2];
+    args2[0] = ps[i - 1];
+    args2[1] = lspat_new_alge(chain);
+    chain    = lspalge_new(lsstr_cstr(":"), 2, args2);
+  }
+  return chain;
+}
 }
 
 %define api.pure full
@@ -518,17 +542,9 @@ earray:
 elist:
       '[' ']' { $$ = lsealge_new(lsstr_cstr("[]"), 0, NULL); }
     | '[' earray ']' {
-        // Desugar [e1, e2, ..., en] into :(e1, :(e2, ...(:(en, [])))
-        lssize_t argc = lsarray_get_size($2);
-        const lsexpr_t *const *es = (const lsexpr_t *const *)lsarray_get($2);
-        const lsealge_t *chain = lsealge_new(lsstr_cstr("[]"), 0, NULL);
-        for (lssize_t i = argc; i > 0; i--) {
-          const lsexpr_t *args2[2];
-          args2[0] = es[i - 1];
-          args2[1] = lsexpr_new_alge(chain);
-          chain    = lsealge_new(lsstr_cstr(":"), 2, args2);
-        }
-        $$ = chain; }
+  lssize_t argc = lsarray_get_size($2);
+  const lsexpr_t *const *es = (const lsexpr_t *const *)lsarray_get($2);
+  $$ = build_ealge_list_from_array(argc, es); }
     ;
 
 elambda:
@@ -616,17 +632,9 @@ parray:
 plist:
       '[' ']' { $$ = lspalge_new(lsstr_cstr("[]"), 0, NULL); }
     | '[' parray ']' {
-        // Desugar [p1, p2, ..., pn] into :(p1, :(p2, ...(:(pn, [])))
-        lssize_t argc = lsarray_get_size($2);
-        const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
-        const lspalge_t *chain = lspalge_new(lsstr_cstr("[]"), 0, NULL);
-        for (lssize_t i = argc; i > 0; i--) {
-          const lspat_t *args2[2];
-          args2[0] = ps[i - 1];
-          args2[1] = lspat_new_alge(chain);
-          chain    = lspalge_new(lsstr_cstr(":"), 2, args2);
-        }
-        $$ = chain; }
+  lssize_t argc = lsarray_get_size($2);
+  const lspat_t *const *ps = (const lspat_t *const *)lsarray_get($2);
+  $$ = build_palge_list_from_array(argc, ps); }
     ;
 
 %%
