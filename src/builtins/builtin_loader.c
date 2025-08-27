@@ -79,14 +79,30 @@ static void build_search_paths(char* out, size_t outsz) {
   char exedir[PATH_MAX]; exedir[0] = '\0'; get_exe_dir(exedir, sizeof(exedir));
   if (exedir[0]) {
     char tmp[PATH_MAX];
-  if (snprintf(tmp, sizeof(tmp), "%s/builtins", exedir) >= (int)sizeof(tmp)) tmp[0] = '\0';
+    {
+      int need = snprintf(NULL, 0, "%s/builtins", exedir);
+      if (need < 0 || (size_t)need >= sizeof(tmp)) tmp[0] = '\0';
+      else snprintf(tmp, (size_t)need + 1, "%s/builtins", exedir);
+    }
     append_path(out, outsz, tmp, NULL);
-  if (snprintf(tmp, sizeof(tmp), "%s/plugins", exedir) >= (int)sizeof(tmp)) tmp[0] = '\0';
+    {
+      int need = snprintf(NULL, 0, "%s/plugins", exedir);
+      if (need < 0 || (size_t)need >= sizeof(tmp)) tmp[0] = '\0';
+      else snprintf(tmp, (size_t)need + 1, "%s/plugins", exedir);
+    }
     append_path(out, outsz, tmp, NULL);
     // When executed from the build tree, shared objects live in .libs/
-  if (snprintf(tmp, sizeof(tmp), "%s/builtins/.libs", exedir) >= (int)sizeof(tmp)) tmp[0] = '\0';
+    {
+      int need = snprintf(NULL, 0, "%s/builtins/.libs", exedir);
+      if (need < 0 || (size_t)need >= sizeof(tmp)) tmp[0] = '\0';
+      else snprintf(tmp, (size_t)need + 1, "%s/builtins/.libs", exedir);
+    }
     append_path(out, outsz, tmp, NULL);
-  if (snprintf(tmp, sizeof(tmp), "%s/plugins/.libs", exedir) >= (int)sizeof(tmp)) tmp[0] = '\0';
+    {
+      int need = snprintf(NULL, 0, "%s/plugins/.libs", exedir);
+      if (need < 0 || (size_t)need >= sizeof(tmp)) tmp[0] = '\0';
+      else snprintf(tmp, (size_t)need + 1, "%s/plugins/.libs", exedir);
+    }
     append_path(out, outsz, tmp, NULL);
   }
   // Fallback system paths
@@ -98,13 +114,24 @@ static void make_candidate(char* out, size_t outsz, const char* dir, const char*
   // variant 0: <dir>/liblazyscript_<name>.so
   // variant 1: <dir>/<name>.so
   int needed = (variant == 0)
-    ? snprintf(NULL, 0, "%s/liblazyscript_%s.so", dir, name)
-    : snprintf(NULL, 0, "%s/%s.so", dir, name);
-  if (needed < 0 || (size_t)needed >= outsz) { out[0] = '\0'; return; }
+                 ? snprintf(NULL, 0, "%s/liblazyscript_%s.so", dir, name)
+                 : snprintf(NULL, 0, "%s/%s.so", dir, name);
+  if (needed < 0) { out[0] = '\0'; return; }
+  // Format into a right-sized temporary buffer to avoid fortify truncation warnings,
+  // then bounded-copy into the provided destination buffer.
+  size_t tlen = (size_t)needed + 1;
+  char*  tmp  = (char*)lsmalloc(tlen);
   if (variant == 0)
-    snprintf(out, outsz, "%s/liblazyscript_%s.so", dir, name);
+    snprintf(tmp, tlen, "%s/liblazyscript_%s.so", dir, name);
   else
-    snprintf(out, outsz, "%s/%s.so", dir, name);
+    snprintf(tmp, tlen, "%s/%s.so", dir, name);
+  if ((size_t)needed >= outsz) {
+    out[0] = '\0';
+  } else {
+    // safe copy including NUL
+    memcpy(out, tmp, tlen);
+  }
+  lsfree(tmp);
 }
 
 static lsthunk_t* make_symbol_key(const char* name) {
@@ -133,7 +160,17 @@ static lsthunk_t* build_namespace_from_module(const ls_builtin_module_t* mod) {
     // Value: builtin function thunk
     char label[256];
     const char* mname = mod->module_name ? mod->module_name : "builtin";
-    snprintf(label, sizeof(label), "builtin:%s#%s", mname, e->name);
+    {
+      int need = snprintf(NULL, 0, "builtin:%s#%s", mname, e->name);
+      if (need < 0) label[0] = '\0';
+      else if ((size_t)need >= sizeof(label)) {
+        // Truncate safely
+        snprintf(label, sizeof(label), "builtin:%s#%s", mname, e->name);
+        label[sizeof(label)-1] = '\0';
+      } else {
+        snprintf(label, (size_t)need + 1, "builtin:%s#%s", mname, e->name);
+      }
+    }
     argv[2*i+1] = lsthunk_new_builtin(lsstr_cstr(label), e->arity, e->fn, e->data);
   }
   lsthunk_t* ns = lsbuiltin_nslit(pairs * 2, argv, NULL);
