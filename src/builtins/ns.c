@@ -174,7 +174,7 @@ static void ns_collect_cb(const lsstr_t* key, lshash_data_t value, void* data) {
   if (!key) return;
   const char* bytes = lsstr_get_buf(key);
   lssize_t    len   = lsstr_get_len(key);
-  if (!bytes || len <= 0) return;
+  if (!bytes || len == 0) return;
   if (ctx->count == ctx->cap) {
     size_t ncap = ctx->cap ? ctx->cap * 2 : 16;
     ctx->items  = (ns_key_item_t*)lsrealloc(ctx->items, ncap * sizeof(ns_key_item_t));
@@ -260,7 +260,7 @@ static void ns_iter_cb_adapter(const lsstr_t* key, lshash_data_t value, void* da
   if (!u || !u->cb || !key) return;
   const char* bytes = lsstr_get_buf(key);
   lssize_t    len   = lsstr_get_len(key);
-  if (!bytes || len <= 0) return;
+  if (!bytes || len == 0) return;
   if (bytes[0] != 'S') return; // only symbol keys
   const lsstr_t* sym = lsstr_new(bytes + 1, len - 1);
   u->cb(sym, (lsthunk_t*)value, u->data);
@@ -459,7 +459,7 @@ static void _ns_dbg_cb(const lsstr_t* key, lshash_data_t value, void* data) {
   if (!key || !c) return;
   const char* bytes = lsstr_get_buf(key);
   lssize_t    len   = lsstr_get_len(key);
-  if (!bytes || len <= 0) return;
+  if (!bytes || len == 0) return;
   if (bytes[0] != 'S') return; // only symbol keys
   if (!c->first) lsprintf(stderr, 0, ", ");
   c->first = 0;

@@ -79,14 +79,14 @@ static void build_search_paths(char* out, size_t outsz) {
   char exedir[PATH_MAX]; exedir[0] = '\0'; get_exe_dir(exedir, sizeof(exedir));
   if (exedir[0]) {
     char tmp[PATH_MAX];
-    snprintf(tmp, sizeof(tmp), "%s/builtins", exedir);
+  if (snprintf(tmp, sizeof(tmp), "%s/builtins", exedir) >= (int)sizeof(tmp)) tmp[0] = '\0';
     append_path(out, outsz, tmp, NULL);
-    snprintf(tmp, sizeof(tmp), "%s/plugins", exedir);
+  if (snprintf(tmp, sizeof(tmp), "%s/plugins", exedir) >= (int)sizeof(tmp)) tmp[0] = '\0';
     append_path(out, outsz, tmp, NULL);
     // When executed from the build tree, shared objects live in .libs/
-    snprintf(tmp, sizeof(tmp), "%s/builtins/.libs", exedir);
+  if (snprintf(tmp, sizeof(tmp), "%s/builtins/.libs", exedir) >= (int)sizeof(tmp)) tmp[0] = '\0';
     append_path(out, outsz, tmp, NULL);
-    snprintf(tmp, sizeof(tmp), "%s/plugins/.libs", exedir);
+  if (snprintf(tmp, sizeof(tmp), "%s/plugins/.libs", exedir) >= (int)sizeof(tmp)) tmp[0] = '\0';
     append_path(out, outsz, tmp, NULL);
   }
   // Fallback system paths
@@ -97,6 +97,10 @@ static void build_search_paths(char* out, size_t outsz) {
 static void make_candidate(char* out, size_t outsz, const char* dir, const char* name, int variant) {
   // variant 0: <dir>/liblazyscript_<name>.so
   // variant 1: <dir>/<name>.so
+  int needed = (variant == 0)
+    ? snprintf(NULL, 0, "%s/liblazyscript_%s.so", dir, name)
+    : snprintf(NULL, 0, "%s/%s.so", dir, name);
+  if (needed < 0 || (size_t)needed >= outsz) { out[0] = '\0'; return; }
   if (variant == 0)
     snprintf(out, outsz, "%s/liblazyscript_%s.so", dir, name);
   else

@@ -62,6 +62,7 @@ const lsstr_t*   lspat_get_str(const lspat_t* pat) { return pat->lp_str; }
 const lsref_t*   lspat_get_ref(const lspat_t* pat) { return pat->lp_ref; }
 
 void             lspat_print(FILE* fp, lsprec_t prec, int indent, const lspat_t* pat) {
+  if (!pat) { lsprintf(fp, indent, "<null-pat>"); return; }
               switch (pat->lp_type) {
               case LSPTYPE_ALGE:
     lspalge_print(fp, prec, indent, pat->lp_alge);
