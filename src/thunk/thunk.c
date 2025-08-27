@@ -662,6 +662,9 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
   }
   case LSTRTYPE_BUILTIN:
     return lsthunk_eval_builtin(origin->lrto_builtin, argc, args);
+  default:
+    lsprintf(stderr, 0, "E: ref origin: unknown type %d\n", (int)origin->lrto_type);
+    return ls_make_err("ref origin type");
   }
 }
 
@@ -764,10 +767,10 @@ lsthunk_t* lsthunk_eval0(lsthunk_t* thunk) {
   return thunk->lt_whnf;
 }
 
-lstref_target_t* lstref_target_new(lstref_target_origin_t* origin, lstpat_t* tpat) {
+lstref_target_t* lstref_target_new(lstref_target_origin_t* origin, lstpat_t* pat) {
   lstref_target_t* target = lsmalloc(sizeof(lstref_target_t));
   target->lrt_origin      = origin;
-  target->lrt_pat         = tpat;
+  target->lrt_pat         = pat;
   return target;
 }
 
@@ -781,7 +784,6 @@ lsthunk_t* lsthunk_new_builtin(const lsstr_t* name, lssize_t arity, lstbuiltin_f
   // execute zero-arity builtins and cache their resulting value, keeping
   // wrappers (e.g., namespace member getters) transparent when printing.
   thunk->lt_whnf        = NULL;
-  thunk->lt_trace_id    = -1;
   thunk->lt_trace_id    = -1;
   lstbuiltin_t* builtin = lsmalloc(sizeof(lstbuiltin_t));
   builtin->lti_name     = name;
@@ -812,6 +814,7 @@ void* lsthunk_get_builtin_data(const lsthunk_t* thunk) {
   return (thunk && thunk->lt_type == LSTTYPE_BUILTIN) ? thunk->lt_builtin->lti_data : NULL;
 }
 
+// cppcheck-suppress unusedFunction
 const lsstr_t* lsthunk_get_builtin_name(const lsthunk_t* thunk) {
   return (thunk && thunk->lt_type == LSTTYPE_BUILTIN) ? thunk->lt_builtin->lti_name : NULL;
 }
@@ -942,13 +945,14 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
       if (lsstrcmp(thunk->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
           thunk->lt_alge.lta_argc == 2) {
         // Collect elements along cons-chain with a safety cap
-        lssize_t    cap = 8, n = 0;
+  lssize_t    cap = 8, n = 0;
+  int         aborted = 0;
         lsthunk_t** elems = lsmalloc(sizeof(lsthunk_t*) * cap);
         const lsthunk_t* cur = thunk;
         const lssize_t   max_steps = 4096;
         lssize_t         steps     = 0;
         while (1) {
-          if (steps++ > max_steps) { n = -1; break; }
+          if (steps++ > max_steps) { aborted = 1; break; }
           const lsthunk_t* curv = lsthunk_eval0((lsthunk_t*)cur);
           if (!(curv->lt_type == LSTTYPE_ALGE &&
                 lsstrcmp(curv->lt_alge.lta_constr, lsstr_cstr(":")) == 0 &&
@@ -963,7 +967,7 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
           elems[n++] = curv->lt_alge.lta_args[0];
           cur        = curv->lt_alge.lta_args[1];
         }
-        if (n >= 0) {
+  if (!aborted) {
           const lsthunk_t* tailv = lsthunk_eval0((lsthunk_t*)cur);
           int is_nil = (tailv->lt_type == LSTTYPE_ALGE &&
                         lsstrcmp(tailv->lt_alge.lta_constr, lsstr_cstr("[]")) == 0 &&
