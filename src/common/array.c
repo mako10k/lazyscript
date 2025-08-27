@@ -94,16 +94,16 @@ const void* const* lsa_concata(lssize_t size1, const void* const* ary1, lssize_t
 }
 
 const void* const* lsa_slice(lssize_t size, const void* const* ary, lssize_t start, lssize_t end) {
-  assert(start >= 0 && start <= size);
-  assert(end >= 0 && end <= size);
+  assert(start <= size);
+  assert(end <= size);
   assert(start <= end);
   return ary + start;
 }
 
 const void* const* lsa_splicev(lssize_t size, const void* const* ary, lssize_t start, lssize_t end,
                                lssize_t insize, va_list ap) {
-  assert(start >= 0 && start <= size);
-  assert(end >= 0 && end <= size);
+  assert(start <= size);
+  assert(end <= size);
   assert(start <= end);
   if (start == 0 && end == size)
     return lsa_newv(insize, ap);
@@ -127,8 +127,8 @@ const void* const* lsa_splicev(lssize_t size, const void* const* ary, lssize_t s
 
 const void* const* lsa_splicea(lssize_t size, const void* const* ary, lssize_t start, lssize_t end,
                                lssize_t insize, const void* const* ins) {
-  assert(start >= 0 && start <= size);
-  assert(end >= 0 && end <= size);
+  assert(start <= size);
+  assert(end <= size);
   assert(start <= end);
   if (start == end && insize == 0)
     return ary;
@@ -246,8 +246,8 @@ const lsarray_t* lsarray_concat(const lsarray_t* ary1, const lsarray_t* ary2) {
 
 const lsarray_t* lsarray_splicev(const lsarray_t* ary, lssize_t start, lssize_t end,
                                  lssize_t insize, va_list ap) {
-  assert(start >= 0 && start <= lsarray_get_size(ary));
-  assert(end >= 0 && end <= lsarray_get_size(ary));
+  assert(start <= lsarray_get_size(ary));
+  assert(end <= lsarray_get_size(ary));
   assert(start <= end);
   if (start == end && insize == 0)
     return ary;
@@ -259,8 +259,8 @@ const lsarray_t* lsarray_splicev(const lsarray_t* ary, lssize_t start, lssize_t 
 
 const lsarray_t* lsarray_splicea(const lsarray_t* ary, lssize_t start, lssize_t end,
                                  const lsarray_t* ins) {
-  assert(start >= 0 && start <= lsarray_get_size(ary));
-  assert(end >= 0 && end <= lsarray_get_size(ary));
+  assert(start <= lsarray_get_size(ary));
+  assert(end <= lsarray_get_size(ary));
   assert(start <= end);
   if (start == end && lsarray_get_size(ins) == 0)
     return ary;

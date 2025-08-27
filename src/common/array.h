@@ -256,4 +256,4 @@ const lsarray_t* lsarray_splicev(const lsarray_t* ary, lssize_t start, lssize_t 
  * @return Spliced array.
  */
 const lsarray_t* lsarray_splicea(const lsarray_t* ary, lssize_t start, lssize_t end,
-                                 const lsarray_t* ary2);
+                                 const lsarray_t* ins);
