@@ -171,7 +171,7 @@ static lsthunk_t* build_namespace_from_module(const ls_builtin_module_t* mod) {
         snprintf(label, (size_t)need + 1, "builtin:%s#%s", mname, e->name);
       }
     }
-    argv[2*i+1] = lsthunk_new_builtin(lsstr_cstr(label), e->arity, e->fn, e->data);
+  argv[2*i+1] = lsthunk_new_builtin(lsstr_cstr(label), e->arity, e->fn, e->data);
   }
   lsthunk_t* ns = lsbuiltin_nslit(pairs * 2, argv, NULL);
   // Free arg array; elements managed by thunks

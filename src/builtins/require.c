@@ -71,38 +71,7 @@ lsthunk_t* lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void
 }
 
 // Option-wrapped require: returns Some () on success, None on not-found (effectful)
-lsthunk_t* lsbuiltin_prelude_require_opt(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc;
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: requireOpt: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return ls_make_err("requireOpt: no env");
-  lsthunk_t* pathv = ls_eval_arg(args[0], "requireOpt: path");
-  if (lsthunk_is_err(pathv)) return pathv;
-  if (lsthunk_get_type(pathv) != LSTTYPE_STR) {
-    return ls_make_err("requireOpt: expected string path");
-  }
-  size_t n=0; char* buf=NULL; FILE* fp=lsopen_memstream_gc(&buf,&n);
-  lsstr_print_bare(fp, LSPREC_LOWEST, 0, lsthunk_get_str(pathv)); fclose(fp);
-  const char* path = buf;
-  if (ls_modules_is_loaded(path)) {
-    const lsexpr_t* unit = lsexpr_new_alge(lsealge_new(lsstr_cstr("()"), 0, NULL));
-    const lsexpr_t* args1[1] = { unit };
-    return lsthunk_new_ealge(lsealge_new(lsstr_cstr("Some"), 1, args1), NULL);
-  }
-  const lsprog_t* prog = ls_require_resolve(path);
-  if (!prog) {
-    return lsthunk_new_ealge(lsealge_new(lsstr_cstr("None"), 0, NULL), NULL);
-  }
-  if (ls_effects_get_strict()) ls_effects_begin();
-  (void)lsprog_eval(prog, tenv);
-  if (ls_effects_get_strict()) ls_effects_end();
-  ls_modules_mark_loaded(path);
-  const lsexpr_t* unit = lsexpr_new_alge(lsealge_new(lsstr_cstr("()"), 0, NULL));
-  const lsexpr_t* args1[1] = { unit };
-  return lsthunk_new_ealge(lsealge_new(lsstr_cstr("Some"), 1, args1), NULL);
-}
+// requireOpt has been moved to the prelude plugin to avoid host-level Option constructors
 
 // include: evaluate another file and return its resulting value without mutating the
 // current environment.  Loading errors are treated as fatal.

@@ -8,6 +8,8 @@ lstrace_table_t* g_lstrace_table = NULL;
 // Thread-local stack for current trace id
 static __thread int g_trace_stack[256];
 static __thread int g_trace_top = 0;
+// Overflow warning guard (per-thread): emit at most once to avoid log spam
+static __thread int g_trace_overflow_warned = 0;
 // Thread-local pending loc for next emission
 static __thread int    g_has_pending_loc = 0;
 static __thread lsloc_t g_pending_loc;
@@ -158,7 +160,10 @@ void lstrace_push(int id) {
   if (g_trace_top < cap) {
     g_trace_stack[g_trace_top++] = id;
   } else {
-    fprintf(stderr, "W: trace stack overflow (cap=%d)\n", cap);
+    if (!g_trace_overflow_warned) {
+      fprintf(stderr, "W: trace stack overflow (cap=%d)\n", cap);
+      g_trace_overflow_warned = 1;
+    }
   }
 }
 

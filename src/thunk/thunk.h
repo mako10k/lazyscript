@@ -17,6 +17,18 @@ typedef enum lstrtype { LSTRTYPE_BIND, LSTRTYPE_LAMBDA, LSTRTYPE_BUILTIN } lstrt
 
 typedef lsthunk_t* (*lstbuiltin_func_t)(lssize_t, lsthunk_t* const*, void*);
 
+// Builtin attribute flags (bitmask)
+//  - PURE (default): no side-effects, no env access
+//  - EFFECT: performs side-effects (requires effects to be allowed)
+//  - ENV_READ: reads from environment via data pointer
+//  - ENV_WRITE: mutates environment via data pointer
+typedef enum lsbuiltin_attr {
+  LSBATTR_PURE      = 0,
+  LSBATTR_EFFECT    = 1 << 0,
+  LSBATTR_ENV_READ  = 1 << 1,
+  LSBATTR_ENV_WRITE = 1 << 2,
+} lsbuiltin_attr_t;
+
 #include "common/int.h"
 #include "common/str.h"
 #include "expr/ealge.h"
@@ -119,6 +131,10 @@ lsthunk_t* lsthunk_new_symbol(const lsstr_t* sym);
  */
 lsthunk_t* lsthunk_new_builtin(const lsstr_t* name, lssize_t arity, lstbuiltin_func_t func,
                                void* data);
+
+// Create a new builtin thunk with attributes
+lsthunk_t* lsthunk_new_builtin_attr(const lsstr_t* name, lssize_t arity, lstbuiltin_func_t func,
+                                    void* data, lsbuiltin_attr_t attr);
 
 // Builtin helpers (introspection)
 int              lsthunk_is_builtin(const lsthunk_t* thunk);

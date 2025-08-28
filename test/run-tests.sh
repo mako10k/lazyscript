@@ -16,6 +16,9 @@ fi
 # The search order allows tests to override by pre-setting LAZYSCRIPT_PATH.
 export LAZYSCRIPT_PATH="${LAZYSCRIPT_PATH:-$DIR:$ROOT}"
 
+# Default init script: bind ~Prelude for tests unless the caller sets LAZYSCRIPT_INIT
+export LAZYSCRIPT_INIT="${LAZYSCRIPT_INIT:-$ROOT/lib/PreludeInit.ls}"
+
 # Default allocator: prefer libc for stable tests unless the caller/CI explicitly sets it.
 # Note: This is a test harness setting only. It MUST NOT drive changes to product defaults.
 # CI matrix can set LAZYSCRIPT_USE_LIBC_ALLOC=0 to enable GC jobs.

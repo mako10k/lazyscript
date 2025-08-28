@@ -151,5 +151,7 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 "<-"       { return LSTLEFTARROW; }
 "->"       { return LSTARROW; }
 "||"       { return LSTOROR; }
+"++"       { return LSTCONCAT; }
+"+"        { return LSTPLUS; }
 . { return yytext[0]; }
 %%

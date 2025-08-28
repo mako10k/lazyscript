@@ -1,0 +1,86 @@
+name: Spec Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited, reopened]
+  push:
+    branches: [ main ]
+
+jobs:
+  spec-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine base and head
+        id: basehead
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="origin/${{ github.base_ref }}"
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            BASE_SHA=$(git merge-base "$BASE_REF" HEAD)
+          else
+            BASE_SHA=$(git rev-parse HEAD~1)
+          fi
+          echo "BASE_SHA=$BASE_SHA" >> $GITHUB_ENV
+
+      - name: Compute changed files
+        id: changes
+        shell: bash
+        run: |
+          git --no-pager diff --name-only "$BASE_SHA" HEAD | sed '/^$/d' > /tmp/changed_files.txt
+          echo "Changed files:" && cat /tmp/changed_files.txt || true
+          GRAMMAR_CHANGED=0
+          SPEC_CHANGED=0
+          if grep -qE '^src/parser/(lexer\.l|parser\.y)$' /tmp/changed_files.txt; then
+            GRAMMAR_CHANGED=1
+          fi
+          if grep -qE '^(docs/parser-bnf\.md|docs/spec/)' /tmp/changed_files.txt; then
+            SPEC_CHANGED=1
+          fi
+          echo "GRAMMAR_CHANGED=$GRAMMAR_CHANGED" >> $GITHUB_ENV
+          echo "SPEC_CHANGED=$SPEC_CHANGED" >> $GITHUB_ENV
+
+      - name: Enforce spec update when grammar changes
+        if: env.GRAMMAR_CHANGED == '1'
+        shell: bash
+        run: |
+          if [ "${ALLOW_SPEC_CHANGE_WITHOUT_DOCS}" = "1" ]; then
+            echo "Override ALLOW_SPEC_CHANGE_WITHOUT_DOCS=1 set; skipping enforcement."; exit 0;
+          fi
+          if [ "${SPEC_CHANGED}" != "1" ]; then
+            echo "Spec Guard: Parser/lexer changed but docs/spec were not updated." >&2
+            echo "Please update docs/parser-bnf.md or files under docs/spec/ to reflect the language change." >&2
+            exit 1
+          fi
+          echo "Spec changes detected; proceeding to author check."
+
+      - name: Verify spec changes are user-approved (Signed-off-by)
+        if: env.SPEC_CHANGED == '1'
+        shell: bash
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          # Collect commits between base and head that touch docs/spec/* or docs/parser-bnf.md
+          COMMITS=$(git --no-pager log --format='%H' "$BASE_SHA"..HEAD)
+          NEED_SIGNOFF=0
+          HAVE_SIGNOFF=0
+          for C in $COMMITS; do
+            if git --no-pager show --name-only --pretty=format: "$C" | grep -qE '^(docs/parser-bnf\.md|docs/spec/)'; then
+              NEED_SIGNOFF=1
+              if git --no-pager log -1 --format='%B' "$C" | grep -qi "Signed-off-by: .*${OWNER}"; then
+                HAVE_SIGNOFF=1
+                break
+              fi
+            fi
+          done
+          if [ "$NEED_SIGNOFF" = "1" ] && [ "$HAVE_SIGNOFF" != "1" ]; then
+            echo "Spec Guard: Spec docs changed but no commit includes 'Signed-off-by: ${OWNER}'." >&2
+            echo "Please add a commit signed-off by the repository owner or amend the message." >&2
+            exit 1
+          fi
+          echo "Spec Guard: docs sign-off verified or not required."

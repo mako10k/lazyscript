@@ -8,6 +8,7 @@
 #include "thunk/tpat.h"
 #include "runtime/error.h"
 #include "runtime/trace.h"
+#include "runtime/effects.h"
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>
@@ -76,6 +77,7 @@ struct lstbuiltin {
   lssize_t          lti_arity;
   lstbuiltin_func_t lti_func;
   void*             lti_data;
+  lsbuiltin_attr_t  lti_attr;
 };
 
 struct lsthunk {
@@ -570,6 +572,15 @@ static lsthunk_t* lsthunk_eval_builtin(lsthunk_t* thunk, lssize_t argc, lsthunk_
   lssize_t          arity = thunk->lt_builtin->lti_arity;
   lstbuiltin_func_t func  = thunk->lt_builtin->lti_func;
   void*             data  = thunk->lt_builtin->lti_data;
+  lsbuiltin_attr_t  attr  = thunk->lt_builtin->lti_attr;
+  // Central attribute guards
+  if ((attr & LSBATTR_EFFECT) && !ls_effects_allowed()) {
+    lsprintf(stderr, 0, "E: builtin: effects not allowed\n");
+    return NULL;
+  }
+  if ((attr & (LSBATTR_ENV_READ | LSBATTR_ENV_WRITE)) && data == NULL) {
+    return ls_make_err("builtin: missing env");
+  }
   if (argc < arity) {
     lsthunk_t* ret        = lsmalloc(lssizeof(lsthunk_t, lt_appl) + argc * sizeof(lsthunk_t*));
     ret->lt_type          = LSTTYPE_APPL;
@@ -777,8 +788,18 @@ lsthunk_t* lsthunk_new_builtin(const lsstr_t* name, lssize_t arity, lstbuiltin_f
   builtin->lti_arity    = arity;
   builtin->lti_func     = func;
   builtin->lti_data     = data;
+  builtin->lti_attr     = LSBATTR_PURE;
   thunk->lt_builtin     = builtin;
   return thunk;
+}
+
+lsthunk_t* lsthunk_new_builtin_attr(const lsstr_t* name, lssize_t arity, lstbuiltin_func_t func,
+                                    void* data, lsbuiltin_attr_t attr) {
+  lsthunk_t* t = lsthunk_new_builtin(name, arity, func, data);
+  if (t && t->lt_type == LSTTYPE_BUILTIN) {
+    ((lstbuiltin_t*)t->lt_builtin)->lti_attr = attr;
+  }
+  return t;
 }
 
 lstref_target_origin_t* lstref_target_origin_new_builtin(const lsstr_t* name, lssize_t arity,

@@ -340,12 +340,42 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
     if (lsexpr_get_type(func_e) == LSETYPE_APPL) {
       const lseappl_t* ap2 = lsexpr_get_appl(func_e);
       const lsexpr_t*  f2  = lseappl_get_func(ap2);
-      if (lsexpr_get_type(f2) == LSETYPE_REF &&
-          strcmp(extract_ref_name(lsexpr_get_ref(f2)), "prelude") == 0) {
+      int is_prelude_head = 0;
+      // Case A: (app (var prelude) a0)
+      if (lsexpr_get_type(f2) == LSETYPE_REF && strcmp(extract_ref_name(lsexpr_get_ref(f2)), "prelude") == 0) {
+        is_prelude_head = 1;
+      }
+      // Case B: (app (app (var prelude) (.env)) sym) i.e., ((prelude .env) .sym)
+      else if (lsexpr_get_type(f2) == LSETYPE_APPL) {
+        const lseappl_t* ap_head = lsexpr_get_appl(f2);
+        if ((int)lseappl_get_argc(ap_head) == 1) {
+          const lsexpr_t* f3 = lseappl_get_func(ap_head);
+          if (lsexpr_get_type(f3) == LSETYPE_REF && strcmp(extract_ref_name(lsexpr_get_ref(f3)), "prelude") == 0) {
+            const lsexpr_t* a0h = lseappl_get_args(ap_head)[0];
+            if ((lsexpr_get_type(a0h) == LSETYPE_SYMBOL && strcmp(lsstr_get_buf(lsexpr_get_symbol(a0h)), ".env") == 0) ||
+                (lsexpr_get_type(a0h) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(a0h)) == 0 && strcmp(lsstr_get_buf(lsealge_get_constr(lsexpr_get_alge(a0h))), ".env") == 0)) {
+              is_prelude_head = 2; // two-step env
+            }
+          }
+        }
+      }
+      if (is_prelude_head) {
         if ((int)lseappl_get_argc(ap2) == 1) {
           const lsexpr_t* a0  = lseappl_get_args(ap2)[0];
           const char*     sym = NULL;
-          if (lsexpr_get_type(a0) == LSETYPE_REF) {
+          if (is_prelude_head == 2) {
+            // ((prelude .env) .sym) form: a0 is the .sym
+            if (lsexpr_get_type(a0) == LSETYPE_SYMBOL) {
+              const char* s = lsstr_get_buf(lsexpr_get_symbol(a0));
+              sym = (s && s[0] == '.') ? (s + 1) : s;
+            } else if (lsexpr_get_type(a0) == LSETYPE_ALGE) {
+              const lsealge_t* al3 = lsexpr_get_alge(a0);
+              if (lsealge_get_argc(al3) == 0) {
+                const char* s = lsstr_get_buf(lsealge_get_constr(al3));
+                sym = (s && s[0] == '.') ? (s + 1) : s;
+              }
+            }
+          } else if (lsexpr_get_type(a0) == LSETYPE_REF) {
             sym = extract_ref_name(lsexpr_get_ref(a0));
           } else if (lsexpr_get_type(a0) == LSETYPE_ALGE) {
             const lsealge_t* al = lsexpr_get_alge(a0);
