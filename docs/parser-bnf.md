@@ -10,7 +10,7 @@
 - LSTINT : 整数リテラル
 - LSTSTR : 文字列リテラル
 - LSTSYMBOL : シンボル/識別子（コンストラクタ等）
-- LSTPRELUDE_CONSTR / LSTPRELUDE_SYMBOL / LSTPRELUDE_STR / LSTPRELUDE_INT : プレリュード糖 (~~... 系)
+- LSTPRELUDE_SYMBOL : プレリュード糖 (~~symbol のみ)
 - LSTNSDEF, LSTNSDEFV : ネームスペース定義系トークン
 - LSTREFSYM : 参照記法トークン（~x 形式）
 - LSTLEFTARROW : "<-"
@@ -64,10 +64,7 @@
          | LSTREFSYM
          | LSTNSDEFV <expr5> LSTSYMBOL <expr5>
          | LSTNSDEF LSTSYMBOL LSTSYMBOL <expr5>
-         | LSTPRELUDE_CONSTR
          | LSTPRELUDE_SYMBOL
-         | LSTPRELUDE_STR
-         | LSTPRELUDE_INT
          | <etuple>
          | <elist>
          | <closure>
@@ -157,6 +154,7 @@
          | '[' <parray> ']'
 
 ## 実装メモ
+- 2025-08: `++` と `+` は削除。`~~` 糖は `~~symbol` のみに統一。
 - parser.y 内の多くの規則は semantic action によって "糖" を展開（ns リテラル、do-block、リスト/タプルのデシュガーなど）する。
 - 優先度: expr 系は複数レベルに分かれ、適用 (application), アルゲ (algebraic constructor), 選択 (choice '|'), cons ':' 等の優先度が分離されている。
 - ラムダ本体は <expr2>（‘|’ の一段上）にしてあるため、`|` はラムダより弱い（`\x -> a | b` は `(\x -> a) | b` とは解釈されない）。
