@@ -201,6 +201,34 @@ static int truthy(const rv_t* v) {
   }
 }
 
+static void print_value_inline(FILE* outfp, const rv_t* v) {
+  if (!v) { fprintf(outfp, "<v>"); return; }
+  switch (v->kind) {
+  case RV_UNIT: fprintf(outfp, "()"); return;
+  case RV_INT: fprintf(outfp, "%lld", v->ival); return;
+  case RV_STR: fprintf(outfp, "%s", v->sval); return;
+  case RV_SYMBOL: fprintf(outfp, "%s", v->sym); return;
+  case RV_CONSTR: {
+    if (v->con.argc == 0) { fprintf(outfp, "%s", v->con.name ? v->con.name : "<con>"); return; }
+    fprintf(outfp, "(%s", v->con.name ? v->con.name : "<con>");
+    for (int j = 0; j < v->con.argc; j++) { fprintf(outfp, " "); print_value_inline(outfp, v->con.args[j]); }
+    fprintf(outfp, ")");
+    return;
+  }
+  case RV_BOTTOM: {
+    fprintf(outfp, "<bottom msg=\"%s\"", v->bot.message ? v->bot.message : "");
+    if (v->bot.argc > 0 && v->bot.args) {
+      fprintf(outfp, " args=[");
+      for (int i = 0; i < v->bot.argc; i++) { if (i) fprintf(outfp, ", "); print_value_inline(outfp, v->bot.args[i]); }
+      fprintf(outfp, "]");
+    }
+    fprintf(outfp, ">");
+    return;
+  }
+  default: fprintf(outfp, "<v>"); return;
+  }
+}
+
 static void print_value(FILE* outfp, const rv_t* v) {
   switch (v->kind) {
   case RV_UNIT:
@@ -271,7 +299,6 @@ static void print_value(FILE* outfp, const rv_t* v) {
             break;
           default:
             fprintf(outfp, "<v>");
-            break;
           }
         }
         fprintf(outfp, "]\n");
@@ -303,8 +330,8 @@ static void print_value(FILE* outfp, const rv_t* v) {
     fprintf(outfp, ")\n");
     return;
   case RV_BOTTOM:
-    // Keep outward behavior stable for now: print unit on stdout
-    fprintf(outfp, "()\n");
+    print_value_inline(outfp, v);
+    fprintf(outfp, "\n");
     return;
   }
   }

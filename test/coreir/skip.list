@@ -1,0 +1,2 @@
+# Skip placeholder/experimental tests under coreir until wiring is ready
+# (kept empty intentionally)
