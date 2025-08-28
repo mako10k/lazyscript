@@ -128,8 +128,6 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 	yylval->strval = lsstr_cstr(yytext + 1);
 	return LSTENVOP;
 }
-"~~nsdefv"  { return LSTNSDEFV; }
-"~~nsdef"   { return LSTNSDEF; }
 [~]{2}[a-zA-Z_][a-zA-Z0-9_]* {
 	/* ~~symbol => LSTPRELUDE_SYMBOL (plain name, no leading dot) */
 	const char* s = yytext + 2;

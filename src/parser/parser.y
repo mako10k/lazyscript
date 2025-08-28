@@ -248,8 +248,6 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
 %token <strval> LSTDOTSYMBOL
 %token <strval> LSTPRELUDE_SYMBOL
 %token <strval> LSTENVOP
-%token LSTNSDEF
-%token LSTNSDEFV
 %token <strval> LSTREFSYM
 %token <strval> LSTSTR
 %token LSTARROW
@@ -394,19 +392,6 @@ efact:
   LSTINT { $$ = lsexpr_with_loc(lsexpr_new_int($1), @$); }
   | LSTSTR { $$ = lsexpr_with_loc(lsexpr_new_str($1), @$); }
   | LSTREFSYM { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($1, @$)), @$); }
-  | LSTNSDEFV expr5 LSTSYMBOL expr5 {
-  const lsexpr_t *fn_defv = mk_prelude_func(yyscanner, @$, "nsdefv");
-  const lsexpr_t *sym = mk_constr0_expr_sym($3);
-  const lsexpr_t *args[] = { $2, sym, $4 };
-  $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn_defv, 3, args)), @$);
-      }
-  | LSTNSDEF LSTSYMBOL LSTSYMBOL expr5 {
-  const lsexpr_t *fn_def = mk_prelude_func(yyscanner, @$, "nsdef");
-        const lsexpr_t *nsname = mk_constr0_expr_sym($2);
-        const lsexpr_t *sym = mk_constr0_expr_sym($3);
-        const lsexpr_t *args[] = { nsname, sym, $4 };
-        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn_def, 3, args)), @$);
-      }
   | LSTPRELUDE_SYMBOL {
     // ~~symbol => (~<ns> symbol) where symbol is a plain name (no leading dot)
     const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @$);

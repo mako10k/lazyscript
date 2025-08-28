@@ -82,7 +82,6 @@ sudo make install   # 任意
 - `~~sym` は `(~prelude sym)` に展開（既定）。`--sugar-namespace` で切替可能。
 - ランタイム提供の簡易名前空間:
   - `~~nsnew NS` で `NS` を作成。
-  - `~~nsdef NS name value` で `NS.name = value` を定義。
   - `(~NS name)` で名前空間から値を取得（値を直接返します）。
 
 ### ビルトインの分割（内部構造）

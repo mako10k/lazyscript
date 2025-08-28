@@ -21,7 +21,7 @@ LazyScript の名前空間は「シンボルキー → 値」の写像です。�
 
 ```
 !{ ~~nsnew NS;
-   ~~nsdef NS .Foo 42;
+  <!-- nsdef/nsdefv sugar removed. Use prelude.env.def or public APIs if available. -->
    !println (~to_str ((~NS .Foo)))
 };
 ```
@@ -46,7 +46,7 @@ LazyScript の名前空間は「シンボルキー → 値」の写像です。�
 ```
 !{
   ns <- (~~nsnew0);
-  (~~nsdefv ns .Foo 42);
+  <!-- nsdef/nsdefv sugar removed. Use prelude.env.def or public APIs if available. -->
   !println (~to_str ((~ns .Foo)))
 };
 ```
@@ -89,10 +89,7 @@ LazyScript の名前空間は「シンボルキー → 値」の写像です。�
 ```
 !{
   ns <- (~~nsnew0);
-  ~~nsdefv ~ns .a 1;
-  ~~nsdefv ~ns .b 2;
-  ~~nsdefv ~ns .aa 3;
-  ~~nsdefv ~ns .ab 4;
+  <!-- nsdef/nsdefv sugar removed. Use prelude.env.def or public APIs if available. -->
   !println (~to_str (~~nsMembers ~ns));
 };
 -- 出力: [.a, .aa, .ab, .b]
