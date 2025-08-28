@@ -12,6 +12,7 @@
 - LSTSYMBOL : シンボル/識別子（コンストラクタ等）
 - LSTPRELUDE_SYMBOL : プレリュード糖 (~~symbol のみ)
 - LSTREFSYM : 参照記法トークン（~x 形式）
+- LSTCARET : キャレット '^'（Bottom 関連の構文で使用）
 - LSTLEFTARROW : "<-"
 - LSTARROW : "->"
 - LSTWILDCARD : ワイルドカード '_'
@@ -62,6 +63,7 @@
          | LSTSTR
          | LSTREFSYM
          | LSTPRELUDE_SYMBOL
+         | '^' '(' <expr> ')'
          | <etuple>
          | <elist>
          | <closure>
@@ -135,6 +137,7 @@
          | LSTSTR
          | <pref>
          | LSTWILDCARD
+         | '^' '(' <pat> ')'
          | <pref> '@' <pat3>
 
 /* ref */
@@ -157,6 +160,10 @@
 - 優先度: expr 系は複数レベルに分かれ、適用 (application), アルゲ (algebraic constructor), 選択 (choice '|'), cons ':' 等の優先度が分離されている。
 - ラムダ本体は <expr2>（‘|’ の一段上）にしてあるため、`|` はラムダより弱い（`\x -> a | b` は `(\x -> a) | b` とは解釈されない）。
 - このドキュメントは文法の読みやすさ優先で簡潔化しているため、細部の AST 構築/位置情報などは省略している。
+ - 2025-08: '^' の導入
+         - パターン側: `^(<pat>)` は Bottom 値にのみマッチする特殊パターン。
+         - 式側: `^(<expr>)` は Bottom を構築する（現状はプリリュードの `raise` 呼び出しに一時的にデシュガー）。
+         - 仕様詳細は `docs/spec/bottom-and-caret.md` を参照。
 
 ## 参照
 - 元ソース: `src/parser/parser.y`
