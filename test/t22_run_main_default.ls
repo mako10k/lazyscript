@@ -1,1 +1,3 @@
-!{ !def main (\ _ -> !{ !println [4,5] }) };
+!{
+	!withImport { .main = (\ _ -> !{ !println [4,5] }) } (\ _ -> ())
+};

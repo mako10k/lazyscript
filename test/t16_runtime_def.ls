@@ -1,1 +1,4 @@
-!{ !def Foo 123; !println (~~to_str ~Foo) };
+!{
+	!withImport { .Foo = 123 } (\ _ -> ());
+	!println (~~to_str ~Foo)
+};

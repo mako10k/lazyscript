@@ -225,8 +225,8 @@ if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
   fi
 
   # Token-gated effect via chain: should print and return unit under evaluator
-  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/t08_coreir_chain.ls")"
-  if diff -u <(printf "%s\n" "$out") "$DIR/t08_coreir_chain.out" >/dev/null; then
+  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/coreir/t08_coreir_chain.ls")"
+  if diff -u <(printf "%s\n" "$out") "$DIR/coreir/t08_coreir_chain.out" >/dev/null; then
     echo "ok - coreir-eval t08_coreir_chain"
     ((pass++))
   else
@@ -236,8 +236,8 @@ if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
   fi
 
   # return should just pass through the value
-  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/t09_coreir_return.ls")"
-  if diff -u <(printf "%s\n" "$out") "$DIR/t09_coreir_return.out" >/dev/null; then
+  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/coreir/t09_coreir_return.ls")"
+  if diff -u <(printf "%s\n" "$out") "$DIR/coreir/t09_coreir_return.out" >/dev/null; then
     echo "ok - coreir-eval t09_coreir_return"
     ((pass++))
   else
