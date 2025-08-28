@@ -407,13 +407,8 @@ efact:
   | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
   | elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
   | LSTCARET '(' expr ')' {
-        // ^(Expr): construct Bottom immediately with message from toString(Expr) — temporary
-        // TODO: wire to dedicated AST node if needed; for now lower to (~ <ns> .raise Expr)
-        const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol(lsstr_cstr(".raise")), @$);
-        const lsexpr_t *nsref = mk_nsref_at(yyscanner, @$);
-        const lsexpr_t *call = mk_call1(nsref, @$, sym);
-        const lsexpr_t *args1[] = { $3 };
-        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(call, 1, args1)), @$);
+        // ^(Expr): dedicated AST node; runtime constructs Bottom from the value of Expr
+        $$ = lsexpr_with_loc(lsexpr_new_raise($3), @$);
       }
   | LSTENVOP {
   // !ident => (~<ns> .env .ident)

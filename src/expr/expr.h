@@ -30,7 +30,8 @@ typedef enum {
   LSETYPE_NSLIT,
   // First-class dot symbol literal (e.g., .name) — distinct from algebraic constructors
   LSETYPE_SYMBOL,
-  // Note: no dedicated raise node; ^(Expr) is lowered in parser to (~<ns> .raise Expr)
+  // Dedicated caret-raise node: ^(Expr) constructs a Bottom from Expr at runtime
+  LSETYPE_RAISE
 } lsetype_t;
 
 #define lsapi_expr_new lsapi_nn1 lsapi_wur
@@ -46,6 +47,8 @@ lsapi_expr_new const lsexpr_t* lsexpr_new_choice(const lsechoice_t* echoice);
 lsapi_expr_new const lsexpr_t* lsexpr_new_nslit(const lsenslit_t* ens);
 // Create a new expression for a dot-prefixed symbol (e.g., .name)
 lsapi_expr_new const lsexpr_t* lsexpr_new_symbol(const lsstr_t* sym);
+// Create a new caret-raise expression ^(arg)
+lsapi_expr_new const lsexpr_t* lsexpr_new_raise(const lsexpr_t* arg);
 lsapi_get lsetype_t            lsexpr_get_type(const lsexpr_t* expr);
 lsapi_get const lsealge_t*     lsexpr_get_alge(const lsexpr_t* expr);
 lsapi_get const lseappl_t*     lsexpr_get_appl(const lsexpr_t* expr);
@@ -58,6 +61,8 @@ lsapi_get const lsechoice_t*   lsexpr_get_choice(const lsexpr_t* expr);
 lsapi_get const lsenslit_t*    lsexpr_get_nslit(const lsexpr_t* expr);
 // Accessor for symbol literal
 lsapi_get const lsstr_t*       lsexpr_get_symbol(const lsexpr_t* expr);
+// Accessor for caret-raise argument
+lsapi_get const lsexpr_t*      lsexpr_get_raise_arg(const lsexpr_t* expr);
 lsapi_print void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr);
 
 // Lightweight query helpers for printers
@@ -71,7 +76,8 @@ typedef enum lsexpr_type_query {
   LSEQ_CLOSURE = LSETYPE_CLOSURE,
   LSEQ_CHOICE = LSETYPE_CHOICE,
   LSEQ_NSLIT = LSETYPE_NSLIT,
-  LSEQ_SYMBOL = LSETYPE_SYMBOL
+  LSEQ_SYMBOL = LSETYPE_SYMBOL,
+  LSEQ_RAISE = LSETYPE_RAISE
 } lsexpr_type_query_t;
 
 lsapi_get lsexpr_type_query_t lsexpr_typeof(const lsexpr_t* expr);

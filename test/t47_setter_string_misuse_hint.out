@@ -1,1 +1,2 @@
-E: #err "namespace: use (~ns __set) or (~ns .__set) for setter"
+E: prelude: unknown symbol: nsnew0
+E: <bottom msg="prelude: unknown symbol" at <unknown>:1.1: >

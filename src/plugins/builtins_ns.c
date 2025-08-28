@@ -22,8 +22,6 @@ static lsthunk_t* pl_include(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* pl_import(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* pl_importOpt(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* pl_withImport(lssize_t argc, lsthunk_t* const* args, void* data);
-// caret expression support: (~<ns> .raise expr)
-static lsthunk_t* pl_raise(lssize_t argc, lsthunk_t* const* args, void* data);
 // forward for callback
 static void pl_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data);
 
@@ -167,23 +165,6 @@ static lsthunk_t* pl_trace_force(lssize_t argc, lsthunk_t* const* args, void* da
   return val ? val : NULL;
 }
 
-// raise: construct Bottom carrying message derived from argument; short-circuit if arg is already Bottom
-// Signature: raise x = ⊥("raise: " ++ toString(x), related=[x])
-static lsthunk_t* pl_raise(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)data;
-  if (argc != 1 || !args) return ls_make_err("raise: arity");
-  // Evaluate argument to detect Bottom; if Bottom, propagate as-is
-  lsthunk_t* v = lsthunk_eval0(args[0]);
-  if (!v) return ls_make_err("raise: eval");
-  if (lsthunk_is_bottom(v)) return v;
-  // Build message using deep print (stable, no external effects)
-  char*  buf = NULL; size_t blen = 0; FILE* fp = lsopen_memstream_gc(&buf, &blen);
-  lsprintf(fp, 0, "raise: ");
-  lsthunk_deep_print(fp, LSPREC_LOWEST, 0, v);
-  fclose(fp);
-  lsthunk_t* rel[1] = { v };
-  return lsthunk_new_bottom(buf ? buf : "raise", lstrace_take_pending_or_unknown(), 1, rel);
-}
 
 // requireOpt: try require; return Some () on success, None on failure. Effectful.
 static lsthunk_t* pl_require_opt(lssize_t argc, lsthunk_t* const* args, void* data) {
@@ -263,8 +244,7 @@ static lsthunk_t* pl_dispatch_env(lssize_t argc, lsthunk_t* const* args, void* d
   /* .def removed */
   if (lsstrcmp(s, lsstr_cstr(".builtin")) == 0)
     return lsthunk_new_builtin_attr(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin, tenv, LSBATTR_EFFECT | LSBATTR_ENV_READ);
-  if (lsstrcmp(s, lsstr_cstr(".raise")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.raise"), 1, pl_raise, NULL, LSBATTR_PURE);
+  /* .raise removed: caret ^(expr) now has a dedicated AST/runtime */
   return ls_make_err("prelude.env: unknown key");
 }
 
@@ -405,8 +385,7 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
     return lsthunk_new_builtin_attr(lsstr_cstr("prelude.force"), 1, pl_force, NULL, LSBATTR_PURE);
   if (lsstrcmp(name, lsstr_cstr("traceForce")) == 0)
     return lsthunk_new_builtin_attr(lsstr_cstr("prelude.traceForce"), 2, pl_trace_force, NULL, LSBATTR_EFFECT);
-  if (lsstrcmp(name, lsstr_cstr(".raise")) == 0 || lsstrcmp(name, lsstr_cstr("raise")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.raise"), 1, pl_raise, NULL, LSBATTR_PURE);
+  /* raise removed: use ^(expr) dedicated AST */
   if (lsstrcmp(name, lsstr_cstr("lt")) == 0) {
     lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
     lsthunk_t* cargv[1] = { carg };

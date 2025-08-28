@@ -1,1 +1,2 @@
-E: #err "namespace: undefined"
+E: prelude: unknown symbol: nsdef
+E: <bottom msg="prelude: unknown symbol" at <unknown>:1.1: >

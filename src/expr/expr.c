@@ -276,6 +276,7 @@ struct lsexpr {
     const lsstr_t*      le_strval;
   const lsenslit_t*   le_nslit;
   const lsstr_t*      le_symbol; // dot symbol literal
+  const lsexpr_t*     le_raise_arg; // caret-raise argument
   };
 };
 
@@ -450,6 +451,13 @@ void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr) {
   // print symbol as bare (no quotes), literal includes the leading dot
   lsstr_print_bare(fp, prec, indent, expr->le_symbol);
     return;
+  case LSETYPE_RAISE: {
+    // Print as ^(e)
+    lsprintf(fp, indent, "^(" );
+    lsexpr_print(fp, LSPREC_LOWEST, indent, expr->le_raise_arg);
+    lsprintf(fp, indent, ")");
+    return;
+  }
   }
   lsprintf(fp, indent, "Unknown expression type %d\n", expr->le_type);
 }
@@ -466,6 +474,19 @@ const lsenslit_t* lsexpr_get_nslit(const lsexpr_t* expr) {
 const lsstr_t* lsexpr_get_symbol(const lsexpr_t* expr) {
   assert(expr->le_type == LSETYPE_SYMBOL);
   return expr->le_symbol;
+}
+
+const lsexpr_t* lsexpr_new_raise(const lsexpr_t* arg) {
+  lsexpr_t* expr   = lsmalloc(sizeof(lsexpr_t));
+  expr->le_type    = LSETYPE_RAISE;
+  expr->le_loc     = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_raise_arg = arg;
+  return expr;
+}
+
+const lsexpr_t* lsexpr_get_raise_arg(const lsexpr_t* expr) {
+  assert(expr->le_type == LSETYPE_RAISE);
+  return expr->le_raise_arg;
 }
 const lsexpr_t* lsexpr_with_loc(const lsexpr_t* expr_in, lsloc_t loc) {
   // cast away const for internal mutation; API returns same pointer as const

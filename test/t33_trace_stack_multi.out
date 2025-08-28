@@ -1,2 +1,2 @@
-E: /workspaces/lazyscript/test/t33_trace_stack_multi.ls:2.19-36: undefined reference: ~undefined_symbol
-E: #err "undefined reference"
+E: <ROOT>/test/t33_trace_stack_multi.ls:2.19-36: undefined reference: ~undefined_symbol
+E: <bottom msg="undefined reference" at <unknown>:1.1: >

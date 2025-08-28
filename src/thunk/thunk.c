@@ -358,6 +358,21 @@ lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
   // or user-provided closures for mutual references.
   return lsthunk_new_expr(base, tenv);
   }
+  case LSETYPE_RAISE: {
+    // Evaluate argument; if Bottom, propagate; else construct Bottom with message and payload.
+    const lsexpr_t* aexpr = lsexpr_get_raise_arg(expr);
+    lsthunk_t* aval = lsthunk_new_expr(aexpr, tenv);
+    if (!aval) return NULL;
+    aval = lsthunk_eval0(aval);
+    if (lsthunk_is_bottom(aval)) return aval;
+    // Build message via deep print: "raise: <aval>"
+    char* buf = NULL; size_t bl = 0; FILE* fp = lsopen_memstream_gc(&buf, &bl);
+    lsprintf(fp, 0, "raise: ");
+    lsthunk_deep_print(fp, LSPREC_LOWEST, 0, aval);
+    fclose(fp);
+    lsthunk_t* rel[1] = { aval };
+    return lsthunk_new_bottom(buf ? buf : "raise", lstrace_take_pending_or_unknown(), 1, rel);
+  }
   }
   assert(0);
 }

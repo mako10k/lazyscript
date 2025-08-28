@@ -396,8 +396,9 @@ static const rv_t* eval_expr(FILE* outfp, const lscir_expr_t* e, eval_ctx_t* ctx
         return eval_expr(outfp, c->body, &sub);
       }
     }
-    // No match -> bottom (printed via effects runtime elsewhere). Encode with special symbol.
-    return rv_sym("#bottom(NoMatchPatterns)");
+  // No match -> emit a Bottom-style diagnostic and return unit
+  fprintf(stderr, "E: <bottom msg=\"match: no case\" at <unknown>:1.1: >\n");
+  return rv_unit();
   }
   }
   return rv_unit();

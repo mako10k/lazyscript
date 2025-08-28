@@ -401,10 +401,9 @@ static const rv_t *eval_expr(FILE *outfp, const lscir_expr_t *e, eval_ctx_t *ctx
         return eval_expr(outfp, c->body, &sub);
       }
     }
-  // No case matched; map to bottom. For clean evaluator, print as (#bottom NoMatchPatterns)
-  // Minimal representation here: return a symbol-like indicator.
-  // [TEMP] Clean evaluator runtime doesn't have thunk; we encode as a symbol for now.
-  return rv_sym("#bottom(NoMatchPatterns)");
+  // No case matched; emit a Bottom-style diagnostic and return unit (clean evaluator has no thunk)
+  fprintf(stderr, "E: <bottom msg=\"match: no case\" at <unknown>:1.1: >\n");
+  return rv_unit();
   }
   }
   return rv_unit();
