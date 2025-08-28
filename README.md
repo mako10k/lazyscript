@@ -92,6 +92,11 @@ sudo make install   # 任意
 - 最小タイプチェッカ: `docs/06_typecheck.md`
 - 型/値コンストラクタの分離とIO規律（設計メモ）: `docs/07_effect_types.md`
 
+### ガード（言語仕様保護）
+
+- 言語レベルの `++` 演算子は非対応です。誤って再導入しないよう、次のガードを用意しています。
+  - `bash scripts/guard_no_plusplus.sh` を実行すると、文法ソース（parser.y/lexer.l）内の `++`/旧トークンを検知して失敗します。
+
 ## コアビルトインとプレリュード
 
 lazyscript には以下の2層があります:
