@@ -15,7 +15,8 @@ typedef enum {
   RV_LAM,
   RV_SYMBOL,
   RV_NATFUN,
-  RV_CONSTR
+  RV_CONSTR,
+  RV_BOTTOM
 } rv_kind_t;
 
 typedef struct rv rv_t;
@@ -53,6 +54,11 @@ struct rv {
       int                argc;
       const rv_t* const* args;
     } con;
+    struct { // internal bottom representation for runtime evaluator
+      const char*        message;
+      int                argc;
+      const rv_t* const* args;
+    } bot;
   };
 };
 
@@ -94,6 +100,14 @@ static const rv_t* rv_sym(const char* s) {
   rv_t* v = lsmalloc(sizeof(rv_t));
   v->kind = RV_SYMBOL;
   v->sym  = s;
+  return v;
+}
+static const rv_t* rv_bottom(const char* msg, int argc, const rv_t* const* args) {
+  rv_t* v     = lsmalloc(sizeof(rv_t));
+  v->kind     = RV_BOTTOM;
+  v->bot.message = msg;
+  v->bot.argc    = argc;
+  v->bot.args    = args;
   return v;
 }
 static const rv_t* rv_lam(const char* p, const lscir_expr_t* b, env_bind_t* env) {
@@ -288,6 +302,10 @@ static void print_value(FILE* outfp, const rv_t* v) {
     }
     fprintf(outfp, ")\n");
     return;
+  case RV_BOTTOM:
+    // Keep outward behavior stable for now: print unit on stdout
+    fprintf(outfp, "()\n");
+    return;
   }
   }
 }
@@ -396,9 +414,10 @@ static const rv_t* eval_expr(FILE* outfp, const lscir_expr_t* e, eval_ctx_t* ctx
         return eval_expr(outfp, c->body, &sub);
       }
     }
-  // No match -> emit a Bottom-style diagnostic and return unit
+  // No match -> emit a Bottom-style diagnostic and return an internal bottom carrying scrutinee
   fprintf(stderr, "E: <bottom msg=\"match: no case\" at <unknown>:1.1: >\n");
-  return rv_unit();
+  const rv_t* rels[1] = { sv };
+  return rv_bottom("match: no case", 1, rels);
   }
   }
   return rv_unit();
