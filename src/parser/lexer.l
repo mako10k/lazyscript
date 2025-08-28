@@ -123,7 +123,7 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 	yylval->strval = inner; return LSTSYMBOL;
 }
 [.][a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext); return LSTDOTSYMBOL; }
-[!][a-zA-Z_][a-zA-Z0-9_$]* {
+[!][a-zA-Z_][a-zA-Z0-9_]* {
 	/* !ident => LSTENVOP (used to access (~prelude .env).ident) */
 	yylval->strval = lsstr_cstr(yytext + 1);
 	return LSTENVOP;
@@ -134,12 +134,12 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 	yylval->strval = lsstr_cstr(s);
 	return LSTPRELUDE_SYMBOL;
 }
-[~][a-zA-Z_][a-zA-Z0-9_$]* {
+[~][a-zA-Z_][a-zA-Z0-9_]* {
 	/* ~varName => LSTREFSYM (exclude dot-prefixed to avoid ambiguity) */
 	yylval->strval = lsstr_cstr(yytext + 1);
 	return LSTREFSYM;
 }
-[a-zA-Z_][a-zA-Z0-9_$]* { yylval->strval = lsstr_cstr(yytext); return LSTSYMBOL; }
+[a-zA-Z_][a-zA-Z0-9_]* { yylval->strval = lsstr_cstr(yytext); return LSTSYMBOL; }
 \"([^\\\"]|\\.)*\" { yylval->strval = lsstr_parse(yytext, yyleng); return LSTSTR; }
 "<-"       { return LSTLEFTARROW; }
 "->"       { return LSTARROW; }
