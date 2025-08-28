@@ -46,6 +46,10 @@ int            lstpat_is_wild(const lstpat_t* pat);
 lstpat_t* lstpat_get_or_left(const lstpat_t* pat);
 lstpat_t* lstpat_get_or_right(const lstpat_t* pat);
 
+// Caret pattern (^pat) — only matches Bottom values, then matches inner pattern
+lstpat_t* lstpat_new_caret(const lspat_t* inner_ast, lstenv_t* tenv, lstref_target_origin_t* origin);
+lstpat_t* lstpat_get_caret_inner(const lstpat_t* pat);
+
 // REF bound management
 void       lstpat_set_refbound(lstpat_t* pat, lsthunk_t* thunk);
 lsthunk_t* lstpat_get_refbound(const lstpat_t* pat);

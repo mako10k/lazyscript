@@ -76,7 +76,8 @@ sudo make install   # 任意
 - Compile to Core IR: `src/lazyscriptc file.ls > out.coreir`
 - Typecheck only: `src/lazyscriptc -t file.ls`
 - Run (temporary: from .ls): `src/lscoreir --from-ls file.ls`
-  - Text IR reader is WIP. Once ready: `src/lazyscriptc file.ls | src/lscoreir`
+- Or via pipe (Core IR text): `src/lazyscriptc file.ls | src/lscoreir`
+  - lazyscriptc prints a header `; LCIR v0` then S式風の Core IR を出力し、lscoreir が読み取って実行します。
   - `~~nsnew NS` で `NS` を作成。
   - `(~NS name)` で名前空間から値を取得（値を直接返します）。
 

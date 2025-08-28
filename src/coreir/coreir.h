@@ -1,6 +1,10 @@
 #pragma once
 
 typedef struct lscir_prog lscir_prog_t;
+// Text IR header/version (for stream format emitted by lazyscriptc)
+#define LCIR_TEXT_VERSION 0
+#define LCIR_TEXT_HEADER  "LCIR v0"
+
 
 #include <stdio.h>
 #include "misc/prog.h"
@@ -24,10 +28,41 @@ typedef enum {
   LCIR_EXP_IF,     // if v then e1 else e2
   LCIR_EXP_EFFAPP, // eff(vs..., token)
   LCIR_EXP_TOKEN,  // 効果トークン生成
+  LCIR_EXP_MATCH,  // match v with (pat -> expr)+
 } lscir_exp_kind_t;
 
 typedef struct lscir_value lscir_value_t;
 typedef struct lscir_expr  lscir_expr_t;
+typedef struct lscir_pat   lscir_pat_t;
+typedef struct lscir_case  lscir_case_t;
+
+// Pattern for match
+typedef enum {
+  LCIR_PAT_WILDCARD,
+  LCIR_PAT_VAR,
+  LCIR_PAT_CONSTR,
+  LCIR_PAT_INT,
+  LCIR_PAT_STR,
+} lscir_pat_kind_t;
+
+struct lscir_pat {
+  lscir_pat_kind_t kind;
+  union {
+    const char* var; // LCIR_PAT_VAR
+    struct {         // LCIR_PAT_CONSTR
+      const char*           name;
+      const lscir_pat_t* const* subpats;
+      int                   subc;
+    } constr;
+    long long   ival; // LCIR_PAT_INT
+    const char* sval; // LCIR_PAT_STR
+  };
+};
+
+struct lscir_case {
+  const lscir_pat_t* pat;
+  const lscir_expr_t* body;
+};
 
 struct lscir_value {
   lscir_val_kind_t kind;
@@ -77,6 +112,11 @@ struct lscir_expr {
       const lscir_value_t* const* args;
       int                         argc;
     } effapp;
+    struct { // LCIR_EXP_MATCH
+      const lscir_value_t* scrut;
+      const lscir_case_t*  cases;
+      int                  casec;
+    } match1;
   };
 };
 
@@ -110,3 +150,10 @@ int lscir_typecheck(FILE* outfp, const lscir_prog_t* cir);
  */
 void lscir_typecheck_set_kind_warn(int warn_enabled);
 void lscir_typecheck_set_kind_error(int error_enabled);
+
+/* Parse textual Core IR from a stream (the s-expression-like format printed by lazyscriptc).
+ * Returns a program on success, or NULL on parse/validation error. When a header of the form
+ * ";" LCIR_TEXT_HEADER is present, the version is validated. Lines starting with ';' are
+ * treated as comments and skipped elsewhere.
+ */
+const lscir_prog_t* lscir_read_text(FILE* infp, FILE* errfp);

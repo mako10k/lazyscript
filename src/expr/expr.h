@@ -30,6 +30,7 @@ typedef enum {
   LSETYPE_NSLIT,
   // First-class dot symbol literal (e.g., .name) — distinct from algebraic constructors
   LSETYPE_SYMBOL,
+  // Note: no dedicated raise node; ^(Expr) is lowered in parser to (~<ns> .raise Expr)
 } lsetype_t;
 
 #define lsapi_expr_new lsapi_nn1 lsapi_wur

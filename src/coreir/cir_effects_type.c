@@ -88,6 +88,14 @@ static int cir_validate_expr(FILE* efp, const lscir_expr_t* e, eff_scope_t sc) {
     errs += cir_validate_expr(efp, e->ife.else_e, sc);
     return errs;
   }
+  case LCIR_EXP_MATCH: {
+    int errs = 0;
+    errs += cir_validate_val(efp, e->match1.scrut, sc);
+    for (int i = 0; i < e->match1.casec; i++) {
+      errs += cir_validate_expr(efp, e->match1.cases[i].body, sc);
+    }
+    return errs;
+  }
   case LCIR_EXP_EFFAPP: {
     int errs = 0;
     if (!sc.has_token) {
@@ -149,6 +157,11 @@ static int expr_has_effects(const lscir_expr_t* e, int in_token_scope) {
   case LCIR_EXP_IF:
     return expr_has_effects(e->ife.then_e, in_token_scope) ||
            expr_has_effects(e->ife.else_e, in_token_scope);
+  case LCIR_EXP_MATCH: {
+    int any = 0;
+    for (int i = 0; i < e->match1.casec; i++) any |= expr_has_effects(e->match1.cases[i].body, in_token_scope);
+    return any;
+  }
   case LCIR_EXP_EFFAPP:
     return 1;
   case LCIR_EXP_TOKEN:
@@ -163,23 +176,11 @@ static int val_has_effects(const lscir_value_t* v) {
   return 0;
 }
 
-// Simple arity knowledge for builtins
+// TODO: Arity checking for native functions must consult an explicit import/registry table
+//       attached to the CIR program, not hard-coded names.
 static int natfun_arity(const char* name) {
-  if (!name)
-    return -1;
-  if (strcmp(name, "add") == 0 || strcmp(name, "sub") == 0)
-    return 2;
-  if (strcmp(name, "cons") == 0 || strcmp(name, "map") == 0)
-    return 2;
-  if (strcmp(name, "concat") == 0)
-    return 2;
-  if (strcmp(name, "chain") == 0)
-    return 2;
-  if (strcmp(name, "return") == 0 || strcmp(name, "is_nil") == 0)
-    return 1;
-  if (strcmp(name, "head") == 0 || strcmp(name, "tail") == 0 || strcmp(name, "length") == 0)
-    return 1;
-  return -1;
+  (void)name; // unused until registry is introduced
+  return -1;  // unknown; do not enforce over-application until registry exists
 }
 
 static int expr_check_arity(const lscir_expr_t* e) {
@@ -194,14 +195,17 @@ static int expr_check_arity(const lscir_expr_t* e) {
     int errs = 0;
     if (e->app.func && e->app.func->kind == LCIR_VAL_VAR) {
       int ar = natfun_arity(e->app.func->var);
-  // 新仕様: 部分適用は OK。過剰適用 (argc > ar) のみエラー。
-  if (ar >= 0 && e->app.argc > ar)
+      // 新仕様: 部分適用は OK。過剰適用のみエラー。ただし現状は未判定（ar < 0）。
+      if (ar >= 0 && e->app.argc > ar)
         errs++;
     }
     return errs;
   }
   case LCIR_EXP_IF:
     return expr_check_arity(e->ife.then_e) + expr_check_arity(e->ife.else_e);
+  case LCIR_EXP_MATCH: {
+    int errs = 0; for (int i = 0; i < e->match1.casec; i++) errs += expr_check_arity(e->match1.cases[i].body); return errs;
+  }
   case LCIR_EXP_EFFAPP:
     return 0;
   case LCIR_EXP_TOKEN:

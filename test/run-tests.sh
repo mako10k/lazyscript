@@ -276,6 +276,27 @@ if "$BIN" --help 2>&1 | grep -q -- "--typecheck"; then
   done
 fi
 
+# Optional: Core IR pipe tests (lazyscriptc | lscoreir) for marked cases
+COMP="$ROOT/src/lazyscriptc"
+RUNIR="$ROOT/src/lscoreir"
+if [[ -x "$COMP" && -x "$RUNIR" ]]; then
+  mapfile -t pipe_marks < <(find "$DIR" -type f -name '*.pipe.ok' -printf '%P\n' | sort)
+  for mark in "${pipe_marks[@]}"; do
+    base="${mark%.pipe.ok}"
+    src="$DIR/$base.ls"; exp="$DIR/$base.out"
+    [[ -f "$src" && -f "$exp" ]] || continue
+    out="$(run_with_timeout_capture bash -lc "$COMP '$src' | '$RUNIR'")"
+    if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
+      echo "ok - pipe $base"
+      ((pass++))
+    else
+      echo "not ok - pipe $base"
+      echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
+      ((fail++))
+    fi
+  done
+fi
+
 if [[ $fail -eq 0 ]]; then
   exit 0
 else

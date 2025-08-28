@@ -98,7 +98,7 @@ lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void
   // Do NOT enable effects here; pure modules will work, effectful ones will raise at call sites.
   lsthunk_t* ret = lsprog_eval(prog, child);
   if (debug_enabled()) {
-    const char* rt = ret ? (lsthunk_is_err(ret) ? "#err" :
+  const char* rt = ret ? (lsthunk_is_err(ret) ? "bottom" :
       (lsthunk_get_type(ret) == LSTTYPE_ALGE ? "alge" :
        lsthunk_get_type(ret) == LSTTYPE_APPL ? "appl" :
        lsthunk_get_type(ret) == LSTTYPE_LAMBDA ? "lambda" :
@@ -106,8 +106,9 @@ lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void
        lsthunk_get_type(ret) == LSTTYPE_INT ? "int" :
        lsthunk_get_type(ret) == LSTTYPE_STR ? "str" :
        lsthunk_get_type(ret) == LSTTYPE_SYMBOL ? "symbol" :
-       lsthunk_get_type(ret) == LSTTYPE_BUILTIN ? "builtin" :
-       lsthunk_get_type(ret) == LSTTYPE_CHOICE ? "choice" : "?")) : "NULL";
+     lsthunk_get_type(ret) == LSTTYPE_BUILTIN ? "builtin" :
+     lsthunk_get_type(ret) == LSTTYPE_CHOICE ? "choice" :
+     lsthunk_get_type(ret) == LSTTYPE_BOTTOM ? "bottom" : "?")) : "NULL";
     lsprintf(stderr, 0, "DBG: include: end eval ret=%p type=%s\n", (void*)ret, rt);
   }
   if (!ret) { return ls_make_err("include: eval"); }

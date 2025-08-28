@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
   if (do_typecheck) {
     return lscir_typecheck(stdout, cir);
   }
+  fprintf(stdout, "; %s\n", LCIR_TEXT_HEADER);
   lscir_print(stdout, 0, cir);
   return 0;
 }

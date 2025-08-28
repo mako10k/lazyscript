@@ -49,7 +49,9 @@ typedef enum lsttype {
   LSTTYPE_STR,
   // First-class symbol literal (e.g., .name)
   LSTTYPE_SYMBOL,
-  LSTTYPE_BUILTIN
+  LSTTYPE_BUILTIN,
+  // Dedicated bottom value carrying message, location, and related thunks
+  LSTTYPE_BOTTOM
 } lsttype_t;
 
 /**
@@ -141,6 +143,20 @@ int              lsthunk_is_builtin(const lsthunk_t* thunk);
 lstbuiltin_func_t lsthunk_get_builtin_func(const lsthunk_t* thunk);
 void*            lsthunk_get_builtin_data(const lsthunk_t* thunk);
 const lsstr_t*   lsthunk_get_builtin_name(const lsthunk_t* thunk);
+
+// Bottom (⊥) constructors and accessors
+// Create a bottom value with message and optional related thunks (argc may be 0)
+lsthunk_t* lsthunk_new_bottom(const char* message, lsloc_t loc, lssize_t argc, lsthunk_t* const* args);
+// Convenience: bottom with current pending/unknown location
+lsthunk_t* lsthunk_bottom_here(const char* message);
+// Predicates and getters
+int         lsthunk_is_bottom(const lsthunk_t* thunk);
+const char* lsthunk_bottom_get_message(const lsthunk_t* thunk);
+lsloc_t     lsthunk_bottom_get_loc(const lsthunk_t* thunk);
+lssize_t    lsthunk_bottom_get_argc(const lsthunk_t* thunk);
+lsthunk_t* const* lsthunk_bottom_get_args(const lsthunk_t* thunk);
+// Merge/accumulate two bottoms: concatenates messages with "; " and appends args; chooses earlier location
+lsthunk_t* lsthunk_bottom_merge(lsthunk_t* a, lsthunk_t* b);
 
 /**
  * Create a new thunk for an expression

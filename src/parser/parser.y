@@ -221,7 +221,7 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 50
+%expect 54
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -252,6 +252,7 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
 %token <strval> LSTSTR
 %token LSTARROW
 %token LSTOROR
+%token LSTCARET /* lexer must return this for '^' */
 %token LSTLEFTARROW
 %token LSTWILDCARD
 %right '|'
@@ -405,6 +406,15 @@ efact:
   | elist { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
   | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
   | elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
+  | LSTCARET '(' expr ')' {
+        // ^(Expr): construct Bottom immediately with message from toString(Expr) — temporary
+        // TODO: wire to dedicated AST node if needed; for now lower to (~ <ns> .raise Expr)
+        const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol(lsstr_cstr(".raise")), @$);
+        const lsexpr_t *nsref = mk_nsref_at(yyscanner, @$);
+        const lsexpr_t *call = mk_call1(nsref, @$, sym);
+        const lsexpr_t *args1[] = { $3 };
+        $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(call, 1, args1)), @$);
+      }
   | LSTENVOP {
   // !ident => (~<ns> .env .ident)
   // CoreIR 降ろしは (~prelude .env .println) も認識する（cir_lower_print.c 側で対応）
@@ -610,6 +620,7 @@ pat3:
     | pref { $$ = lspat_new_ref($1); }
   | LSTWILDCARD { $$ = lspat_new_wild(); }
     | pref '@' pat3 { $$ = lspat_new_as(lspas_new($1, $3)); }
+  | LSTCARET '(' pat ')' { $$ = lspat_new_caret($3); }
     ;
 
 pref:

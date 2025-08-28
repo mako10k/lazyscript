@@ -127,6 +127,13 @@ static const rv_t* eval_expr(FILE* outfp, const lscir_expr_t* e, eval_ctx_t* ctx
 static const rv_t* apply(FILE* outfp, const rv_t* f, int argc, const rv_t* const* args,
                          eval_ctx_t* ctx);
 
+// POLICY NOTE:
+//  - Unauthorized fallback is prohibited.
+//  - Do not use fixed identifiers (prelude, builtins, internal, env, specific builtin names) in implementation logic.
+// TEMP/TODO: Import-based builtin resolution is not implemented yet for Core IR runtime.
+//            Until an explicit import/registry exists in the IR and reader, unknown variables must NOT be
+//            implicitly resolved to native functions. They remain plain symbols and will not be callable here.
+//            Follow-up: Introduce explicit import table in CIR and wire evaluator/typechecker to it.
 static const rv_t* eval_value(FILE* outfp, const lscir_value_t* v, eval_ctx_t* ctx) {
   (void)outfp;
   switch (v->kind) {
@@ -138,28 +145,7 @@ static const rv_t* eval_value(FILE* outfp, const lscir_value_t* v, eval_ctx_t* c
     const rv_t* found = env_lookup(ctx ? ctx->env : NULL, v->var);
     if (found)
       return found;
-    if (strcmp(v->var, "add") == 0)
-      return rv_natfun("add", 2, 0, NULL);
-    if (strcmp(v->var, "sub") == 0)
-      return rv_natfun("sub", 2, 0, NULL);
-    if (strcmp(v->var, "chain") == 0)
-      return rv_natfun("chain", 2, 0, NULL);
-    if (strcmp(v->var, "return") == 0)
-      return rv_natfun("return", 1, 0, NULL);
-    if (strcmp(v->var, "cons") == 0)
-      return rv_natfun("cons", 2, 0, NULL);
-    if (strcmp(v->var, "concat") == 0)
-      return rv_natfun("concat", 2, 0, NULL);
-    if (strcmp(v->var, "is_nil") == 0)
-      return rv_natfun("is_nil", 1, 0, NULL);
-    if (strcmp(v->var, "head") == 0)
-      return rv_natfun("head", 1, 0, NULL);
-    if (strcmp(v->var, "tail") == 0)
-      return rv_natfun("tail", 1, 0, NULL);
-    if (strcmp(v->var, "length") == 0)
-      return rv_natfun("length", 1, 0, NULL);
-    if (strcmp(v->var, "map") == 0)
-      return rv_natfun("map", 2, 0, NULL);
+    // No implicit mapping to native functions. Treat as plain symbol.
     return rv_sym(v->var);
   }
   case LCIR_VAL_CONSTR: {
@@ -328,151 +314,9 @@ static const rv_t* apply_natfun(FILE* outfp, const rv_t* nf, int argc, const rv_
     xs[i] = nf->nf.caps[i];
   for (int i = 0; i < argc; i++)
     xs[nf->nf.capc + i] = args[i];
-  if (strcmp(name, "add") == 0) {
-    long long a = xs[0]->ival, b = xs[1]->ival;
-    return rv_int(a + b);
-  }
-  if (strcmp(name, "sub") == 0) {
-    long long a = xs[0]->ival, b = xs[1]->ival;
-    return rv_int(a - b);
-  }
-  if (strcmp(name, "return") == 0) {
-    return xs[0];
-  }
-  if (strcmp(name, "chain") == 0) {
-    if (tot >= 2) {
-      const rv_t* fun = xs[1];
-      const rv_t* arg = rv_tok();
-      if (fun->kind == RV_LAM) {
-        const rv_t* argv[1] = { arg };
-        (void)apply(outfp, fun, 1, argv, ctx);
-      } else if (fun->kind == RV_NATFUN) {
-        const rv_t* argv[1] = { arg };
-        (void)apply_natfun(outfp, fun, 1, argv, ctx);
-      }
-    }
-    return rv_unit();
-  }
-  if (strcmp(name, "cons") == 0) {
-    const rv_t** pair = lsmalloc(sizeof(rv_t*) * 2);
-    pair[0]           = xs[0];
-    pair[1]           = xs[1];
-    return rv_constr(":", 2, pair);
-  }
-  if (strcmp(name, "concat") == 0) {
-    // concat: append list xs[0] and list xs[1]; tolerate mixed element types.
-    const rv_t* l = xs[0];
-    const rv_t* r = xs[1];
-    // Collect left spine elements
-    const rv_t** acc = NULL;
-    int          cap = 8, n = 0;
-    acc               = lsmalloc(sizeof(rv_t*) * cap);
-    const rv_t* cur   = l;
-    while (cur && cur->kind == RV_CONSTR &&
-           ((strcmp(cur->con.name, ":") == 0 || strcmp(cur->con.name, "Cons") == 0) && cur->con.argc == 2)) {
-      const rv_t* hd = cur->con.args[0];
-      const rv_t* tl = cur->con.args[1];
-      if (n >= cap) {
-        cap *= 2;
-        const rv_t** tmp = lsmalloc(sizeof(rv_t*) * cap);
-        for (int i = 0; i < n; i++)
-          tmp[i] = acc[i];
-        acc = tmp;
-      }
-      acc[n++] = hd;
-      cur      = tl;
-    }
-    // If left is a proper list (ends with Nil/[]), rebuild onto r
-    if (cur && cur->kind == RV_CONSTR &&
-        ((strcmp(cur->con.name, "[]") == 0 && cur->con.argc == 0) ||
-         (strcmp(cur->con.name, "Nil") == 0 && cur->con.argc == 0))) {
-      const rv_t* res = r;
-      for (int i = n - 1; i >= 0; i--) {
-        const rv_t** pair = lsmalloc(sizeof(rv_t*) * 2);
-        pair[0]          = acc[i];
-        pair[1]          = res;
-        res              = rv_constr(":", 2, pair);
-      }
-      return res;
-    }
-    // If left isn't a proper list, just return right (conservative)
-    return r;
-  }
-  if (strcmp(name, "is_nil") == 0) {
-    const rv_t* v = xs[0];
-    int is_nil = (v->kind == RV_CONSTR && ((strcmp(v->con.name, "[]") == 0 && v->con.argc == 0) ||
-                                           (strcmp(v->con.name, "Nil") == 0 && v->con.argc == 0)));
-    return rv_sym(is_nil ? "true" : "false");
-  }
-  if (strcmp(name, "head") == 0) {
-    const rv_t* v = xs[0];
-    if (v->kind == RV_CONSTR &&
-        (strcmp(v->con.name, ":") == 0 || strcmp(v->con.name, "Cons") == 0) && v->con.argc == 2)
-      return v->con.args[0];
-    return rv_unit();
-  }
-  if (strcmp(name, "tail") == 0) {
-    const rv_t* v = xs[0];
-    if (v->kind == RV_CONSTR &&
-        (strcmp(v->con.name, ":") == 0 || strcmp(v->con.name, "Cons") == 0) && v->con.argc == 2)
-      return v->con.args[1];
-    return rv_constr("[]", 0, NULL);
-  }
-  if (strcmp(name, "length") == 0) {
-    const rv_t* v   = xs[0];
-    int         cnt = 0;
-    while (v && v->kind == RV_CONSTR &&
-           (strcmp(v->con.name, ":") == 0 || strcmp(v->con.name, "Cons") == 0) &&
-           v->con.argc == 2) {
-      cnt++;
-      v = v->con.args[1];
-    }
-    if (v && v->kind == RV_CONSTR &&
-        ((strcmp(v->con.name, "[]") == 0 && v->con.argc == 0) ||
-         (strcmp(v->con.name, "Nil") == 0 && v->con.argc == 0))) {
-      return rv_int(cnt);
-    }
-    return rv_int(0);
-  }
-  if (strcmp(name, "map") == 0) {
-    const rv_t* f   = xs[0];
-    const rv_t* lst = xs[1];
-    if (!(f->kind == RV_LAM || f->kind == RV_NATFUN))
-      return lst;
-    const rv_t** acc = NULL;
-    int          cap = 8, n = 0;
-    acc             = lsmalloc(sizeof(rv_t*) * cap);
-    const rv_t* cur = lst;
-    while (cur && cur->kind == RV_CONSTR &&
-           (strcmp(cur->con.name, ":") == 0 || strcmp(cur->con.name, "Cons") == 0) &&
-           cur->con.argc == 2) {
-      const rv_t* hd     = cur->con.args[0];
-      const rv_t* tl     = cur->con.args[1];
-      const rv_t* mapped = hd;
-      if (n >= cap) {
-        cap *= 2;
-        const rv_t** tmp = lsmalloc(sizeof(rv_t*) * cap);
-        for (int i = 0; i < n; i++)
-          tmp[i] = acc[i];
-        acc = tmp;
-      }
-      acc[n++] = mapped;
-      cur      = tl;
-    }
-    if (cur && cur->kind == RV_CONSTR &&
-        ((strcmp(cur->con.name, "[]") == 0 && cur->con.argc == 0) ||
-         (strcmp(cur->con.name, "Nil") == 0 && cur->con.argc == 0))) {
-      const rv_t* res = rv_constr("[]", 0, NULL);
-      for (int i = n - 1; i >= 0; i--) {
-        const rv_t** pair = lsmalloc(sizeof(rv_t*) * 2);
-        pair[0]           = acc[i];
-        pair[1]           = res;
-        res               = rv_constr(":", 2, pair);
-      }
-      return res;
-    }
-    return lst;
-  }
+  // TODO: Native function application requires an explicit registry provided via IR imports.
+  //       Current evaluator deliberately avoids any name-based behavior.
+  (void)tot; (void)xs; (void)name; // unused until registry is introduced
   return rv_unit();
 }
 
@@ -533,19 +377,28 @@ static const rv_t* eval_expr(FILE* outfp, const lscir_expr_t* e, eval_ctx_t* ctx
       for (int i = 0; i < e->effapp.argc; i++)
         xs[i] = eval_value(outfp, e->effapp.args[i], ctx);
     }
-    if (f->kind == RV_SYMBOL && strcmp(f->sym, "println") == 0) {
-      if (e->effapp.argc == 1 && xs[0]->kind == RV_STR) {
-        fprintf(outfp, "%s\n", xs[0]->sval);
-        return rv_unit();
-      }
-    }
-    if (f->kind == RV_SYMBOL && strcmp(f->sym, "exit") == 0) {
-      return rv_unit();
-    }
+  // TODO: Effects must be mediated via explicit effectful builtins from an import table.
+  //       No implicit symbol-based effects here.
     return rv_unit();
   }
   case LCIR_EXP_TOKEN:
     return rv_tok();
+  case LCIR_EXP_MATCH: {
+    const rv_t* sv = eval_value(outfp, e->match1.scrut, ctx);
+    for (int i = 0; i < e->match1.casec; i++) {
+      const lscir_case_t* c = &e->match1.cases[i];
+      // Reuse clean matcher logic: only handle trivial equality/constructors via rv_t structure
+      // For runtime path, we don’t have thunk infra here; pattern eval lives in clean evaluator only.
+      // So we limit to wildcard and variables; others require lowering.
+      if (!c->pat || c->pat->kind == LCIR_PAT_WILDCARD || c->pat->kind == LCIR_PAT_VAR) {
+        eval_ctx_t sub = { .env = ctx->env, .has_token = ctx->has_token };
+        // Bind var is ignored in runtime path until full env wiring exists.
+        return eval_expr(outfp, c->body, &sub);
+      }
+    }
+    // No match -> bottom (printed via effects runtime elsewhere). Encode with special symbol.
+    return rv_sym("#bottom(NoMatchPatterns)");
+  }
   }
   return rv_unit();
 }

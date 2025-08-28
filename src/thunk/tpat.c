@@ -31,6 +31,9 @@ struct lstpat {
       lstpat_t* left;
       lstpat_t* right;
     } orp;
+    struct {
+      lstpat_t* inner;
+    } caret;
   };
 };
 
@@ -78,6 +81,9 @@ static void      lspat_walk_mark_right(const lspat_t* p, lstenv_t* tenv) {
        case LSPTYPE_OR:
     lspat_walk_mark_right(lspat_get_or_left(p), tenv);
     lspat_walk_mark_right(lspat_get_or_right(p), tenv);
+    break;
+  case LSPTYPE_CARET:
+    lspat_walk_mark_right(lspat_get_caret_inner(p), tenv);
     break;
   }
 }
@@ -131,6 +137,14 @@ lstpat_t* lstpat_new_pat(const lspat_t* pat, lstenv_t* tenv, lstref_target_origi
     return lstpat_from_lspalge(lspat_get_alge(pat), tenv, origin);
   case LSPTYPE_AS:
     return lstpat_from_lspas(lspat_get_as(pat), tenv, origin);
+  case LSPTYPE_CARET: {
+    lstpat_t* in = lstpat_new_pat(lspat_get_caret_inner(pat), tenv, origin);
+    if (!in) return NULL;
+    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_CARET;
+    ret->caret.inner = in;
+    return ret;
+  }
   case LSPTYPE_OR: {
     // For OR, build left first, then enforce right uses exactly the same
     // variable set; reuse the same ref nodes via env (no new names allowed).
@@ -306,6 +320,9 @@ static void lstpat_clear_binds_internal(lstpat_t* pat) {
     lstpat_clear_binds_internal(pat->orp.left);
     lstpat_clear_binds_internal(pat->orp.right);
     break;
+  case LSPTYPE_CARET:
+    lstpat_clear_binds_internal(pat->caret.inner);
+    break;
   }
 }
 
@@ -365,6 +382,12 @@ static lstpat_t* lstpat_clone_internal(const lstpat_t* pat) {
     ret->orp.right = lstpat_clone_internal(pat->orp.right);
     return ret;
   }
+  case LSPTYPE_CARET: {
+    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_CARET;
+    ret->caret.inner = lstpat_clone_internal(pat->caret.inner);
+    return ret;
+  }
   }
   return NULL;
 }
@@ -421,7 +444,18 @@ void      lstpat_print(FILE* fp, lsprec_t prec, int indent, const lstpat_t* pat)
     if (prec > LSPREC_CHOICE)
       lsprintf(fp, indent, ")");
     break;
+  case LSPTYPE_CARET:
+    lsprintf(fp, indent, "^(" );
+    lstpat_print(fp, LSPREC_LOWEST, indent, pat->caret.inner);
+    lsprintf(fp, indent, ")");
+    break;
   }
+}
+
+// Public accessor for caret inner
+lstpat_t* lstpat_get_caret_inner(const lstpat_t* pat) {
+  assert(pat->ltp_type == LSPTYPE_CARET);
+  return pat->caret.inner;
 }
 
 // Helpers implementation
@@ -445,6 +479,9 @@ static void lstpat_mark_refs_present(lstpat_t* pat) {
   case LSPTYPE_INT:
   case LSPTYPE_STR:
   case LSPTYPE_WILDCARD:
+    break;
+  case LSPTYPE_CARET:
+    lstpat_mark_refs_present(pat->caret.inner);
     break;
   }
 }
@@ -484,6 +521,8 @@ static int lstpat_any_mark_present(const lstpat_t* pat) {
   case LSPTYPE_STR:
   case LSPTYPE_WILDCARD:
     return 0;
+  case LSPTYPE_CARET:
+    return lstpat_any_mark_present(pat->caret.inner);
   }
   return 0;
 }
@@ -510,6 +549,9 @@ static void lstpat_mark_clear(lstpat_t* pat) {
   case LSPTYPE_STR:
   case LSPTYPE_WILDCARD:
     break;
+  case LSPTYPE_CARET:
+    lstpat_mark_clear(pat->caret.inner);
+    break;
   }
 }
 
@@ -532,6 +574,14 @@ static lstpat_t* lstpat_new_pat_reuse_only(const lspat_t* pat, lstenv_t* tenv,
       }
       return lstpat_new_alge_internal(lspalge_get_constr(pa), argc, args);
     }
+  }
+  case LSPTYPE_CARET: {
+    lstpat_t* in = lstpat_new_pat_reuse_only(lspat_get_caret_inner(pat), tenv, origin);
+    if (!in) return NULL;
+    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type = LSPTYPE_CARET;
+    ret->caret.inner = in;
+    return ret;
   }
   case LSPTYPE_AS: {
     const lspas_t*   pa       = lspat_get_as(pat);

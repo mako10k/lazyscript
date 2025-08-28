@@ -80,6 +80,11 @@ struct lstbuiltin {
   lsbuiltin_attr_t  lti_attr;
 };
 
+typedef struct lsbotrel {
+  lssize_t    lbr_argc;
+  lsthunk_t** lbr_args; // related thunks (opaque)
+} lsbotrel_t;
+
 struct lsthunk {
   lsttype_t  lt_type;
   lsthunk_t* lt_whnf;
@@ -94,10 +99,74 @@ struct lsthunk {
     const lsstr_t*      lt_str;
   const lsstr_t*      lt_symbol;
     const lstbuiltin_t* lt_builtin;
+    struct {
+      const char* lt_msg;
+      lsloc_t     lt_loc;
+      lsbotrel_t  lt_rel;
+    } lt_bottom;
   };
 };
 
 static int g_trace_next_id = 0;
+
+// --- Bottom (⊥) -----------------------------------------------------------
+
+lsthunk_t* lsthunk_new_bottom(const char* message, lsloc_t loc, lssize_t argc, lsthunk_t* const* args) {
+  lsthunk_t* t = lsmalloc(sizeof(lsthunk_t));
+  t->lt_type = LSTTYPE_BOTTOM;
+  t->lt_whnf = t; // bottom is WHNF
+  t->lt_trace_id = g_trace_next_id++;
+  lstrace_emit_loc(loc.filename ? loc : lstrace_take_pending_or_unknown());
+  t->lt_bottom.lt_msg = message ? message : "";
+  t->lt_bottom.lt_loc = loc;
+  t->lt_bottom.lt_rel.lbr_argc = argc;
+  if (argc > 0) {
+    t->lt_bottom.lt_rel.lbr_args = lsmalloc(sizeof(lsthunk_t*) * argc);
+    for (lssize_t i = 0; i < argc; i++) t->lt_bottom.lt_rel.lbr_args[i] = args[i];
+  } else {
+    t->lt_bottom.lt_rel.lbr_args = NULL;
+  }
+  return t;
+}
+
+lsthunk_t* lsthunk_bottom_here(const char* message) {
+  return lsthunk_new_bottom(message, lstrace_take_pending_or_unknown(), 0, NULL);
+}
+
+int lsthunk_is_bottom(const lsthunk_t* thunk) { return thunk && thunk->lt_type == LSTTYPE_BOTTOM; }
+const char* lsthunk_bottom_get_message(const lsthunk_t* thunk) { return (thunk && thunk->lt_type == LSTTYPE_BOTTOM) ? thunk->lt_bottom.lt_msg : NULL; }
+lsloc_t lsthunk_bottom_get_loc(const lsthunk_t* thunk) { return (thunk && thunk->lt_type == LSTTYPE_BOTTOM) ? thunk->lt_bottom.lt_loc : lstrace_take_pending_or_unknown(); }
+lssize_t lsthunk_bottom_get_argc(const lsthunk_t* thunk) { return (thunk && thunk->lt_type == LSTTYPE_BOTTOM) ? thunk->lt_bottom.lt_rel.lbr_argc : 0; }
+lsthunk_t* const* lsthunk_bottom_get_args(const lsthunk_t* thunk) { return (thunk && thunk->lt_type == LSTTYPE_BOTTOM) ? (lsthunk_t* const*)thunk->lt_bottom.lt_rel.lbr_args : NULL; }
+
+static lsloc_t earlier_loc(lsloc_t a, lsloc_t b) {
+  // Prefer a if it has a filename and b doesn't, or keep a by default.
+  if (a.filename && (!b.filename || strcmp(b.filename, "<unknown>") == 0)) return a;
+  return a.filename ? a : b;
+}
+
+lsthunk_t* lsthunk_bottom_merge(lsthunk_t* a, lsthunk_t* b) {
+  if (!a) return b; if (!b) return a;
+  if (!lsthunk_is_bottom(a)) return a;
+  if (!lsthunk_is_bottom(b)) return b;
+  // Merge messages with "; "
+  const char* ma = lsthunk_bottom_get_message(a);
+  const char* mb = lsthunk_bottom_get_message(b);
+  size_t na = ma ? strlen(ma) : 0; size_t nb = mb ? strlen(mb) : 0;
+  char* m = lsmalloc(na + (na && nb ? 2 : 0) + nb + 1);
+  size_t off = 0; if (na) { memcpy(m + off, ma, na); off += na; }
+  if (na && nb) { m[off++] = ';'; m[off++] = ' '; }
+  if (nb) { memcpy(m + off, mb, nb); off += nb; }
+  m[off] = '\0';
+  // Concatenate args
+  lssize_t ca = lsthunk_bottom_get_argc(a), cb = lsthunk_bottom_get_argc(b);
+  lssize_t cn = ca + cb;
+  lsthunk_t** xs = cn ? lsmalloc(sizeof(lsthunk_t*) * cn) : NULL;
+  for (lssize_t i = 0; i < ca; i++) xs[i] = a->lt_bottom.lt_rel.lbr_args[i];
+  for (lssize_t i = 0; i < cb; i++) xs[ca + i] = b->lt_bottom.lt_rel.lbr_args[i];
+  lsloc_t loc = earlier_loc(a->lt_bottom.lt_loc, b->lt_bottom.lt_loc);
+  return lsthunk_new_bottom(m, loc, cn, xs);
+}
 
 lsthunk_t* lsthunk_new_ealge(const lsealge_t* ealge, lstenv_t* tenv) {
   lssize_t               eargc = lsealge_get_argc(ealge);
@@ -415,6 +484,8 @@ static lsmres_t lsthunk_match_str(lsthunk_t* thunk, const lstpat_t* tpat) {
 
 lsmres_t lsthunk_match_ref(lsthunk_t* thunk, lstpat_t* tpat) {
   assert(lstpat_get_type(tpat) == LSPTYPE_REF);
+  // Bottom does not bind to variables
+  if (lsthunk_is_bottom(thunk)) return LSMATCH_FAILURE;
   lstpat_set_refbound(tpat, thunk);
   return LSMATCH_SUCCESS;
 }
@@ -432,7 +503,29 @@ lsmres_t lsthunk_match_pat(lsthunk_t* thunk, lstpat_t* tpat) {
   case LSPTYPE_REF:
     return lsthunk_match_ref(thunk, tpat);
   case LSPTYPE_WILDCARD:
-    return LSMATCH_SUCCESS;
+    // Bottom does not match wildcard per spec
+    return lsthunk_is_bottom(thunk) ? LSMATCH_FAILURE : LSMATCH_SUCCESS;
+  case LSPTYPE_CARET: {
+  // Force WHNF to observe Bottom produced by expressions like (~prelude .raise) x
+  lsthunk_t* thunk_whnf = lsthunk_eval0(thunk);
+  if (!lsthunk_is_bottom(thunk_whnf)) return LSMATCH_FAILURE;
+    // TODO: consider matching additional info (message/args) in future
+    lstpat_t* inner = lstpat_get_caret_inner(tpat);
+    // For caret pattern: only Bottom matches. Semantics:
+    //  - ^(_)           : succeed (ignore payload)
+    //  - ^(~x)         : bind ~x to Bottom's related payload (first related arg). If none, fail.
+    //  - other patterns: currently unsupported (fail). TODO: allow matching message/args in the future.
+    if (lstpat_get_type(inner) == LSPTYPE_WILDCARD) return LSMATCH_SUCCESS;
+    if (lstpat_get_type(inner) == LSPTYPE_REF) {
+      lssize_t         argc = lsthunk_bottom_get_argc(thunk_whnf);
+      lsthunk_t* const* args = lsthunk_bottom_get_args(thunk_whnf);
+      if (argc <= 0 || args == NULL) return LSMATCH_FAILURE;
+      lstpat_set_refbound(inner, args[0]);
+      return LSMATCH_SUCCESS;
+    }
+    // Other inners are unsupported for now
+    return LSMATCH_FAILURE;
+  }
   case LSPTYPE_OR: {
     // Try left; on failure, clear any ref bindings and try right
     lstpat_t* left  = lstpat_get_or_left(tpat);
@@ -518,7 +611,9 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
     #if LS_TRACE
     lsprintf(stderr, 0, "DBG lambda: match failed\n");
     #endif
-    return ls_make_err("lambda match failure");
+  // Pattern mismatch -> bottom (no match), carry arg as related context
+  lsthunk_t* rels[1] = { arg };
+  return lsthunk_new_bottom("lambda match failure", lstrace_take_pending_or_unknown(), 1, rels);
   }
   #if LS_TRACE
   lsprintf(stderr, 0, "DBG lambda: eval body\n");
@@ -666,6 +761,12 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
   }
 }
 
+static int is_lambda_match_failure_err(lsthunk_t* err) {
+  if (!lsthunk_is_bottom(err)) return 0;
+  const char* m = lsthunk_bottom_get_message(err);
+  return m && strcmp(m, "lambda match failure") == 0;
+}
+
 static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t* const* args) {
   // eval (l | r) x y ...
   //   = let v = eval l x y ... in
@@ -680,20 +781,17 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   if (left == NULL)
     return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
   if (lsthunk_is_err(left)) {
-    // Only treat lambda match failure as a fallback trigger; propagate others.
-    int is_lam_match_fail = 0;
-    if (left->lt_type == LSTTYPE_ALGE &&
-        lsstrcmp(left->lt_alge.lta_constr, lsstr_cstr("#err")) == 0 &&
-        left->lt_alge.lta_argc == 1) {
-      lsthunk_t* msgt = lsthunk_eval0(left->lt_alge.lta_args[0]);
-      if (msgt && lsthunk_get_type(msgt) == LSTTYPE_STR) {
-        const lsstr_t* s = lsthunk_get_str(msgt);
-        if (lsstrcmp(s, lsstr_cstr("lambda match failure")) == 0)
-          is_lam_match_fail = 1;
+    if (is_lambda_match_failure_err(left) || lsthunk_is_bottom(left)) {
+      lsthunk_t* right = lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
+      if (right == NULL) return right;
+      if (lsthunk_is_bottom(right)) {
+        // Accumulate info from both bottoms
+        return lsthunk_bottom_merge(left, right);
       }
+      // Right succeeded: discard left bottom
+      return right;
     }
-    if (is_lam_match_fail)
-      return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
+    // Non-bottom errors should not exist anymore; but if they do, propagate
     return left;
   }
   // Success on left: commit left-biased result.
@@ -730,6 +828,9 @@ lsthunk_t* lsthunk_eval(lsthunk_t* func, lssize_t argc, lsthunk_t* const* args) 
   case LSTTYPE_SYMBOL:
     lsprintf(stderr, 0, "F: cannot apply for symbol\n");
     if (func->lt_trace_id >= 0) lstrace_pop(); return NULL;
+  case LSTTYPE_BOTTOM:
+    // Bottom applied is still bottom
+    if (func->lt_trace_id >= 0) lstrace_pop(); return func;
   case LSTTYPE_BUILTIN:
     { lsthunk_t* r = lsthunk_eval_builtin(func, argc, args); if (func->lt_trace_id >= 0) lstrace_pop(); return r; }
   }
@@ -752,6 +853,9 @@ lsthunk_t* lsthunk_eval0(lsthunk_t* thunk) {
     break;
   case LSTTYPE_CHOICE:
     thunk->lt_whnf = lsthunk_eval_choice(thunk, 0, NULL);
+    break;
+  case LSTTYPE_BOTTOM:
+    thunk->lt_whnf = thunk;
     break;
   case LSTTYPE_BUILTIN:
     thunk->lt_whnf = lsthunk_eval_builtin(thunk, 0, NULL);
@@ -902,6 +1006,12 @@ static lsthunk_colle_t* lsthunk_colle_new(lsthunk_t* thunk, lsthunk_colle_t* hea
   case LSTTYPE_LAMBDA:
     head = lsthunk_colle_new(thunk->lt_lambda.ltl_body, head, pid, level + 1, mode);
     break;
+  case LSTTYPE_BOTTOM: {
+    lssize_t ac = lsthunk_bottom_get_argc(thunk);
+    lsthunk_t* const* xs = lsthunk_bottom_get_args(thunk);
+    for (lssize_t i = 0; i < ac; i++) head = lsthunk_colle_new(xs[i], head, pid, level + 1, mode);
+    break;
+  }
   case LSTTYPE_REF:
   case LSTTYPE_INT:
   case LSTTYPE_STR:
@@ -1106,6 +1216,25 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
       // Print symbol as bare (already includes leading dot)
       lsstr_print_bare(fp, prec, indent, thunk->lt_symbol);
       break;
+    case LSTTYPE_BOTTOM: {
+      // ASCII representation
+      lsprintf(fp, indent, "<bottom msg=\"");
+      const char* msg = lsthunk_bottom_get_message(thunk);
+      if (msg) fprintf(fp, "%s", msg);
+      lsprintf(fp, 0, "\" at ");
+      lsloc_print(fp, lsthunk_bottom_get_loc(thunk));
+      lssize_t ac = lsthunk_bottom_get_argc(thunk);
+      if (ac > 0) {
+        lsprintf(fp, 0, " args=[");
+        for (lssize_t i = 0; i < ac; i++) {
+          if (i) lsprintf(fp, 0, ", ");
+          lsthunk_print_internal(fp, LSPREC_LOWEST, indent, thunk->lt_bottom.lt_rel.lbr_args[i], level + 1, colle, mode, 0);
+        }
+        lsprintf(fp, 0, "]");
+      }
+      lsprintf(fp, 0, ">");
+      break;
+    }
     case LSTTYPE_BUILTIN:
       lsprintf(fp, indent, "~%s{-builtin/%d-}", lsstr_get_buf(thunk->lt_builtin->lti_name),
                thunk->lt_builtin->lti_arity);

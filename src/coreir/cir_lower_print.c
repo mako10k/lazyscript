@@ -340,7 +340,10 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
     if (lsexpr_get_type(func_e) == LSETYPE_APPL) {
       const lseappl_t* ap2 = lsexpr_get_appl(func_e);
       const lsexpr_t*  f2  = lseappl_get_func(ap2);
-      int is_prelude_head = 0;
+  // TODO: Avoid silent prelude flattening.
+  // This block recognizes (~prelude .env .sym) and emits (var sym). This is a temporary lowering
+  // for bootstrapping and must be replaced by explicit IR imports emission and reader-bound registry.
+  int is_prelude_head = 0;
       // Case A: (app (var prelude) a0)
       if (lsexpr_get_type(f2) == LSETYPE_REF && strcmp(extract_ref_name(lsexpr_get_ref(f2)), "prelude") == 0) {
         is_prelude_head = 1;
@@ -424,42 +427,9 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
               }
             }
           }
-          if (sym && (strcmp(sym, "println") == 0 || strcmp(sym, "exit") == 0)) {
-            const lscir_value_t** vals   = NULL;
-            const char**          lnames = NULL;
-            const lsexpr_t**      lexprs = NULL;
-            int                   letc   = 0;
-            if (argc > 0)
-              vals = lsmalloc(sizeof(const lscir_value_t*) * argc);
-            for (int i = 0; i < argc; i++) {
-              const lscir_value_t* vi = lower_value(eargs[i]);
-              if (vi) {
-                vals[i] = vi;
-              } else {
-                const char*      tn = cir_gensym("a$");
-                vals[i]             = mk_val_var(tn);
-                const char**     nn = lsmalloc(sizeof(const char*) * (letc + 1));
-                const lsexpr_t** ee = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
-                for (int k = 0; k < letc; k++) {
-                  nn[k] = lnames[k];
-                  ee[k] = lexprs[k];
-                }
-                nn[letc] = tn;
-                ee[letc] = eargs[i];
-                letc++;
-                lnames = nn;
-                lexprs = ee;
-              }
-            }
-            const lscir_value_t* fv   = mk_val_var(sym);
-            const char*          tokn = cir_gensym("E$");
-            const lscir_value_t* tokv = mk_val_var(tokn);
-            const lscir_expr_t*  core = mk_exp_effapp(fv, tokv, argc, vals);
-            for (int i = letc - 1; i >= 0; i--)
-              core = mk_exp_let(lnames[i], lower_expr(lexprs[i]), core);
-            core = mk_exp_let(tokn, mk_exp_token(), core);
-            return core;
-          }
+          // Effects for println/exit are not special-cased here. Use explicit imports later.
+          // TODO: Instead of turning (~prelude .env .sym) into a plain var, emit an import entry
+          // and keep reference as var sym bound by the import table.
           if (sym) {
             const lscir_value_t** vals   = NULL;
             const char**          lnames = NULL;

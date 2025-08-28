@@ -18,6 +18,9 @@ struct lspat {
       const lspat_t* left;
       const lspat_t* right;
     } lp_or;
+    struct {
+      const lspat_t* inner;
+    } lp_caret;
   };
 };
 
@@ -91,6 +94,11 @@ void             lspat_print(FILE* fp, lsprec_t prec, int indent, const lspat_t*
     if (prec > LSPREC_CHOICE)
       lsprintf(fp, indent, ")");
     break;
+              case LSPTYPE_CARET:
+    lsprintf(fp, indent, "^(" );
+    lspat_print(fp, LSPREC_LOWEST, indent, pat->lp_caret.inner);
+    lsprintf(fp, indent, ")");
+    break;
   }
 }
 
@@ -118,3 +126,12 @@ const lspat_t* lspat_new_or(const lspat_t* left, const lspat_t* right) {
 
 const lspat_t* lspat_get_or_left(const lspat_t* pat) { return pat->lp_or.left; }
 const lspat_t* lspat_get_or_right(const lspat_t* pat) { return pat->lp_or.right; }
+
+const lspat_t* lspat_new_caret(const lspat_t* inner) {
+  lspat_t* pat   = lsmalloc(sizeof(lspat_t));
+  pat->lp_type   = LSPTYPE_CARET;
+  pat->lp_caret.inner = inner;
+  return pat;
+}
+
+const lspat_t* lspat_get_caret_inner(const lspat_t* pat) { return pat->lp_caret.inner; }

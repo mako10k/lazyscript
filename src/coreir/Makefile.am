@@ -7,6 +7,7 @@ liblscoreir_la_SOURCES = \
     coreir.h \
     cir_callconv.h \
     cir_internal.h \
-    cir_effects_type.c
+    cir_effects_type.c \
+    cir_text_reader.c
 
 AM_CPPFLAGS = -I$(top_srcdir)/src

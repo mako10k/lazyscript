@@ -385,12 +385,12 @@ int main(int argc, char** argv) {
         if (ret != NULL) {
           if (g_debug) {
             const char* rt = "?";
-            if (lsthunk_is_err(ret)) rt = "#err"; else switch (lsthunk_get_type(ret)) {
+            if (lsthunk_is_err(ret)) rt = "<bottom>"; else switch (lsthunk_get_type(ret)) {
               case LSTTYPE_ALGE: rt = "alge"; break; case LSTTYPE_APPL: rt = "appl"; break;
               case LSTTYPE_LAMBDA: rt = "lambda"; break; case LSTTYPE_REF: rt = "ref"; break;
               case LSTTYPE_INT: rt = "int"; break; case LSTTYPE_STR: rt = "str"; break;
               case LSTTYPE_SYMBOL: rt = "symbol"; break; case LSTTYPE_BUILTIN: rt = "builtin"; break;
-              case LSTTYPE_CHOICE: rt = "choice"; break; }
+              case LSTTYPE_CHOICE: rt = "choice"; break; case LSTTYPE_BOTTOM: rt = "bottom"; break; }
             lsprintf(stderr, 0, "DBG: eval(-e) ret-type=%s\n", rt);
           }
           if (lsthunk_is_err(ret)) {
@@ -591,7 +591,7 @@ int main(int argc, char** argv) {
   if (g_trace_dump_path && g_trace_dump_path[0]) lstrace_begin_dump(g_trace_dump_path);
   lsthunk_t* ret = lsprog_eval(prog, tenv);
       if (ret != NULL && !ls_maybe_run_entry(tenv)) {
-        if (lsthunk_is_err(ret)) {
+  if (lsthunk_is_err(ret)) {
           lsprintf(stderr, 0, "E: ");
           lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
       if (g_lstrace_table && g_trace_stack_depth > 0)

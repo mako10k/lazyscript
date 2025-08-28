@@ -32,6 +32,8 @@ lex.yy.c
 
 src/lazyscript
 src/lazyscript_format
+src/lazyscriptc
+src/lscoreir
 src/lsllvmir_dump
 src/parser/lexer.c
 src/parser/lexer.h

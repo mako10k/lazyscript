@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
   if (!(_ls_use_libc && _ls_use_libc[0] && _ls_use_libc[0] != '0')) GC_init();
   if (strict) ls_effects_set_strict(1);
 
-  if (from_ls) {
+    if (from_ls) {
     const lsprog_t* prog = parse_file(from_ls_path);
     if (!prog) return 1;
     const lscir_prog_t* cir = lscir_lower_prog(prog);
@@ -56,6 +56,12 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  fprintf(stderr, "E: lscoreir: text IR reader not implemented yet. Use --from-ls FILE for now.\n");
-  return 2;
+    // Fallback: read Core IR text from stdin and execute
+    const lscir_prog_t* cir = lscir_read_text(stdin, stderr);
+    if (!cir) return 2;
+    if (strict) {
+      int errs = lscir_validate_effects(stderr, cir);
+      if (errs > 0) { fprintf(stderr, "E: strict-effects: %d error(s)\n", errs); return 1; }
+    }
+    return lscir_eval(stdout, cir);
 }
