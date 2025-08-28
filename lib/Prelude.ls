@@ -10,7 +10,6 @@
   .sub        = (~builtins .sub);
   .to_str     = (~builtins .to_str);
   .nsMembers  = (~builtins .nsMembers);
-  .nsSelf     = (~builtins .nsSelf);
   .include    = (~internal .include); # pure include（その場のスコープで評価して値を返す）
   # 標準ライブラリ再エクスポート（後置 let で定義される ~List を公開）
   .List       = ~List;
@@ -33,7 +32,6 @@
   .import      = (~internal .import);
   .importOpt   = (~internal .importOpt);
   .withImport  = (~internal .withImport);
-    .def         = (~internal .def);
   # 可変名前空間 API は削除済みのため未公開
   # .nsMembers/.nsSelf は純粋 API としてトップレベルに公開済み
   };

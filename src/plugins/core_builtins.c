@@ -17,7 +17,6 @@ lsthunk_t* lsbuiltin_sub(lssize_t argc, lsthunk_t* const* args, void* data);
 lsthunk_t* lsbuiltin_lt(lssize_t argc, lsthunk_t* const* args, void* data);
 // namespace helpers from main binary
 lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* data);
-lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void* data);
 // Equality: provide a local minimal eq to avoid coupling to prelude module
 static lsthunk_t* cb_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
 	(void)argc; (void)data;
@@ -122,7 +121,6 @@ static const ls_builtin_entry_t CORE_ENTRIES[] = {
 	{ "lt",     2, lsbuiltin_lt,          NULL },
 	{ "eq",     2, cb_eq,                 NULL },
 	{ "nsMembers", 1, lsbuiltin_ns_members, NULL },
-	{ "nsSelf",    0, lsbuiltin_prelude_ns_self, NULL },
 };
 
 static ls_builtin_module_t CORE_MOD = {

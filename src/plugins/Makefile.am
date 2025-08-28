@@ -14,7 +14,7 @@ liblazyscript_prelude_la_LIBADD = \
     $(GC_LIBS)
 
 liblazyscript_prelude_la_SOURCES = \
-    prelude_plugin.c
+    builtins_ns.c
 
 # Demo builtin plugin built to exercise (~prelude builtin)
 liblazyscript_demo_la_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS) -I.. -fPIC
