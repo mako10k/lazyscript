@@ -9,5 +9,5 @@
 		((~prelude .env .import) ~builtins);
 
 	# Prelude 値を include で読み込む（Prelude.ls 内で ~builtins/~internal を参照可能）
-	!def Prelude ((~prelude include) "lib/Prelude.ls");
+	!def Prelude ((~prelude .include) "lib/Prelude.ls");
 };
