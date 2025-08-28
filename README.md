@@ -16,15 +16,13 @@ make -j
 sudo make install   # 任意
 ```
 
-## 実行
-
-```
-./src/lazyscript --help
 ./src/lazyscript -e "..."
 ```
 
 ヒント（bash のヒストリ展開に注意）
 - bash では二重引用符 "..." の中でも `!` がヒストリ展開されます。`-e` のワンライナーやヒアドキュメントでコード先頭に `!{` を書く場合は、外側のシェルでヒストリ展開を無効化するか、単引用符/エスケープを使ってください。
+- `src/lazyscriptc` (new: compiler, emits Core IR)
+- `src/lscoreir` (new: runtime, executes Core IR)
 - 推奨の安全な呼び方の例:
   - 外側でヒストリ展開を無効化
     ```bash
@@ -34,8 +32,6 @@ sudo make install   # 任意
     ```bash
     ( set +H; bash -lc 'cat > /tmp/prog.ls <<\LS
   !{ !println ("ok"); };
-    LS
-    ./src/lazyscript /tmp/prog.ls' )
     ```
   - どうしても二重引用符を使う場合は `\!` でエスケープ（場面により効かないことがあるため非推奨）
     ```bash
@@ -54,7 +50,6 @@ sudo make install   # 任意
   - `-t, --typecheck`: Core IR の最小タイプチェック（OK / E: type error を出力）
   - `--no-kind-warn`: 効果（IO種別）の警告を抑制（既定は警告を stderr に出力）
   - `--kind-error`: 効果（IO種別）をエラーとして扱う（stderr にエラーを出力し非ゼロ終了）
-- プラグイン/糖衣:
   - `-p, --prelude-so <path>`: prelude プラグイン .so を指定（未指定時は組み込み）
   - `-n, --sugar-namespace <ns>`: `~~sym` の展開先名前空間を指定（既定 `prelude`）
 - 環境変数:
@@ -64,10 +59,8 @@ sudo make install   # 任意
   - `LAZYSCRIPT_USE_LIBC_ALLOC=1`: ランタイムのアロケータを Boehm GC から libc に切替えます。
     - デバッグ用途。長時間プロセスでの GC 動作検証とは別に、メモリまわりの問題切り分けに役立ちます。
     - この変数が真の場合、起動時の `GC_init()` もスキップされます。
-
 ### 既定動作の変更ポリシー（貢献者向け）
 
-- 既定のランタイム動作（GC 初期化、アロケータ、トレース既定、検索パスなど）は、事前合意なしに変更しません。
 - 実験的変更は環境変数やフラグでオプトインにしてください。既定は安定維持します。
 - 既定に影響する PR は、タイトル/本文に `[allow-default-change]` を明記してください。
 
@@ -77,10 +70,13 @@ sudo make install   # 任意
 - `-e/--eval` は従来通り、式の最終値を出力します（`main` は無視）。
 - 効果のあるビルトイン（`println/print/def/require` など）は `strict-effects` が有効な場合、`chain/seq/bind` の文脈内でのみ許可されます。
 
-### 名前空間（Namespace）
 
-- `~~sym` は `(~prelude sym)` に展開（既定）。`--sugar-namespace` で切替可能。
-- ランタイム提供の簡易名前空間:
+### Compiler/Runtime split (experimental)
+
+- Compile to Core IR: `src/lazyscriptc file.ls > out.coreir`
+- Typecheck only: `src/lazyscriptc -t file.ls`
+- Run (temporary: from .ls): `src/lscoreir --from-ls file.ls`
+  - Text IR reader is WIP. Once ready: `src/lazyscriptc file.ls | src/lscoreir`
   - `~~nsnew NS` で `NS` を作成。
   - `(~NS name)` で名前空間から値を取得（値を直接返します）。
 
