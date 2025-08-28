@@ -56,25 +56,37 @@ normalize_stream() {
   fi
 }
 
-# Discover interpreter tests automatically: any test/*.ls that has a matching .out
-shopt -s nullglob
+# Discover interpreter tests automatically: any test/**/*.ls that has a matching .out
+# Backward compatible with flat layout. Stable sort for deterministic order.
+mapfile -t case_files < <(find "$DIR" -type f -name '*.ls' -printf '%P\n' | sort)
 cases=()
-for f in "$DIR"/*.ls; do
-  base="${f%.ls}"
-  if [[ -f "$base.out" ]]; then
-    cases+=("$(basename "$base")")
+for rel in "${case_files[@]}"; do
+  base_noext="${rel%.ls}"
+  if [[ -f "$DIR/$base_noext.out" ]]; then
+    cases+=("$base_noext")
   fi
 done
-shopt -u nullglob
 
 # Load skip list if present
 skip=()
+# Support root skip.list and per-directory skip.list with path-aware entries.
 if [[ -f "$DIR/skip.list" ]]; then
   while IFS= read -r s; do
     [[ -z "$s" || "$s" =~ ^# ]] && continue
     skip+=("$s")
   done < "$DIR/skip.list"
 fi
+while IFS= read -r sl; do
+  [[ -z "$sl" ]] && continue
+  d="$(dirname "$sl")"
+  if [[ -f "$DIR/$d/skip.list" ]]; then
+    while IFS= read -r s; do
+      [[ -z "$s" || "$s" =~ ^# ]] && continue
+      # Prefix with directory for disambiguation
+      skip+=("$d/${s}")
+    done < "$DIR/$d/skip.list"
+  fi
+done < <(printf '%s\n' "${cases[@]}")
 
 for name in "${cases[@]}"; do
   [[ -z "$name" ]] && continue
@@ -83,7 +95,7 @@ for name in "${cases[@]}"; do
   base="$DIR/$name"
   # Skip known-bad tests
   for s in "${skip[@]}"; do
-    if [[ "$name" == "$s" ]]; then
+    if [[ "$name" == "$s" || "$(basename "$name")" == "$s" ]]; then
       echo "skip - $name"
       continue 2
     fi
@@ -116,16 +128,14 @@ for name in "${cases[@]}"; do
   fi
 done
 
-# Discover eval (-e) tests: any test/*.ls that has a matching .eval.out
-shopt -s nullglob
+# Discover eval (-e) tests: any test/**/*.ls that has a matching .eval.out
 eval_cases=()
-for f in "$DIR"/*.ls; do
-  base="${f%.ls}"
-  if [[ -f "$base.eval.out" ]]; then
-    eval_cases+=("$(basename "$base")")
+for rel in "${case_files[@]}"; do
+  base_noext="${rel%.ls}"
+  if [[ -f "$DIR/$base_noext.eval.out" ]]; then
+    eval_cases+=("$base_noext")
   fi
 done
-shopt -u nullglob
 
 for name in "${eval_cases[@]}"; do
   [[ -z "$name" ]] && continue
@@ -153,16 +163,14 @@ for name in "${eval_cases[@]}"; do
   fi
 done
 
-# Discover Core IR dump tests: any test/*.ls that has a matching .coreir.out
-shopt -s nullglob
+# Discover Core IR dump tests: any test/**/*.ls that has a matching .coreir.out
 cir_cases=()
-for f in "$DIR"/*.ls; do
-  base="${f%.ls}"
-  if [[ -f "$base.coreir.out" ]]; then
-    cir_cases+=("$(basename "$base")")
+for rel in "${case_files[@]}"; do
+  base_noext="${rel%.ls}"
+  if [[ -f "$DIR/$base_noext.coreir.out" ]]; then
+    cir_cases+=("$base_noext")
   fi
 done
-shopt -u nullglob
 
 for name in "${cir_cases[@]}"; do
   [[ -z "$name" ]] && continue
