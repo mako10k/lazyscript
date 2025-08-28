@@ -27,6 +27,7 @@
   .env = {
   .require     = (~internal .require);
   .requireOpt  = (~internal .requireOpt);
+  .include     = (~internal .include);
   .println     = (~builtins .println);
   .print       = (~builtins .print);
   .import      = (~internal .import);

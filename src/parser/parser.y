@@ -221,7 +221,7 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 58
+%expect 50
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
