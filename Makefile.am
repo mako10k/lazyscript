@@ -15,7 +15,7 @@ AM_MAKEFLAGS = --no-print-directory
 
 # Run spec guard before building anything to ensure grammar changes are documented
 spec-guard:
-	@./scripts/spec_guard.sh || (echo 'Hint: set ALLOW_SPEC_CHANGE_WITHOUT_DOCS=1 to bypass (CI will still enforce).' >&2; exit 1)
+	@/usr/bin/env bash ./scripts/spec_guard.sh || (echo 'Hint: set ALLOW_SPEC_CHANGE_WITHOUT_DOCS=1 to bypass (CI will still enforce).' >&2; exit 1)
 
 all-local: spec-guard
 

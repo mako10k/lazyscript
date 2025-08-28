@@ -130,16 +130,11 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 }
 "~~nsdefv"  { return LSTNSDEFV; }
 "~~nsdef"   { return LSTNSDEF; }
-[~]{2}[0-9]+      { yylval->intval = lsint_new(atoi(yytext + 2)); return LSTPRELUDE_INT; }
-[~]{2}[.]?[a-zA-Z_][a-zA-Z0-9_]* {
-	/* ~~constr or ~~.symbol */
-	const char* s = yytext + 2; /* include leading '.' if present */
-	if (s[0] == '.') { yylval->strval = lsstr_cstr(s); return LSTPRELUDE_SYMBOL; }
-	yylval->strval = lsstr_cstr(s); return LSTPRELUDE_CONSTR;
-}
-[~]{2}\"([^\\\"]|\\.)*\" { /* ~~"string" */
-	yylval->strval = lsstr_parse(yytext + 2, yyleng - 2);
-	return LSTPRELUDE_STR;
+[~]{2}[a-zA-Z_][a-zA-Z0-9_]* {
+	/* ~~symbol => LSTPRELUDE_SYMBOL (plain name, no leading dot) */
+	const char* s = yytext + 2;
+	yylval->strval = lsstr_cstr(s);
+	return LSTPRELUDE_SYMBOL;
 }
 [~][a-zA-Z_][a-zA-Z0-9_$]* {
 	/* ~varName => LSTREFSYM (exclude dot-prefixed to avoid ambiguity) */
@@ -151,7 +146,5 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 "<-"       { return LSTLEFTARROW; }
 "->"       { return LSTARROW; }
 "||"       { return LSTOROR; }
-"++"       { return LSTCONCAT; }
-"+"        { return LSTPLUS; }
 . { return yytext[0]; }
 %%

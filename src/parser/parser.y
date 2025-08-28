@@ -221,7 +221,7 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 72
+%expect 58
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -246,10 +246,7 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
 %token <intval> LSTINT
 %token <strval> LSTSYMBOL
 %token <strval> LSTDOTSYMBOL
-%token <strval> LSTPRELUDE_CONSTR
 %token <strval> LSTPRELUDE_SYMBOL
-%token <strval> LSTPRELUDE_STR
-%token <intval> LSTPRELUDE_INT
 %token <strval> LSTENVOP
 %token LSTNSDEF
 %token LSTNSDEFV
@@ -257,14 +254,11 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
 %token <strval> LSTSTR
 %token LSTARROW
 %token LSTOROR
-%token LSTCONCAT
-%token LSTPLUS
 %token LSTLEFTARROW
 %token LSTWILDCARD
 %right '|'
 %right ':'
-%left LSTCONCAT
-%left LSTPLUS
+/* removed LSTCONCAT (++) and LSTPLUS (+) */
 
 %start prog
 
@@ -322,18 +316,6 @@ econs:
 
 expr3:
     expr4 { $$ = $1; }
-  | expr3 LSTCONCAT expr4 {
-      // a ++ b  ==>  (~<ns> "strcat") a b
-      const lsexpr_t *fn = mk_prelude_func(yyscanner, @$, "strcat");
-      const lsexpr_t *args2[] = { $1, $3 };
-      $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn, 2, args2)), @$);
-    }
-  | expr3 LSTPLUS expr4 {
-      // a + b  ==>  (~<ns> add) a b
-      const lsexpr_t *fn = mk_prelude_func(yyscanner, @$, "add");
-      const lsexpr_t *args2[] = { $1, $3 };
-      $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn, 2, args2)), @$);
-    }
   | expr3 LSTOROR expr4 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new($1, $3)), @$); }
     ;
 
@@ -425,25 +407,10 @@ efact:
         const lsexpr_t *args[] = { nsname, sym, $4 };
         $$ = lsexpr_with_loc(lsexpr_new_appl(lseappl_new(fn_def, 3, args)), @$);
       }
-    | LSTPRELUDE_CONSTR {
-        // ~~constr => (~<ns> constr)
-  const lsexpr_t *sym = mk_constr0_expr_sym($1);
-  $$ = mk_prelude_call1(yyscanner, @$, sym);
-      }
   | LSTPRELUDE_SYMBOL {
-    // ~~.symbol => (~<ns> .symbol) where .symbol is a first-class symbol
-    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol($1), @$);
-  $$ = mk_prelude_call1(yyscanner, @$, sym);
-      }
-    | LSTPRELUDE_STR {
-        // ~~"str" => (~<ns> "str")
-        const lsexpr_t *s = lsexpr_with_loc(lsexpr_new_str($1), @$);
-  $$ = mk_prelude_call1(yyscanner, @$, s);
-      }
-    | LSTPRELUDE_INT {
-        // ~~N => (~<ns> N)
-        const lsexpr_t *n = lsexpr_with_loc(lsexpr_new_int($1), @$);
-  $$ = mk_prelude_call1(yyscanner, @$, n);
+    // ~~symbol => (~<ns> symbol) where symbol is a plain name (no leading dot)
+    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @$);
+    $$ = mk_prelude_call1(yyscanner, @$, sym);
       }
     | etuple {
         lssize_t argc = lsealge_get_argc($1);
@@ -563,19 +530,6 @@ dostmt:
         const lsref_t *r = lsref_new($1, @1);
         const lsexpr_t *re = lsexpr_new_ref(r);
         $$ = lsarray_new(2, re, $3);
-      }
-    | LSTSYMBOL LSTSYMBOL '=' expr {
-        /* do-block local binding: let x = e;  ==> bind e (x -> ...) */
-        /* First symbol must be 'let'; we accept only simple variable for x */
-        const lsstr_t* kw = $1;
-        if (lsstrcmp(kw, lsstr_cstr("let")) != 0) {
-          /* Fallback: treat as plain expression "sym1 sym2 = expr" is not allowed here */
-          lsloc_t loc = @$; yyerror(&loc, yyget_extra(yyscanner), "syntax error: expected 'let'");
-          YYERROR;
-        }
-        const lsref_t *r = lsref_new($2, @2);
-        const lsexpr_t *re = lsexpr_new_ref(r);
-        $$ = lsarray_new(2, re, $4);
       }
     | expr { $$ = lsarray_new(1, $1); }
     ;
