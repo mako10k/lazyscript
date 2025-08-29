@@ -1338,7 +1338,7 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
   case LSTTYPE_ALGE: {
     lssize_t n = t->lt_alge.lta_argc;
     lsthunk_t* nt = lsmalloc(lssizeof(lsthunk_t, lt_alge) + n * sizeof(lsthunk_t*));
-    nt->lt_type = LSTTYPE_ALGE; nt->lt_whnf = nt;
+    nt->lt_type = LSTTYPE_ALGE; nt->lt_whnf = nt; nt->lt_trace_id = -1;
     nt->lt_alge.lta_constr = t->lt_alge.lta_constr;
     nt->lt_alge.lta_argc = n;
     *pmemo = subst_bind(*pmemo, t, nt);
@@ -1349,7 +1349,7 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
   case LSTTYPE_APPL: {
     lssize_t n = t->lt_appl.lta_argc;
     lsthunk_t* nt = lsmalloc(lssizeof(lsthunk_t, lt_appl) + n * sizeof(lsthunk_t*));
-    nt->lt_type = LSTTYPE_APPL; nt->lt_whnf = NULL;
+    nt->lt_type = LSTTYPE_APPL; nt->lt_whnf = NULL; nt->lt_trace_id = -1;
     nt->lt_appl.lta_func = lsthunk_subst_param_rec(t->lt_appl.lta_func, param, pmemo);
     nt->lt_appl.lta_argc = n;
     *pmemo = subst_bind(*pmemo, t, nt);
@@ -1359,7 +1359,7 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
   }
   case LSTTYPE_CHOICE: {
     lsthunk_t* nt = lsmalloc(sizeof(lsthunk_t));
-  nt->lt_type = LSTTYPE_CHOICE; nt->lt_whnf = NULL;
+  nt->lt_type = LSTTYPE_CHOICE; nt->lt_whnf = NULL; nt->lt_trace_id = -1;
     *pmemo = subst_bind(*pmemo, t, nt);
     nt->lt_choice.ltc_left = lsthunk_subst_param_rec(t->lt_choice.ltc_left, param, pmemo);
     nt->lt_choice.ltc_right = lsthunk_subst_param_rec(t->lt_choice.ltc_right, param, pmemo);
@@ -1369,7 +1369,7 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
     // Capture references to the outer parameter even across lambda boundaries by
     // substituting inside the lambda body. Keep the parameter pattern as-is.
     lsthunk_t* nt = lsmalloc(sizeof(lsthunk_t));
-    nt->lt_type = LSTTYPE_LAMBDA; nt->lt_whnf = nt;
+    nt->lt_type = LSTTYPE_LAMBDA; nt->lt_whnf = nt; nt->lt_trace_id = -1;
     nt->lt_lambda.ltl_param = t->lt_lambda.ltl_param;
     *pmemo = subst_bind(*pmemo, t, nt);
     nt->lt_lambda.ltl_body = lsthunk_subst_param_rec(t->lt_lambda.ltl_body, param, pmemo);

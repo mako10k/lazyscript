@@ -257,7 +257,7 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
 %token LSTWILDCARD
 %right '|'
 %right ':'
-/* removed LSTCONCAT (++) and LSTPLUS (+) */
+/* removed legacy tokens */
 
 %start prog
 

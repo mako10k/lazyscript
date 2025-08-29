@@ -1,6 +1,59 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Guard: ban the "++" operator from language sources (spec, grammar, libraries, tests)
+# - Strict ban in .ls and docs
+# - Parser/lexer (.y/.l): only flag token/lexeme definitions like '"++"' or token names (e.g., LSTCONCAT)
+#   and ignore incidental C code increments (i++) in semantic actions.
+
+shopt -s globstar nullglob
+
+paths_ls_docs=(
+  "docs/**/*.md"
+  "docs/**/*.bnf"
+  "docs/parser-bnf.md"
+  "lib/**/*.ls"
+  "test/**/*.ls"
+)
+paths_parser=(
+  "src/parser/**/*.y"
+  "src/parser/**/*.l"
+)
+
+violations=()
+
+# Strict ban in docs/.ls
+for gl in "${paths_ls_docs[@]}"; do
+  for f in $gl; do
+    [[ -f "$f" ]] || continue
+    if grep -n -- '++' "$f" >/dev/null 2>&1; then
+      while IFS= read -r line; do
+        violations+=("$f:$line")
+      done < <(grep -n -- '++' "$f")
+    fi
+  done
+done
+
+# Parser/lexer: only flag explicit '++' token definitions or token names
+for gl in "${paths_parser[@]}"; do
+  for f in $gl; do
+    [[ -f "$f" ]] || continue
+    if grep -nE "LSTCONCAT|\"\+\+\"|'\+\+'" "$f" >/dev/null 2>&1; then
+      while IFS= read -r line; do
+        violations+=("$f:$line")
+      done < <(grep -nE "LSTCONCAT|\"\+\+\"|'\+\+'" "$f")
+    fi
+  done
+done
+
+if (( ${#violations[@]} > 0 )); then
+  echo "ERROR: '++' operator is banned from language spec/grammar/libs/tests. Found in:" >&2
+  printf '  %s\n' "${violations[@]}" >&2
+  exit 1
+fi
+
+echo "guard_no_plusplus: OK (no occurrences)."
+
 # Guard against accidentally reintroducing the language-level "++" operator.
 #
 # Scope: Only checks grammar sources (parser.y, lexer.l). It allows C/C++ "++" in generated C files.

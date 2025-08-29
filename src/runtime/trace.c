@@ -15,6 +15,19 @@ static __thread int    g_has_pending_loc = 0;
 static __thread lsloc_t g_pending_loc;
 // Optional JSONL dump state
 static FILE* g_trace_dump_fp = NULL;
+// Debug guard (opt-in via env): verbose push/pop logs to locate imbalance
+static __thread int g_trace_dbg_inited = 0;
+static __thread int g_trace_dbg_enabled = 0;
+static __thread int g_trace_dbg_printed = 0; // rate-limit logs
+
+static inline int trace_dbg_enabled(void) {
+  if (!g_trace_dbg_inited) {
+    const char* e = getenv("LAZYSCRIPT_TRACE_GUARD");
+    g_trace_dbg_enabled = (e && *e);
+    g_trace_dbg_inited = 1;
+  }
+  return g_trace_dbg_enabled;
+}
 
 static void free_table(lstrace_table_t* t) {
   if (!t) return;
@@ -159,17 +172,48 @@ void lstrace_push(int id) {
   int cap = (int)(sizeof(g_trace_stack) / sizeof(g_trace_stack[0]));
   if (g_trace_top < cap) {
     g_trace_stack[g_trace_top++] = id;
+    if (trace_dbg_enabled()) {
+      // Print a few initial pushes and then every 32 levels to avoid flooding
+      if (g_trace_top <= 16 || (g_trace_top % 32) == 0) {
+        if (g_lstrace_table && id >= 0) {
+          lstrace_span_t s = lstrace_lookup(id);
+          fprintf(stderr, "[TRACE] push #%d id=%d @ %s:%d:%d\n", g_trace_top, id,
+                  s.filename ? s.filename : "<unknown>", s.first_line, s.first_column);
+        } else {
+          fprintf(stderr, "[TRACE] push #%d id=%d\n", g_trace_top, id);
+        }
+      }
+    }
   } else {
     if (!g_trace_overflow_warned) {
       fprintf(stderr, "W: trace stack overflow (cap=%d)\n", cap);
+      if (trace_dbg_enabled()) {
+        // Best-effort: show the frame that attempted to push
+        if (g_lstrace_table && id >= 0) {
+          lstrace_span_t s = lstrace_lookup(id);
+          fprintf(stderr, "[TRACE] overflow at id=%d @ %s:%d:%d\n", id,
+                  s.filename ? s.filename : "<unknown>", s.first_line, s.first_column);
+        } else {
+          fprintf(stderr, "[TRACE] overflow at id=%d (no table)\n", id);
+        }
+      }
       g_trace_overflow_warned = 1;
     }
   }
 }
 
 void lstrace_pop(void) {
-  if (g_trace_top > 0) g_trace_top--;
-  else fprintf(stderr, "W: trace stack underflow\n");
+  if (g_trace_top > 0) {
+    if (trace_dbg_enabled()) {
+      int after = g_trace_top - 1;
+      if (after < 16 || (after % 32) == 0) {
+        fprintf(stderr, "[TRACE] pop  -> #%d\n", after);
+      }
+    }
+    g_trace_top--;
+  } else {
+    fprintf(stderr, "W: trace stack underflow\n");
+  }
 }
 
 void lstrace_print_stack(FILE* fp, int max_depth) {

@@ -2,6 +2,26 @@
 
 ## Backlog
 
+### テスト・トリアージ（t52 一時スキップ）
+- 状態: Deferred
+- 背景: t52（namespace utilities）実行時にトレーススタック溢れ（cap=256）→まれに SEGV。lib/Ls 側のユーザトレースを外しても再現。現在は原因の局所化途中。
+- 現状: `test/skip.list` に `t52_ns_utils` を追加し、スイートから一時除外。再開時に再度 enable。
+- 対応タスク
+    - [ ] 評価器の主要分岐（lambda/ref/choice/appl/eval0）に環境変数ゲート付きの最小ログを追加し、push/pop 不一致の起点を特定（本体修正は別タスク）
+    - [ ] ns 経路のログタグ（nsMembers/dispatch）で evaluator 側か ns 側かを二分
+    - [ ] 原因特定後、最小修正→スキップ解除→回帰テスト追加
+- 受け入れ条件
+    - [ ] LAZYSCRIPT_TRACE_GUARD 有効時に push/pop バランスが保たれ、t52 が安定通過
+    - [ ] ガード無効でも SEGV 不発（連続実行で確認）
+
+### 仕様ガード（'++' 完全禁止）
+- 状態: Done / Enforced
+- 決定: “++” は仕様外。実装もパースも行わない。ドキュメントからも削除。
+- 実施: `scripts/guard_no_plusplus.sh` を追加し、docs/.ls では厳格禁止、parser/lexer はトークン定義のみ検出（C の i++ は誤検出しない）に調整。関連ドキュメント修正済み（`docs/09_list_syntax_and_library.md`, `docs/parser-bnf.md`）。
+- 受け入れ条件
+    - [x] リポジトリ内から “++” 言及が排除されている（仕様説明を除く明示禁止文言のみ）
+    - [ ] CI でガードが実行され、違反時に PR をブロック
+
 ### GC/アロケータ安定化（nslit × パターンラムダでの SEGV）
 - 状態: Investigate
 - 背景: GC 経路のみで `{ .Option = {...}; .map = (\~f -> \~opt -> (\None -> None | \(Some ~x) -> Some (~f ~x)) ~opt) }` などが SEGV。libc アロケータでは回避可能。
@@ -40,6 +60,7 @@
 - 対応タスク
     - [x] GitHub Actions に GC/非 GC のジョブマトリクスを追加
     - [ ] クラッシュ時の自動バックトレース収集とログ保存
+    - [ ] `scripts/guard_no_plusplus.sh` を CI に組み込み、“++” の再流入をブロック
 - 受け入れ条件
     - [ ] 回帰が PR で自動検出される
 
@@ -91,6 +112,21 @@
 - 受け入れ条件
     - [ ] 該当トークンが入力に含まれる場合は非推奨警告→期日後エラー
     - [ ] 既存テストがすべて通過
+
+### 選択演算子の意味論見直し（'|' と '||' の分離）
+- 状態: To Do
+- 背景: 現状 '|' が「ラムダ分岐」と「式分岐（Bottom検出）」の双方の意味を担っており、ラムダ本体が Bottom の場合でも右腕が評価されてしまう等の不適切な挙動が起こりうる。
+- 方針:
+    - '|'（ラムダ分岐）: 左右の腕はいずれもラムダまたは LambdaChoice。左腕適用時にパターンマッチ失敗（lambda match failure）の場合のみ右腕を評価。ラムダ本体が Bottom の場合は右腕を評価しない。
+    - '||'（式分岐）: 一般式の選択。左腕の評価結果が Bottom 値の場合のみ右腕を評価。それ以外（成功値や lambda match failure 以外の Bottom 合成方針は別途仕様化）の場合は左腕を採用。
+- 影響範囲:
+    - パーサ／AST: '||' の導入と '|' の使用箇所チェック。
+    - ランタイム: lsthunk_eval_choice の分岐条件を『lambda match failure のみ右腕』に限定。'||' 用の別経路（Bottom 検出）を追加。
+    - ドキュメント: 02_parsing.md / 03_semantics.md / 05_syntax_sugar.md を更新。
+    - テスト: 既存 '|' 依存箇所の再評価と '||' 導入テストの追加。
+- 受け入れ条件:
+    - ラムダ本体 Bottom で右腕が評価されないことを確認するテストが通過。
+    - 左腕 Bottom のときのみ右腕を評価する '||' のテストが通過。
 
 ### `~~constr` の意味論変更（`~~name` → `~prelude .name`）
 - 状態: To Do
