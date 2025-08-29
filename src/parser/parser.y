@@ -221,10 +221,11 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 54
+%expect 3
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
+%nterm <expr> lamchain
 %nterm <array> dostmt
 %nterm <elambda> elambda
 %nterm <pat> lamparam lamparam2
@@ -299,8 +300,7 @@ expr:
     ;
 
 expr1:
-      expr2 { $$ = $1; }
-  | expr2 '|' expr1 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind($1, $3, LSECHOICE_LAMBDA)), @$); }
+  expr2 { $$ = $1; }
   ;
 
 expr2:
@@ -317,6 +317,16 @@ econs:
 expr3:
     expr4 { $$ = $1; }
   | expr4 LSTOROR expr3 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind($1, $3, LSECHOICE_EXPR)), @$); }
+    ;
+
+// Lambda-only choice chain appears only at efact level, starting from a lambda.
+// Right-associative: \a -> A | \b -> B | \c -> C  ==  \a -> A | (\b -> B | (\c -> C))
+lamchain:
+      elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
+    | elambda '|' lamchain {
+        const lsexpr_t *lhs = lsexpr_with_loc(lsexpr_new_lambda($1), @1);
+        $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind(lhs, $3, LSECHOICE_LAMBDA)), @$);
+      }
     ;
 
 eappl:
@@ -376,6 +386,7 @@ expr4:
       expr5 { $$ = $1; }
   | eappl { $$ = lsexpr_with_loc(lsexpr_new_appl($1), @$); }
   | ealge { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
+  | lamchain { $$ = $1; }
     ;
 
 ealge:
@@ -406,7 +417,6 @@ efact:
     }
   | elist { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
   | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
-  | elambda { $$ = lsexpr_with_loc(lsexpr_new_lambda($1), @$); }
   | LSTCARET '(' expr ')' {
         // ^(Expr): dedicated AST node; runtime constructs Bottom from the value of Expr
         $$ = lsexpr_with_loc(lsexpr_new_raise($3), @$);

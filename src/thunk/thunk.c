@@ -631,6 +631,8 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
     lsprintf(stderr, 0, "DBG lambda: match failed\n");
     #endif
   // Pattern mismatch -> bottom (no match), carry arg as related context
+  // Clear bindings established during a failed match attempt to avoid leaking into siblings
+  lstpat_clear_binds(param);
   lsthunk_t* rels[1] = { arg };
   return lsthunk_new_bottom("lambda match failure", lstrace_take_pending_or_unknown(), 1, rels);
   }
@@ -642,7 +644,9 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
     #if LS_TRACE
     lsprintf(stderr, 0, "DBG lambda: body eval returned NULL\n");
     #endif
-    return NULL;
+  // Clear parameter bindings before early return
+  lstpat_clear_binds(param);
+  return NULL;
   }
   // Capture current binding of this parameter inside the returned value by
   // substituting any references to the parameter with the bound thunk. This
@@ -789,12 +793,45 @@ static int is_lambda_match_failure_err(lsthunk_t* err) {
 static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t* const* args) {
   // eval (l | r) x y ...
   // For lambda-choice ('|'):
-  //   = let v = eval l x y ... in if v is lambda match failure then eval r x y ... else v
+  //   Guard only on the FIRST parameter:
+  //   = if argc > 0 then
+  //       let v1 = eval l x in
+  //         if v1 is "lambda match failure" then eval r x y ... else eval v1 y ...
+  //     else
+  //       eval l (no fallback occurs at this point)
+  //   This ensures deeper (second or later) parameter match failures result in Bottom without
+  //   evaluating the right arm, matching the sugar: \P1 P2 -> E1  |  \Q1 Q2 -> E2
+  //   where only P1 vs Q1 controls the choice.
   // For expr-choice ('||'):
   //   = let v = eval l x y ... in if v is Bottom then eval r x y ... else v
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_CHOICE);
   assert(argc == 0 || args != NULL);
+  // Lambda-choice: special stepwise handling for first-arg guard
+  if (thunk->lt_choice.ltc_kind == 1 /* LSECHOICE_LAMBDA */ && argc > 0) {
+    // Apply only the first argument to the left arm
+    lsthunk_t* left1 = lsthunk_eval(thunk->lt_choice.ltc_left, 1, &args[0]);
+    if (left1 == NULL) {
+      // Treat as left failure and try right with full args
+      return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
+    }
+    if (lsthunk_is_err(left1)) {
+      // Fallback ONLY when the first-parameter match failed
+      if (is_lambda_match_failure_err(left1)) {
+        lsthunk_t* right = lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
+        if (right == NULL) return right;
+        if (lsthunk_is_bottom(right)) {
+          return lsthunk_bottom_merge(left1, right);
+        }
+        return right;
+      }
+      // Other bottoms (if any) commit to left; do not fallback
+      return left1;
+    }
+    // Commit to left: apply remaining args without any further fallback
+    return lsthunk_eval(left1, argc - 1, args + 1);
+  }
+  // Default behavior: evaluate left fully, then decide fallback
   lsthunk_t* left = lsthunk_eval(thunk->lt_choice.ltc_left, argc, args);
   if (left == NULL)
     return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
@@ -1371,6 +1408,8 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
     *pmemo = subst_bind(*pmemo, t, nt);
     nt->lt_choice.ltc_left = lsthunk_subst_param_rec(t->lt_choice.ltc_left, param, pmemo);
     nt->lt_choice.ltc_right = lsthunk_subst_param_rec(t->lt_choice.ltc_right, param, pmemo);
+    // Preserve choice operator kind to keep evaluation semantics ('|' vs '||')
+    nt->lt_choice.ltc_kind = t->lt_choice.ltc_kind;
     return nt;
   }
   case LSTTYPE_LAMBDA: {

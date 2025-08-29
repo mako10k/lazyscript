@@ -36,14 +36,15 @@
 <expr> ::= <expr1>
 
 <expr1> ::= <expr2>
-          | <expr2> '|' <expr1>
+          | <lamchoice>
 
 <expr2> ::= <expr3>
           | <econs>
 
 <econs> ::= <expr1> ':' <expr3>
 
-<expr3> ::= <expr4>
+        <expr> ::= <expr1>
+        <expr1> ::= <expr2>
           | <expr4> '||' <expr3>
 
 <eappl> ::= <efact> <expr5>
@@ -56,14 +57,16 @@
           | <ealge> <expr5>
 
 <expr5> ::= <efact>
-          | LSTSYMBOL
-
+        <expr4> ::= <expr5>
+                  | <eappl>
+                  | <ealge>
+                  | <lamchain>
 /* efact: 基本要素 */
 <efact> ::= LSTINT
          | LSTSTR
          | LSTREFSYM
          | LSTPRELUDE_SYMBOL
-         | '^' '(' <expr> ')'
+        <efact> ::= LSTINT
          | <etuple>
          | <elist>
          | <closure>
@@ -71,19 +74,16 @@
          | '!' '{' <dostmts> '}'
          | '{' <nslit_entries> '}'
 
-/* nslit_entries: 純粋な名前空間リテラル (メンバのみ) */
-<nslit_entries> ::= ε
-                  | <nslit_entry>
-                  | <nslit_entries> ';' <nslit_entry>
-                  | <nslit_entries> ';'
+        /* lambda */
+        <elambda> ::= '\\' <lamparams> LSTARROW <expr3>
 
-<nslit_entry> ::= LSTDOTSYMBOL '=' <expr>
-                | LSTDOTSYMBOL <lamparams> '=' <expr>
-
+        /* lambda-only choice (right associative) */
+        <lamchain> ::= <elambda>
+                     | <elambda> '|' <lamchain>
 /* do-block スタイル（dostmt: 中間ノード） */
-<dostmts> ::= ε
-           | <dostmt>
-           | <dostmt> ';' <dostmts>
+         優先度: expr 系は複数レベルに分かれ、適用 (application), アルゲ (algebraic constructor), 選択 (choice '|' / '||'), cons ':' 等の優先度が分離されている。
+         ‘|’ はラムダ専用（<lamchain>）で右結合。一般式のフォールバックは ‘||’ を使用。
+         ラムダを適用ヘッドに置くには括弧が必要（例: `\\x -> f x y` に引数を適用する場合は `((\\x -> f x y) a)` のように括弧で囲む）。
 
 <dostmt> ::= <pref> LSTLEFTARROW <expr>
            | LSTSYMBOL LSTLEFTARROW <expr>
@@ -104,6 +104,13 @@
 
 /* lambda */
 <elambda> ::= '\\' <lamparams> LSTARROW <expr2>
+
+/* lambda-only choice (right associative) */
+<lamchoice> ::= <lamfactor>
+              | <lamfactor> '|' <lamchoice>
+
+<lamfactor> ::= <elambda>
+              | '(' <lamchoice> ')'
 
 /* lambda パラメータ（パターン） */
 <lamparam> ::= <lamparam2>
