@@ -129,7 +129,7 @@ static const lscir_expr_t *lower_expr(const lsexpr_t *e) {
   case LSETYPE_CHOICE: {
     const lsechoice_t *ch = lsexpr_get_choice(e); const lsexpr_t *l = lsechoice_get_left(ch); const lsexpr_t *r = lsechoice_get_right(ch);
     const lscir_value_t *vl = lower_value(l); const lscir_value_t *vr = lower_value(r); const char *ln = NULL, *rn = NULL; if (!vl) { ln = cir_gensym("c$"); vl = mk_val_var(ln); } if (!vr) { rn = cir_gensym("c$"); vr = mk_val_var(rn); }
-    const lscir_value_t *f = mk_val_var("|"); const lscir_value_t **args_arr = lsmalloc(sizeof(const lscir_value_t*) * 2); args_arr[0] = vl; args_arr[1] = vr; const lscir_expr_t *core = mk_exp_app(f, 2, args_arr); if (rn) core = mk_exp_let(rn, lower_expr(r), core); if (ln) core = mk_exp_let(ln, lower_expr(l), core); return core;
+  const lscir_value_t *f = mk_val_var(lsechoice_get_kind(ch) == LSECHOICE_LAMBDA ? "choice.lambda" : "choice.expr"); const lscir_value_t **args_arr = lsmalloc(sizeof(const lscir_value_t*) * 2); args_arr[0] = vl; args_arr[1] = vr; const lscir_expr_t *core = mk_exp_app(f, 2, args_arr); if (rn) core = mk_exp_let(rn, lower_expr(r), core); if (ln) core = mk_exp_let(ln, lower_expr(l), core); return core;
   }
   case LSETYPE_CLOSURE: return lower_closure(lsexpr_get_closure(e));
   case LSETYPE_NSLIT:

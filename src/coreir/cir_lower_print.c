@@ -520,7 +520,7 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
       rn = cir_gensym("c$");
       vr = mk_val_var(rn);
     }
-    const lscir_value_t*  f        = mk_val_var("|");
+  const lscir_value_t*  f        = mk_val_var(lsechoice_get_kind(ch) == LSECHOICE_LAMBDA ? "choice.lambda" : "choice.expr");
     const lscir_value_t** args_arr = lsmalloc(sizeof(const lscir_value_t*) * 2);
     args_arr[0]                    = vl;
     args_arr[1]                    = vr;

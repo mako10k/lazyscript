@@ -299,7 +299,7 @@ expr:
 
 expr1:
       expr2 { $$ = $1; }
-  | expr2 '|' expr1 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new($1, $3)), @$); }
+  | expr2 '|' expr1 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind($1, $3, LSECHOICE_LAMBDA)), @$); }
   ;
 
 expr2:
@@ -315,7 +315,7 @@ econs:
 
 expr3:
     expr4 { $$ = $1; }
-  | expr3 LSTOROR expr4 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new($1, $3)), @$); }
+  | expr3 LSTOROR expr4 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind($1, $3, LSECHOICE_EXPR)), @$); }
     ;
 
 eappl:

@@ -3,20 +3,28 @@
 #include "common/malloc.h"
 
 struct lsechoice {
-  const lsexpr_t* lec_left;
-  const lsexpr_t* lec_right;
+  const lsexpr_t*   lec_left;
+  const lsexpr_t*   lec_right;
+  lsechoice_kind_t  lec_kind;
 };
 
-const lsechoice_t* lsechoice_new(const lsexpr_t* left, const lsexpr_t* right) {
+const lsechoice_t* lsechoice_new_kind(const lsexpr_t* left, const lsexpr_t* right, lsechoice_kind_t kind) {
   lsechoice_t* echoice = lsmalloc(sizeof(lsechoice_t));
   echoice->lec_left    = left;
   echoice->lec_right   = right;
+  echoice->lec_kind    = kind;
   return echoice;
+}
+
+const lsechoice_t* lsechoice_new(const lsexpr_t* left, const lsexpr_t* right) {
+  return lsechoice_new_kind(left, right, LSECHOICE_EXPR);
 }
 
 const lsexpr_t* lsechoice_get_left(const lsechoice_t* echoice) { return echoice->lec_left; }
 
 const lsexpr_t* lsechoice_get_right(const lsechoice_t* echoice) { return echoice->lec_right; }
+
+lsechoice_kind_t lsechoice_get_kind(const lsechoice_t* echoice) { return echoice->lec_kind; }
 
 // Helpers to inspect nested choice chains
 static const lsexpr_t* choice_leftmost_term(const lsechoice_t* ch) {
@@ -39,45 +47,23 @@ void            lsechoice_print(FILE* fp, lsprec_t prec, int indent, const lsech
   indent++;
              lsprintf(fp, indent, "\n");
              while (1) {
-               // Determine adjacent pair around the boundary to pick operator and paren policy
-               const lsexpr_t* left_adj = (lsexpr_get_type(echoice->lec_left) == LSETYPE_CHOICE)
-                                              ? choice_rightmost_term(lsexpr_get_choice(echoice->lec_left))
-                                              : echoice->lec_left;
-               const lsexpr_t* right_adj = (lsexpr_get_type(echoice->lec_right) == LSETYPE_CHOICE)
-                                               ? choice_leftmost_term(lsexpr_get_choice(echoice->lec_right))
-                                               : echoice->lec_right;
-               const int both_lambda = (lsexpr_get_type(left_adj) == LSETYPE_LAMBDA &&
-                                        lsexpr_get_type(right_adj) == LSETYPE_LAMBDA);
-
-               // Print the left side; avoid wrapping nested choices; parenthesize lambda if op is '||'
+               // Print the left side; avoid wrapping nested choices
                if (lsexpr_get_type(echoice->lec_left) == LSETYPE_CHOICE) {
       lsechoice_print(fp, LSPREC_CHOICE, indent, lsexpr_get_choice(echoice->lec_left));
                } else {
-      lsprec_t child_prec = (!both_lambda && lsexpr_get_type(echoice->lec_left) == LSETYPE_LAMBDA)
-                                ? (LSPREC_LAMBDA + 1)
-                                : (LSPREC_CHOICE + 1);
-      lsexpr_print(fp, child_prec, indent, echoice->lec_left);
+      lsexpr_print(fp, LSPREC_CHOICE + 1, indent, echoice->lec_left);
                }
 
-               const char* op_sym = both_lambda ? " |\n" : " ||\n";
+               const char* op_sym = (lsechoice_get_kind(echoice) == LSECHOICE_LAMBDA) ? " |\n" : " ||\n";
                lsprintf(fp, indent, "%s", op_sym);
 
                if (lsexpr_get_type(echoice->lec_right) != LSETYPE_CHOICE)
       break;
     echoice = lsexpr_get_choice(echoice->lec_right);
   }
-             // Print the final right term with same paren policy
+             // Print the final right term
              {
-               const lsexpr_t* left_adj = (lsexpr_get_type(echoice->lec_left) == LSETYPE_CHOICE)
-                                              ? choice_rightmost_term(lsexpr_get_choice(echoice->lec_left))
-                                              : echoice->lec_left;
-               const lsexpr_t* right_adj = echoice->lec_right;
-               const int both_lambda = (lsexpr_get_type(left_adj) == LSETYPE_LAMBDA &&
-                                        lsexpr_get_type(right_adj) == LSETYPE_LAMBDA);
-               lsprec_t child_prec = (!both_lambda && lsexpr_get_type(echoice->lec_right) == LSETYPE_LAMBDA)
-                                         ? (LSPREC_LAMBDA + 1)
-                                         : (LSPREC_CHOICE);
-               lsexpr_print(fp, child_prec, indent, echoice->lec_right);
+               lsexpr_print(fp, LSPREC_CHOICE, indent, echoice->lec_right);
              }
              indent--;
              if (prec > LSPREC_CHOICE)

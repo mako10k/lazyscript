@@ -2,16 +2,22 @@
 
 typedef struct lsechoice lsechoice_t;
 
+// Choice operator kind: '|' (lambda-choice) vs '||' (expr-choice)
+typedef enum lsechoice_kind {
+	LSECHOICE_LAMBDA = 1,
+	LSECHOICE_EXPR   = 2
+} lsechoice_kind_t;
+
 #include "expr/expr.h"
 
 #define lsapi_echoice_new lsapi_nn12 lsapi_wur
 
 /**
- * Create a new choice expression.
- * @param left The left expression.
- * @param right The right expression.
- * @return The new choice expression.
+ * Create a new choice expression with explicit kind.
  */
+lsapi_echoice_new const lsechoice_t* lsechoice_new_kind(const lsexpr_t* left, const lsexpr_t* right, lsechoice_kind_t kind);
+
+// Backward helper (defaults to EXPR-kind). Prefer lsechoice_new_kind in new code.
 lsapi_echoice_new const lsechoice_t* lsechoice_new(const lsexpr_t* left, const lsexpr_t* right);
 
 /**
@@ -27,6 +33,9 @@ lsapi_get const lsexpr_t* lsechoice_get_left(const lsechoice_t* echoice);
  * @return The right expression.
  */
 lsapi_get const lsexpr_t* lsechoice_get_right(const lsechoice_t* echoice);
+
+// Get choice operator kind
+lsapi_get lsechoice_kind_t lsechoice_get_kind(const lsechoice_t* echoice);
 
 /**
  * Print a choice expression.

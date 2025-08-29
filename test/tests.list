@@ -9,3 +9,6 @@ t16_runtime_def
 
 # new sugar tests
 t78_bang_env_sugar
+
+# expr-choice basic eval
+t85_expr_choice_basic

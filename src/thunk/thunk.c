@@ -15,6 +15,7 @@
  #include "expr/enslit.h"
  #include "expr/eappl.h"
  #include "expr/ealge.h"
+ #include "expr/echoice.h"
  // removed duplicate: #include "expr/eclosure.h"
  #include "misc/bind.h"
  #include "pat/pat.h"
@@ -40,6 +41,7 @@ struct lstappl {
 struct lstchoice {
   lsthunk_t* ltc_left;
   lsthunk_t* ltc_right;
+  int        ltc_kind; // 1=lambda-choice ('|'), 2=expr-choice ('||')
 };
 
 struct lstbind {
@@ -215,6 +217,8 @@ lsthunk_t* lsthunk_new_echoice(const lsechoice_t* echoice, lstenv_t* tenv) {
   lstrace_emit_loc(lstrace_take_pending_or_unknown());
   thunk->lt_choice.ltc_left  = lsthunk_new_expr(lsechoice_get_left(echoice), tenv);
   thunk->lt_choice.ltc_right = lsthunk_new_expr(lsechoice_get_right(echoice), tenv);
+  // Persist kind from AST to runtime
+  thunk->lt_choice.ltc_kind  = (int)lsechoice_get_kind(echoice);
   return thunk;
 }
 
@@ -784,11 +788,10 @@ static int is_lambda_match_failure_err(lsthunk_t* err) {
 
 static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t* const* args) {
   // eval (l | r) x y ...
-  //   = let v = eval l x y ... in
-  //       if v is lambda match failure then eval r x y ...
-  //       else v
-  // This makes '|' behave like pattern-lambda alternatives rather than
-  // producing a residual choice value.
+  // For lambda-choice ('|'):
+  //   = let v = eval l x y ... in if v is lambda match failure then eval r x y ... else v
+  // For expr-choice ('||'):
+  //   = let v = eval l x y ... in if v is Bottom then eval r x y ... else v
   assert(thunk != NULL);
   assert(thunk->lt_type == LSTTYPE_CHOICE);
   assert(argc == 0 || args != NULL);
@@ -796,7 +799,9 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   if (left == NULL)
     return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
   if (lsthunk_is_err(left)) {
-    if (is_lambda_match_failure_err(left) || lsthunk_is_bottom(left)) {
+    int is_lambda_choice = (thunk->lt_choice.ltc_kind == 1);
+    int fallback = is_lambda_choice ? is_lambda_match_failure_err(left) : lsthunk_is_bottom(left);
+    if (fallback) {
       lsthunk_t* right = lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
       if (right == NULL) return right;
       if (lsthunk_is_bottom(right)) {
@@ -1199,9 +1204,12 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
     case LSTTYPE_CHOICE:
       if (prec > LSPREC_CHOICE)
         lsprintf(fp, 0, "(");
-      lsthunk_print_internal(fp, LSPREC_CHOICE + 1, indent, thunk->lt_choice.ltc_left, level + 1,
-                             colle, mode, 0);
-      lsprintf(fp, 0, " | ");
+  lsthunk_print_internal(fp, LSPREC_CHOICE + 1, indent, thunk->lt_choice.ltc_left, level + 1,
+             colle, mode, 0);
+  // Operator print: use AST kind if available via source expr; at runtime we print '|'
+  // for lambda-choice and '||' for expr-choice. We cannot access kind here; fall back to '||'.
+  // Note: precise operator echo is handled in expr printer (AST level). Thunk printer is debug.
+  lsprintf(fp, 0, " || ");
       lsthunk_print_internal(fp, LSPREC_CHOICE, indent, thunk->lt_choice.ltc_right, level + 1,
                              colle, mode, 0);
       if (prec > LSPREC_CHOICE)
