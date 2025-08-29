@@ -257,6 +257,7 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
 %token LSTWILDCARD
 %right '|'
 %right ':'
+%right LSTOROR
 /* removed legacy tokens */
 
 %start prog
@@ -315,7 +316,7 @@ econs:
 
 expr3:
     expr4 { $$ = $1; }
-  | expr3 LSTOROR expr4 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind($1, $3, LSECHOICE_EXPR)), @$); }
+  | expr4 LSTOROR expr3 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind($1, $3, LSECHOICE_EXPR)), @$); }
     ;
 
 eappl:

@@ -44,7 +44,7 @@
 <econs> ::= <expr1> ':' <expr3>
 
 <expr3> ::= <expr4>
-          | <eappl>
+          | <expr4> '||' <expr3>
 
 <eappl> ::= <efact> <expr5>
           | <eappl> <expr5>
@@ -157,7 +157,7 @@
 - 2025-08: `+` は仕様外（削除済み）。`~~` 糖は `~~symbol` のみに統一。
 - 2025-08: 識別子(ident)の許容文字は `[a-zA-Z_][a-zA-Z0-9_]*` に限定。`$` は不可。必要な場合はクォートしたコンストラクタ `'ident$'` を用いる。
 - parser.y 内の多くの規則は semantic action によって "糖" を展開（ns リテラル、do-block、リスト/タプルのデシュガーなど）する。
-- 優先度: expr 系は複数レベルに分かれ、適用 (application), アルゲ (algebraic constructor), 選択 (choice '|'), cons ':' 等の優先度が分離されている。
+- 優先度: expr 系は複数レベルに分かれ、適用 (application), アルゲ (algebraic constructor), 選択 (choice '|' / '||'), cons ':' 等の優先度が分離されている。
 - ラムダ本体は <expr2>（‘|’ の一段上）にしてあるため、`|` はラムダより弱い（`\x -> a | b` は `(\x -> a) | b` とは解釈されない）。
 - このドキュメントは文法の読みやすさ優先で簡潔化しているため、細部の AST 構築/位置情報などは省略している。
  - 2025-08: '^' の導入
