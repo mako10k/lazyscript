@@ -54,7 +54,9 @@ void            lsechoice_print(FILE* fp, lsprec_t prec, int indent, const lsech
       lsexpr_print(fp, LSPREC_CHOICE + 1, indent, echoice->lec_left);
                }
 
-               const char* op_sym = (lsechoice_get_kind(echoice) == LSECHOICE_LAMBDA) ? " |\n" : " ||\n";
+               const char* op_sym = (lsechoice_get_kind(echoice) == LSECHOICE_LAMBDA) ? " |\n" :
+                                      (lsechoice_get_kind(echoice) == LSECHOICE_EXPR) ? " ||\n" :
+                                                                                         " ^|\n";
                lsprintf(fp, indent, "%s", op_sym);
 
                if (lsexpr_get_type(echoice->lec_right) != LSETYPE_CHOICE)

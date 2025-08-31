@@ -221,7 +221,7 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
   yylloc = lsloc(lsscan_get_filename(yyget_extra(yyscanner)), 1, 1, 1, 1);
 }
 
-%expect 3
+%expect 4
 
 %nterm <prog> prog
 %nterm <expr> expr expr1 expr2 expr3 expr4 expr5 efact dostmts
@@ -254,11 +254,12 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
 %token LSTARROW
 %token LSTOROR
 %token LSTCARET /* lexer must return this for '^' */
+%token LSTCARETBAR /* lexer must return this for '^|' */
 %token LSTLEFTARROW
 %token LSTWILDCARD
 %right '|'
 %right ':'
-%right LSTOROR
+%right LSTOROR LSTCARETBAR
 /* removed legacy tokens */
 
 %start prog
@@ -317,6 +318,7 @@ econs:
 expr3:
     expr4 { $$ = $1; }
   | expr4 LSTOROR expr3 { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind($1, $3, LSECHOICE_EXPR)), @$); }
+  | expr4 LSTCARETBAR lamchain { $$ = lsexpr_with_loc(lsexpr_new_choice(lsechoice_new_kind($1, $3, LSECHOICE_CATCH)), @$); }
     ;
 
 // Lambda-only choice chain appears only at efact level, starting from a lambda.

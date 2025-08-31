@@ -37,10 +37,9 @@
 
 <expr1> ::= <expr2>
           | <lamchoice>
-
+<expr3> ::= <expr4> | <expr4 '||' <expr3> | <expr4 '^|' <lamchain>
 <expr2> ::= <expr3>
-          | <econs>
-
+'^|' catches Bottom from the left; right must be lamchain; binds Bottom via caret patterns.
 <econs> ::= <expr1> ':' <expr3>
 
         <expr> ::= <expr1>

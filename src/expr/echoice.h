@@ -5,7 +5,9 @@ typedef struct lsechoice lsechoice_t;
 // Choice operator kind: '|' (lambda-choice) vs '||' (expr-choice)
 typedef enum lsechoice_kind {
 	LSECHOICE_LAMBDA = 1,
-	LSECHOICE_EXPR   = 2
+	LSECHOICE_EXPR   = 2,
+	// Catch operator: Expr ^| LamChoice
+	LSECHOICE_CATCH  = 3
 } lsechoice_kind_t;
 
 #include "expr/expr.h"
