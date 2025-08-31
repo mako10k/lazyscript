@@ -1,6 +1,15 @@
-# LazyScript Thunk Binary Format (proposal v0.1)
+# LazyScript Runtime Binary Formats
 
-本書は、LazyScript の実行時 Thunk グラフを永続化/IPC/デバッガ用に安全にバイナリ化するための設計案です。現行ランタイム構造体（`src/thunk/thunk.c`）と言語要素（'|', '||', '^|' を含む）に整合することを目標にします。
+本書は、LazyScript の実行時 Thunk グラフをバイナリ化する2系統の仕様を定義します。
+
+- LSTB: Portable Thunk Binary（提案 v0.1）
+  - 目的: 永続化/転送/デバッガやツール連携向けのポータブル表現
+  - 特徴: ID参照・LEB128・セクション分割で前方互換を重視
+- LSTI: Runtime Thunk Image（新提案）
+  - 目的: 同一アーキ上での高速起動・mmap前提のゼロコピー参照
+  - 特徴: 整列済み固定ヘッダ+相対オフセット中心、ポインタ再配置不要
+
+現行ランタイム構造体（`src/thunk/thunk.c`）と言語要素（'|', '||', '^|' を含む）に整合することを目標にします。
 
 - 目的
   - ランタイム Thunk グラフのスナップショット保存/復元
@@ -10,7 +19,7 @@
   - GC/アロケータ状態の完全再現
   - OS/ポインタ依存のアドレス保持
 
-## 全体方針
+## LSTB: Portable Thunk Binary（v0.1）
 
 - グラフは「オブジェクト ID 参照」で表現（ポインタは使わない）。
 - 共有（同一ノードの多重参照）は ID を再利用して保存。循環も可。
@@ -18,7 +27,7 @@
 - セクション化（ヘッダ、文字列プール、パターンプール、Thunk テーブル、ルート一覧、オプションのデバッグ情報）。
 - 前方互換の拡張を flags とセクション追加で実現。
 
-## 用語とプリミティブ
+### 用語とプリミティブ
 
 - u8/u16/u32/u64: Little-Endian の符号なし整数
 - i64: Little-Endian の符号付き 64bit 整数
@@ -27,7 +36,7 @@
 - id: varuint（0..N-1 のインデックス）
 - off32/off64: 相対オフセット（将来拡張用。v0.1 では固定テーブルで不要）
 
-## ファイルレイアウト（v0.1）
+### ファイルレイアウト（v0.1）
 
 ```
 +----------------------------+
@@ -53,7 +62,7 @@
   - bit2: store_locs（Bottom の loc を拡張格納）
   - bit3: store_types（型参照を格納する。未設定なら全エントリに型情報なし）
 
-### STRING_POOL
+#### STRING_POOL
 
 - 文字列を一意化して格納。UTF-8。
 - layout:
@@ -62,12 +71,12 @@
     - len: varuint
     - bytes: len バイト
 
-### SYMBOL_POOL
+#### SYMBOL_POOL
 
 - 言語の「シンボル」（先頭に '.' を含む）やコンストラクタ名、参照名等の識別子を格納。
 - layout は STRING_POOL と同一（将来、種別タグを追加可能）。
 
-### PATTERN_POOL（パターン AST）
+#### PATTERN_POOL（パターン AST）
 
 - ラムダ param、バインド lhs、キャレット/OR などのパターンを保存。
 - layout:
@@ -85,7 +94,7 @@
       - OR: left_pat_id(varuint), right_pat_id(varuint)
       - CARET: inner_pat_id(varuint)（v0.1 は WILDCARD or REF のみ推奨）
 
-### THUNK_TABLE（本体）
+#### THUNK_TABLE（本体）
 
 - layout:
   - count: varuint
@@ -143,14 +152,14 @@
 - `trace_id` は任意。ロード側で新規採番に差し替えることも可。
 - 型参照: file.flags.store_types=1 の時のみ有効。エントリごとに has_type=1 なら `type_id` を持つ。
 
-### ROOTS（エントリポイント）
+#### ROOTS（エントリポイント）
 
 - 複数のトップレベル Thunk を公開したいケース向け。
 - layout:
   - root_count: varuint
   - roots[root_count]: thunk_id(varuint)
 
-### TYPE_POOL（型参照の予約領域）
+#### TYPE_POOL（型参照の予約領域）
 
 - 目的: 将来の型システム導入に備え、各 Thunk に型参照を付与できるようにする。
 - v0.1 では型の解釈は未定。ここでは「識別子や将来のblobへの参照」を格納する最小仕様のみ提供。
@@ -166,20 +175,20 @@
       - SYMBOL_NAME: sym_id(varuint)
       - OPAQUE_BLOB: blob_len(varuint), blob_bytes[blob_len]
 
-## 互換性戦略
+### 互換性戦略
 
 - version_major が変わる変更は後方互換なし。minor/flags/追加セクションでの追加は後方互換ありを原則。
 - 未知 kind/未知 attr ビット/未知セクションは、size フィールドでスキップ可能に設計。
 - 参照解決（REF mode==1/2）は、ロード時の環境（`~prelude` 等）に依存。解決不可はエラーかプレースホルダ Bottom 作成のどちらかを選択可能に。
 - TYPE_POOL は存在しなくてもよい（file.flags.store_types=0 の場合）。存在しても、各エントリの has_type=0 なら `type_id` は現れない。
 
-## セキュリティと整合性
+### セキュリティと整合性
 
 - 入力境界で全 varuint の上限チェック、size による境界超過検知。
 - 循環は許容（例: Y コンビネータ）。ロード時は 2 フェーズ（割当→辺解決）で構築。
 - ID 範囲・重複参照の検証、未定義参照はエラーに。
 
-## 例（抜粋）
+### 例（抜粋）
 
 - INT 42 のみのグラフ:
   - STRING_POOL: count=0
@@ -195,7 +204,7 @@
   - right = thunk_id=1（lambda param=CARET(REF x), body=H）
   - entry2: kind=CHOICE, choice_kind=3, left_id=0, right_id=1
 
-## ランタイム対応（実装メモ）
+### ランタイム対応（実装メモ）
 
 - writer:
   - 走査で DAG を ID 化（`lsthunk_colle_new` の要領）。
@@ -207,14 +216,14 @@
   - 第2段: 参照 ID を解決してポインタ接続。REF 外部は環境に問い合わせ。
   - 必要なら WHNF フラグに応じて `lt_whnf=自分` をセット（INT/STR/SYMBOL/ALGE など）。
 
-## 拡張の余地
+### 拡張の余地
 
 - 大整数/バイナリ Blob（将来の数値型）
 - 位置情報の高精度化（ファイル ID, スパン、トレーススタック）
 - 圧縮（セクション単位の zstd）
 - 署名/ハッシュ（整合性検証）
 
-## 付録: 現行ランタイムとの対応表（要約）
+### 付録: 現行ランタイムとの対応表（要約）
 
 - LSTTYPE_ALGE  ↔ kind=ALGE
 - LSTTYPE_APPL  ↔ kind=APPL
@@ -228,3 +237,64 @@
 - LSTTYPE_BOTTOM↔ kind=BOTTOM
 
 この案は最小限の実装コストで現行機能（'^|' の caret パターン、Bottom の関連引数、右結合 choice）をカバーします。v0.1 ではパターンの完全表現と REF の 2 モード（内部/外部）を優先し、将来の相互運用に備えてセクション/size による前方互換を確保します。
+
+---
+
+## LSTI: Runtime Thunk Image（高速イメージ）
+
+LSTI は、同一アーキ/ABI を前提に、mmap で即時参照可能なイメージを目指します。整列済みの固定長ヘッダと相対オフセット参照を採用し、復元時の再割当・ポインタ修復を不要化します。
+
+### 方針
+- LE 小端固定、8または16バイト整列（ターゲットに合わせビルド時に選択）。
+- 参照は 32bit 相対オフセット（ベースアドレスからの距離）か、32bit ID→別テーブル参照。
+- セクションテーブルで各セクションの file-off/size を列挙。未知セクションは飛ばせる。
+- WHNF はフラグのみ。実データはゼロコピー参照（再配置不要）。
+
+### ヘッダ（案）
+```
+struct LSTI_Header {
+  u32 magic = 'LSTI';
+  u16 version_major = 1;
+  u16 version_minor = 0;
+  u16 section_count;
+  u16 align_log2;        // 3=8B, 4=16B など
+  u32 flags;             // デバッグ/型/トレース有無
+};
+struct LSTI_Section { u32 kind; u32 reserved; u64 file_off; u64 size; };
+```
+
+### 主要セクション
+- STRING_BLOB: 連結文字列バッファ（UTF-8）。各エントリは u32 オフセット指し。
+- SYMBOL_BLOB: 同上。
+- PATTERN_TAB: 固定ヘッダ + 可変部。参照は u32 offset/ID。
+- THUNK_TAB: 各ノードは固定ヘッダ（kind:u8, flags:u8, argc:u32 等）+ 可変部。子は u32 ID または u32 相対オフセット。
+- ROOTS: u32 count + u32 ids[]。
+- TYPE_TAB: 型参照テーブル（LSTB と同様の種別、ペイロードは u32 オフセット/長）。
+
+### ノード固定ヘッダ（例）
+```
+struct LSTI_Thunk {
+  u8  kind;   // LSTB と同一割当
+  u8  flags;  // WHNF/has_type など
+  u16 pad;
+  u32 arity_or_len;  // ALGE=argc, STR=byte_len, BOTTOM=related_count など
+  u32 extra;         // ALGE=constr sym id, STR=offset, SYMBOL=offset, TYPE=type id
+  // 続けて可変領域（例: args[u32 id] * argc）
+};
+```
+
+### 互換性/注意
+- アーキ依存（LE/整列/ワード幅）。異なる環境間の可搬性は保証しない。
+- 版上げ時はセクション追加/予約フィールドでの拡張を優先。
+- ツールは LSTB/LSTI 双方を入出力可能にし、用途に応じて選択。
+
+### LSTB ↔ LSTI 変換
+- LSTB→LSTI: デコーダでグラフ復元後、整列配置に再パック。
+- LSTI→LSTB: セクションを走査し ID 化→可変長で再エンコード。
+
+---
+
+## 運用ガイド
+- 長期保存/転送/ツール間連携: LSTB を推奨。
+- 同一環境での高速起動/プリロード/キャッシュ: LSTI を推奨。
+- ランタイム/ビルドは両方のエンコーダ/デコーダを同居させ、用途で切替。
