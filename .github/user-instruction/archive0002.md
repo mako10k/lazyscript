@@ -1,12 +1,4 @@
-created: 2025-08-31T05:35:00Z
-
-## Current Instruction (verbatim)
-
-現在エラーが出てるのはスキップ、ただし、 ~Prelude はお前、もう存在しない報告が虚偽でしたね。。
-```markdown
----
 created: 2025-08-31T06:25:00Z
----
 
 ## Current Instruction (verbatim)
 
@@ -24,6 +16,4 @@ created: 2025-08-31T06:25:00Z
 ## Prior Context Summary (compact)
 - LSTB spec exists and doc now includes LSTI high-level spec; runtime contains LSTB subset I/O in `thunk.c`.
 - Choice operators and caret catch are stable; build system is Automake/libtool.
-
-```
 integrity_note: Archived from current.md per protocol.

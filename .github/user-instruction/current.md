@@ -1,13 +1,8 @@
-created: 2025-08-31T06:10:00Z
-
-```markdown
----
-created: 2025-08-31T06:25:00Z
----
+created: 2025-08-31T11:59:20Z
 
 ## Current Instruction (verbatim)
 
-実行ランタイムがLSTIを利用する実装に変更する計画を立ててください。
+次のステップを実施
 
 ## Metadata
 - source: chat (user message)
@@ -15,11 +10,9 @@ created: 2025-08-31T06:25:00Z
 - next archive index: 0002
 
 ## Assistant Context (most-recent first)
-- Plan an implementation roadmap to switch runtime to use LSTI for fast loading, while keeping LSTB for portability.
-- Define phases: image spec finalization, header/constants, encoder, minimal loader, integration flag, tests/benchmarks, rollout.
+- Proceed with the next steps of the LSTI plan: strengthen validator (THUNK_TAB/ROOTS/POOL integrity), rebuild, and run smoke.
+- Keep default runtime behavior unchanged; only tooling and validator improvements.
 
 ## Prior Context Summary (compact)
-- LSTB spec exists and doc now includes LSTI high-level spec; runtime contains LSTB subset I/O in `thunk.c`.
-- Choice operators and caret catch are stable; build system is Automake/libtool.
-
-```
+- LSTI writer/validator exists; smoke tool lslsti_check writes/map/validates a minimal image.
+- ENABLE_LSTI is build-enabled; runtime load path not yet switched.

@@ -301,11 +301,15 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc, const lst
       default:
         free(rel_offs); return -ENOTSUP;
     }
-    // finally write header at the beginning of entry: we wrote variable part first for ALGE/BOTTOM args; so move file to ent_off and write header then seek back after payload
-    long cur = ftell(fp); if (cur < 0) { free(rel_offs); return -EIO; }
-    if (fseek(fp, ent_off, SEEK_SET) != 0) { free(rel_offs); return -EIO; }
-    if (fwrite(&hdr2, 1, sizeof(hdr2), fp) != sizeof(hdr2)) { free(rel_offs); return -EIO; }
-    if (fseek(fp, cur, SEEK_SET) != 0) { free(rel_offs); return -EIO; }
+  // finally write header at the beginning of entry, then ensure file position is after header/payload
+  long cur = ftell(fp); if (cur < 0) { free(rel_offs); return -EIO; }
+  if (fseek(fp, ent_off, SEEK_SET) != 0) { free(rel_offs); return -EIO; }
+  if (fwrite(&hdr2, 1, sizeof(hdr2), fp) != sizeof(hdr2)) { free(rel_offs); return -EIO; }
+  // Seek to the end of payload or at least past the header to advance file end correctly
+  long after = cur;
+  long min_after = ent_off + (long)sizeof(hdr2);
+  if (after < min_after) after = min_after;
+  if (fseek(fp, after, SEEK_SET) != 0) { free(rel_offs); return -EIO; }
   }
   long thtab_end = ftell(fp); if (thtab_end < 0) { free(rel_offs); return -EIO; }
   // backfill offset table
@@ -390,16 +394,58 @@ int lsti_validate(const lsti_image_t* img) {
   lssize_t need = (lssize_t)sizeof(lsti_header_disk_t) + (lssize_t)hdr->section_count * (lssize_t)sizeof(lsti_section_disk_t);
   if (img->size < need) return -EINVAL;
   const lsti_section_disk_t* sect = (const lsti_section_disk_t*)(p + sizeof(lsti_header_disk_t));
+  // Gather section info and validate bounds/alignment
+  uint64_t mask = ((uint64_t)1 << hdr->align_log2) - 1u;
+  const lsti_section_disk_t *string_blob = NULL, *symbol_blob = NULL, *thunk_tab = NULL, *roots = NULL;
   for (uint16_t i = 0; i < hdr->section_count; ++i) {
-    uint64_t off = sect[i].file_off;
-    uint64_t sz  = sect[i].size;
+    uint32_t kind = sect[i].kind;
+    uint64_t off  = sect[i].file_off;
+    uint64_t sz   = sect[i].size;
     if (sz > (uint64_t)img->size) return -EINVAL;
     if (off > (uint64_t)img->size) return -EINVAL;
     if (off + sz > (uint64_t)img->size) return -EINVAL;
-    // alignment check
-    uint64_t mask = ((uint64_t)1 << hdr->align_log2) - 1u;
     if ((off & mask) != 0) return -EINVAL;
-    (void)sect[i].kind; // unknown kinds are allowed; skip
+    switch (kind) {
+      case LSTI_SECT_STRING_BLOB: string_blob = &sect[i]; break;
+      case LSTI_SECT_SYMBOL_BLOB: symbol_blob = &sect[i]; break;
+      case LSTI_SECT_THUNK_TAB:   thunk_tab   = &sect[i]; break;
+      case LSTI_SECT_ROOTS:       roots       = &sect[i]; break;
+      default: break; // tolerate unknown sections for forward-compat
+    }
+  }
+  // Minimal required sections
+  if (!thunk_tab || !roots) return -EINVAL;
+  // Validate THUNK_TAB structure: [u32 count][u64 offs[count]] followed by entries within section
+  if (thunk_tab->size < sizeof(uint32_t)) return -EINVAL;
+  const uint8_t* tt = img->base + (lssize_t)thunk_tab->file_off;
+  uint32_t ncnt = 0; memcpy(&ncnt, tt, sizeof(uint32_t));
+  uint64_t off_tbl_bytes = (uint64_t)ncnt * (uint64_t)sizeof(uint64_t);
+  uint64_t header_bytes  = (uint64_t)sizeof(uint32_t) + off_tbl_bytes;
+  if (thunk_tab->size < header_bytes) return -EINVAL;
+  const uint64_t* offs = (const uint64_t*)(tt + sizeof(uint32_t));
+  // Each entry offset must point within the THUNK_TAB section and be >= header_bytes
+  for (uint32_t i = 0; i < ncnt; ++i) {
+    uint64_t eo = offs[i];
+    if (eo < header_bytes) return -EINVAL;
+    if (eo >= thunk_tab->size) return -EINVAL;
+    // For subset kinds, entry must at least contain our fixed header struct
+    if (thunk_tab->size - eo < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t)) return -EINVAL;
+  }
+  // Validate ROOTS: [u32 count][u32 ids...]
+  if (roots->size < sizeof(uint32_t)) return -EINVAL;
+  const uint8_t* rp = img->base + (lssize_t)roots->file_off;
+  uint32_t rcnt = 0; memcpy(&rcnt, rp, sizeof(uint32_t));
+  uint64_t roots_bytes = (uint64_t)sizeof(uint32_t) + (uint64_t)rcnt * (uint64_t)sizeof(uint32_t);
+  if (roots->size < roots_bytes) return -EINVAL;
+  const uint32_t* rids = (const uint32_t*)(rp + sizeof(uint32_t));
+  for (uint32_t i = 0; i < rcnt; ++i) { if (rids[i] >= ncnt) return -EINVAL; }
+  // Optional: for STR/SYMBOL, offsets must be within corresponding blobs when present
+  if (string_blob) {
+    // nothing to do here yet (we don't encode string table of descriptors, only raw blob)
+    (void)string_blob;
+  }
+  if (symbol_blob) {
+    (void)symbol_blob;
   }
   return 0;
 }
