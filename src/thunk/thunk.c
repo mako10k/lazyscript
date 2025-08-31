@@ -210,7 +210,8 @@ lsthunk_t* lsthunk_new_eappl(const lseappl_t* eappl, lstenv_t* tenv) {
 }
 
 lsthunk_t* lsthunk_new_echoice(const lsechoice_t* echoice, lstenv_t* tenv) {
-  lsthunk_t* thunk           = lsmalloc(offsetof(lsthunk_t, lt_choice));
+  // Allocate enough space to include the 'choice' union member
+  lsthunk_t* thunk           = lsmalloc(lssizeof(lsthunk_t, lt_choice));
   thunk->lt_type             = LSTTYPE_CHOICE;
   thunk->lt_whnf             = NULL;
   thunk->lt_trace_id         = g_trace_next_id++;
@@ -831,6 +832,24 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
     // Commit to left: apply remaining args without any further fallback
     return lsthunk_eval(left1, argc - 1, args + 1);
   }
+  // Catch-choice: left '^|' rightLamChain
+  //   Evaluate left with args; if result is Bottom, apply right to the Bottom as a single argument.
+  if (thunk->lt_choice.ltc_kind == 3 /* LSECHOICE_CATCH */) {
+    lsthunk_t* left = lsthunk_eval(thunk->lt_choice.ltc_left, argc, args);
+    if (left == NULL) {
+      // Treat as error; cannot catch NULL, so propagate via right applied to a bottom value
+      lsthunk_t* b = lsthunk_bottom_here("null");
+      lsthunk_t* rargs[1] = { b };
+      return lsthunk_eval(thunk->lt_choice.ltc_right, 1, rargs);
+    }
+    if (lsthunk_is_bottom(left)) {
+      // Apply right lamchain to bottom payload
+      lsthunk_t* rargs[1] = { left };
+      return lsthunk_eval(thunk->lt_choice.ltc_right, 1, rargs);
+    }
+    // Non-bottom: pass through
+    return left;
+  }
   // Default behavior: evaluate left fully, then decide fallback
   lsthunk_t* left = lsthunk_eval(thunk->lt_choice.ltc_left, argc, args);
   if (left == NULL)
@@ -1243,10 +1262,11 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
         lsprintf(fp, 0, "(");
   lsthunk_print_internal(fp, LSPREC_CHOICE + 1, indent, thunk->lt_choice.ltc_left, level + 1,
              colle, mode, 0);
-  // Operator print: use AST kind if available via source expr; at runtime we print '|'
-  // for lambda-choice and '||' for expr-choice. We cannot access kind here; fall back to '||'.
-  // Note: precise operator echo is handled in expr printer (AST level). Thunk printer is debug.
-  lsprintf(fp, 0, " || ");
+  // Operator print: show symbol based on kind (debug printer)
+  const char* op_sym_dbg = " || ";
+  if (thunk->lt_choice.ltc_kind == 1) op_sym_dbg = " | ";
+  else if (thunk->lt_choice.ltc_kind == 3) op_sym_dbg = " ^| ";
+  lsprintf(fp, 0, "%s", op_sym_dbg);
       lsthunk_print_internal(fp, LSPREC_CHOICE, indent, thunk->lt_choice.ltc_right, level + 1,
                              colle, mode, 0);
       if (prec > LSPREC_CHOICE)
