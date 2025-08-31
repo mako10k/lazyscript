@@ -20,6 +20,9 @@
  #include "misc/bind.h"
  #include "pat/pat.h"
  #include "common/array.h"
+ #include "thunk/thunk_bin.h"
+ #include <stdint.h>
+ #include <stdlib.h>
 
 // Debug tracing for thunk evaluation (off by default). Enable with -DLS_TRACE=1
 #ifndef LS_TRACE
@@ -1453,4 +1456,354 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
 lsthunk_t* lsthunk_subst_param(lsthunk_t* thunk, lstpat_t* param) {
   subst_entry_t* memo = NULL;
   return lsthunk_subst_param_rec(thunk, param, &memo);
+}
+
+// --- Thunk Binary (LSTB) I/O (subset v0.1) -------------------------------
+
+// Note: For v0.1 implementation we support a safe subset of kinds that do not
+// depend on external environments or ref-targets: INT, STR, SYMBOL, ALGE, BOTTOM.
+// Other kinds (APPL/LAMBDA/CHOICE/REF/BUILTIN) currently return an error.
+
+// Small helpers: ULEB128/SLEB128
+static int write_varuint(FILE* fp, uint64_t v) {
+  while (1) {
+    uint8_t b = (uint8_t)(v & 0x7fu);
+    v >>= 7;
+    if (v) { b |= 0x80u; }
+    if (fputc((int)b, fp) == EOF) return -1;
+    if (!v) break;
+  }
+  return 0;
+}
+
+static int write_varint(FILE* fp, int64_t val) {
+  // SLEB128 encoding
+  int more = 1;
+  while (more) {
+    uint8_t byte = (uint8_t)(val & 0x7f);
+    int sign = (val & ~0x3f) == 0 || (val & ~0x3f) == ~0ULL; // determine termination
+    val >>= 7;
+    if ((val == 0 && (byte & 0x40) == 0) || (val == -1 && (byte & 0x40) != 0)) {
+      more = 0;
+    } else {
+      byte |= 0x80;
+    }
+    if (fputc((int)byte, fp) == EOF) return -1;
+  }
+  return 0;
+}
+
+static int read_varuint(FILE* fp, uint64_t* out) {
+  uint64_t result = 0; int shift = 0; int ch;
+  do {
+    ch = fgetc(fp); if (ch == EOF) return -1;
+    uint8_t byte = (uint8_t)ch;
+    result |= ((uint64_t)(byte & 0x7f)) << shift;
+    shift += 7;
+    if (!(byte & 0x80)) break;
+    if (shift > 63) return -1;
+  } while (1);
+  *out = result; return 0;
+}
+
+static int read_varint(FILE* fp, int64_t* out) {
+  uint64_t result = 0; int shift = 0; int ch; uint8_t byte;
+  do {
+    ch = fgetc(fp); if (ch == EOF) return -1; byte = (uint8_t)ch;
+    result |= ((uint64_t)(byte & 0x7f)) << shift;
+    shift += 7;
+    if (!(byte & 0x80)) break;
+    if (shift > 63) return -1;
+  } while (1);
+  // sign extend
+  if (shift < 64 && (byte & 0x40)) result |= (~UINT64_C(0)) << shift;
+  *out = (int64_t)result; return 0;
+}
+
+// Simple pointer->index map for traversal (linear scan for now)
+typedef struct {
+  lsthunk_t** items; lssize_t size; lssize_t cap;
+} thvec_t;
+
+static void thvec_init(thvec_t* v) { v->items = NULL; v->size = 0; v->cap = 0; }
+static void thvec_free(thvec_t* v) { if (v->items) free(v->items); v->items = NULL; v->size = v->cap = 0; }
+static int thvec_push(thvec_t* v, lsthunk_t* t) {
+  if (v->size == v->cap) {
+    lssize_t ncap = v->cap ? v->cap * 2 : 16;
+    lsthunk_t** ni = (lsthunk_t**)realloc(v->items, sizeof(lsthunk_t*) * (size_t)ncap);
+    if (!ni) return -1; v->items = ni; v->cap = ncap;
+  }
+  v->items[v->size++] = t; return 0;
+}
+static lssize_t thvec_index_of(const thvec_t* v, const lsthunk_t* t) {
+  for (lssize_t i = 0; i < v->size; i++) if (v->items[i] == t) return i; return -1;
+}
+
+static int collect_subset(thvec_t* order, lsthunk_t* t) {
+  if (!t) return 0;
+  if (thvec_index_of(order, t) >= 0) return 0;
+  if (thvec_push(order, t) != 0) return -1;
+  switch (t->lt_type) {
+  case LSTTYPE_INT:
+  case LSTTYPE_STR:
+  case LSTTYPE_SYMBOL:
+  case LSTTYPE_BOTTOM:
+    return 0;
+  case LSTTYPE_ALGE:
+    for (lssize_t i = 0; i < t->lt_alge.lta_argc; i++) {
+      if (collect_subset(order, t->lt_alge.lta_args[i]) != 0) return -2;
+    }
+    return 0;
+  default:
+    return -100 - (int)t->lt_type;
+  }
+}
+
+// Simple string pool for STRING_POOL and SYMBOL_POOL
+typedef struct { const char** items; lssize_t size; lssize_t cap; } strpool_t;
+static void strpool_init(strpool_t* p) { p->items = NULL; p->size = 0; p->cap = 0; }
+static void strpool_free(strpool_t* p) { if (p->items) free(p->items); p->items = NULL; p->size = p->cap = 0; }
+static lssize_t strpool_index_of(const strpool_t* p, const char* s) {
+  for (lssize_t i = 0; i < p->size; i++) if (strcmp(p->items[i], s) == 0) return i; return -1;
+}
+static int strpool_add(strpool_t* p, const char* s, lssize_t* out_id) {
+  lssize_t idx = strpool_index_of(p, s);
+  if (idx >= 0) { if (out_id) *out_id = idx; return 0; }
+  if (p->size == p->cap) {
+    lssize_t ncap = p->cap ? p->cap * 2 : 32;
+    const char** ni = (const char**)realloc(p->items, sizeof(const char*) * (size_t)ncap);
+    if (!ni) return -1; p->items = ni; p->cap = ncap;
+  }
+  p->items[p->size] = s; if (out_id) *out_id = p->size; p->size++;
+  return 0;
+}
+
+static int pool_collect_from_thunk(strpool_t* sp, strpool_t* yp, lsthunk_t* t) {
+  if (!t) return 0;
+  switch (t->lt_type) {
+  case LSTTYPE_INT: return 0;
+  case LSTTYPE_STR: return strpool_add(sp, lsstr_get_buf(t->lt_str), NULL);
+  case LSTTYPE_SYMBOL: return strpool_add(yp, lsstr_get_buf(t->lt_symbol), NULL);
+  case LSTTYPE_ALGE: {
+    if (strpool_add(yp, lsstr_get_buf(t->lt_alge.lta_constr), NULL) != 0) return -1;
+    for (lssize_t i = 0; i < t->lt_alge.lta_argc; i++) if (pool_collect_from_thunk(sp, yp, t->lt_alge.lta_args[i]) != 0) return -1;
+    return 0;
+  }
+  case LSTTYPE_BOTTOM: {
+    const char* m = t->lt_bottom.lt_msg ? t->lt_bottom.lt_msg : "";
+    if (strpool_add(sp, m, NULL) != 0) return -1;
+    for (lssize_t i = 0; i < t->lt_bottom.lt_rel.lbr_argc; i++) if (pool_collect_from_thunk(sp, yp, t->lt_bottom.lt_rel.lbr_args[i]) != 0) return -1;
+    return 0;
+  }
+  default: return -1;
+  }
+}
+
+static int write_pool(FILE* fp, const strpool_t* p) {
+  if (write_varuint(fp, (uint64_t)p->size) != 0) return -1;
+  for (lssize_t i = 0; i < p->size; i++) {
+    const char* s = p->items[i]; size_t n = s ? strlen(s) : 0;
+    if (write_varuint(fp, (uint64_t)n) != 0) return -1;
+    if (n && fwrite(s, 1, n, fp) != n) return -1;
+  }
+  return 0;
+}
+
+static char** read_pool(FILE* fp, lssize_t* out_count) {
+  uint64_t cnt64 = 0; if (read_varuint(fp, &cnt64) != 0) return NULL; lssize_t cnt = (lssize_t)cnt64;
+  char** arr = cnt ? (char**)malloc(sizeof(char*) * (size_t)cnt) : NULL; if (cnt && !arr) return NULL;
+  for (lssize_t i = 0; i < cnt; i++) {
+    uint64_t n64 = 0; if (read_varuint(fp, &n64) != 0) { for (lssize_t j = 0; j < i; j++) free(arr[j]); free(arr); return NULL; }
+    size_t n = (size_t)n64; char* s = n ? (char*)malloc(n + 1) : (char*)malloc(1);
+    if (!s) { for (lssize_t j = 0; j < i; j++) free(arr[j]); free(arr); return NULL; }
+    if (n) { if (fread(s, 1, n, fp) != n) { for (lssize_t j = 0; j < i; j++) free(arr[j]); free(s); free(arr); return NULL; } }
+    s[n] = '\0'; arr[i] = s;
+  }
+  *out_count = cnt; return arr;
+}
+
+int lstb_write(FILE* fp, lsthunk_t* const* roots, lssize_t rootc, unsigned file_flags) {
+  if (!fp) return -1; if (rootc < 0) return -1; (void)file_flags;
+  thvec_t order; thvec_init(&order);
+  for (lssize_t i = 0; i < rootc; i++) {
+    int rc = collect_subset(&order, roots[i]);
+    if (rc != 0) { thvec_free(&order); return rc; }
+  }
+
+  strpool_t sp; strpool_t yp; strpool_init(&sp); strpool_init(&yp);
+  for (lssize_t i = 0; i < order.size; i++) {
+    if (pool_collect_from_thunk(&sp, &yp, order.items[i]) != 0) { strpool_free(&sp); strpool_free(&yp); thvec_free(&order); return -1; }
+  }
+
+  uint32_t magic = LSTB_MAGIC; uint16_t vmaj = LSTB_VERSION_MAJOR, vmin = LSTB_VERSION_MINOR; uint32_t flags = file_flags;
+  if (fwrite(&magic, sizeof(magic), 1, fp) != 1) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  if (fwrite(&vmaj, sizeof(vmaj), 1, fp) != 1) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  if (fwrite(&vmin, sizeof(vmin), 1, fp) != 1) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  if (fwrite(&flags, sizeof(flags), 1, fp) != 1) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  uint16_t scount = 5; if (fwrite(&scount, sizeof(scount), 1, fp) != 1) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+
+  if (write_pool(fp, &sp) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  if (write_pool(fp, &yp) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  if (write_varuint(fp, 0) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+
+  if (write_varuint(fp, (uint64_t)order.size) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  for (lssize_t i = 0; i < order.size; i++) {
+    lsthunk_t* t = order.items[i];
+    uint8_t kind;
+    switch (t->lt_type) {
+    case LSTTYPE_INT: kind = LSTB_KIND_INT; break;
+    case LSTTYPE_STR: kind = LSTB_KIND_STR; break;
+    case LSTTYPE_SYMBOL: kind = LSTB_KIND_SYMBOL; break;
+    case LSTTYPE_ALGE: kind = LSTB_KIND_ALGE; break;
+    case LSTTYPE_BOTTOM: kind = LSTB_KIND_BOTTOM; break;
+    default: thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1;
+    }
+    if (fputc(kind, fp) == EOF) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+    uint8_t eflags = 0; if (t->lt_whnf == t) eflags |= LSTB_EF_WHNF; if (fputc(eflags, fp) == EOF) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+    if (write_varuint(fp, 0) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+    switch (t->lt_type) {
+    case LSTTYPE_INT: {
+      int64_t v = (int64_t)lsint_get(t->lt_int);
+      if (write_varint(fp, v) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      break; }
+    case LSTTYPE_STR: {
+      lssize_t sid = strpool_index_of(&sp, lsstr_get_buf(t->lt_str));
+      if (sid < 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      if (write_varuint(fp, (uint64_t)sid) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      break; }
+    case LSTTYPE_SYMBOL: {
+      lssize_t yid = strpool_index_of(&yp, lsstr_get_buf(t->lt_symbol));
+      if (yid < 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      if (write_varuint(fp, (uint64_t)yid) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      break; }
+    case LSTTYPE_ALGE: {
+      lssize_t yid = strpool_index_of(&yp, lsstr_get_buf(t->lt_alge.lta_constr));
+      if (yid < 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      if (write_varuint(fp, (uint64_t)yid) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      if (write_varuint(fp, (uint64_t)t->lt_alge.lta_argc) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      for (lssize_t j = 0; j < t->lt_alge.lta_argc; j++) {
+        lssize_t id = thvec_index_of(&order, t->lt_alge.lta_args[j]);
+        if (id < 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+        if (write_varuint(fp, (uint64_t)id) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      }
+      break; }
+    case LSTTYPE_BOTTOM: {
+      const char* m = t->lt_bottom.lt_msg ? t->lt_bottom.lt_msg : "";
+      lssize_t sid = strpool_index_of(&sp, m);
+      if (sid < 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      if (write_varuint(fp, (uint64_t)sid) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      if (fputc(0, fp) == EOF) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      if (write_varuint(fp, (uint64_t)t->lt_bottom.lt_rel.lbr_argc) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      for (lssize_t j = 0; j < t->lt_bottom.lt_rel.lbr_argc; j++) {
+        lssize_t id = thvec_index_of(&order, t->lt_bottom.lt_rel.lbr_args[j]);
+        if (id < 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+        if (write_varuint(fp, (uint64_t)id) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+      }
+      break; }
+    default: break;
+    }
+  }
+
+  if (write_varuint(fp, (uint64_t)rootc) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  for (lssize_t i = 0; i < rootc; i++) {
+    lssize_t id = thvec_index_of(&order, roots[i]); if (id < 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+    if (write_varuint(fp, (uint64_t)id) != 0) { thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return -1; }
+  }
+
+  thvec_free(&order); strpool_free(&sp); strpool_free(&yp); return 0;
+}
+
+int lstb_read(FILE* fp, lsthunk_t*** out_roots, lssize_t* out_rootc, unsigned* out_file_flags,
+              lstenv_t* prelude_env) {
+  (void)prelude_env;
+  if (!fp || !out_roots || !out_rootc || !out_file_flags) return -1;
+  uint32_t magic = 0; uint16_t vmaj = 0, vmin = 0; uint32_t flags = 0; uint16_t scount = 0;
+  if (fread(&magic, sizeof(magic), 1, fp) != 1) return -1; if (magic != LSTB_MAGIC) return -1;
+  if (fread(&vmaj, sizeof(vmaj), 1, fp) != 1) return -1; if (fread(&vmin, sizeof(vmin), 1, fp) != 1) return -1;
+  if (fread(&flags, sizeof(flags), 1, fp) != 1) return -1; if (fread(&scount, sizeof(scount), 1, fp) != 1) return -1;
+  if (vmaj != LSTB_VERSION_MAJOR) return -1;
+  *out_file_flags = flags; (void)scount;
+
+  lssize_t sp_cnt = 0; char** sp = read_pool(fp, &sp_cnt); if (sp_cnt < 0) return -1;
+  lssize_t yp_cnt = 0; char** yp = read_pool(fp, &yp_cnt);
+  uint64_t pat_cnt = 0; if (read_varuint(fp, &pat_cnt) != 0) { for (lssize_t i = 0; i < sp_cnt; i++) free(sp[i]); free(sp); for (lssize_t i = 0; i < yp_cnt; i++) free(yp[i]); free(yp); return -1; }
+  if (pat_cnt != 0) { for (lssize_t i = 0; i < sp_cnt; i++) free(sp[i]); free(sp); for (lssize_t i = 0; i < yp_cnt; i++) free(yp[i]); free(yp); return -1; }
+
+  uint64_t tcount64 = 0; if (read_varuint(fp, &tcount64) != 0) { for (lssize_t i = 0; i < sp_cnt; i++) free(sp[i]); free(sp); for (lssize_t i = 0; i < yp_cnt; i++) free(yp[i]); free(yp); return -1; }
+  lssize_t tcount = (lssize_t)tcount64;
+  lsthunk_t** nodes = tcount ? (lsthunk_t**)lsmalloc(sizeof(lsthunk_t*) * (size_t)tcount) : NULL;
+  typedef struct { lssize_t argc; lssize_t* ids; } pend_alge_t;
+  pend_alge_t* pend = tcount ? (pend_alge_t*)calloc((size_t)tcount, sizeof(pend_alge_t)) : NULL;
+  if (tcount && (!nodes || !pend)) { for (lssize_t i = 0; i < sp_cnt; i++) free(sp[i]); free(sp); for (lssize_t i = 0; i < yp_cnt; i++) free(yp[i]); free(yp); free(nodes); free(pend); return -1; }
+
+  for (lssize_t i = 0; i < tcount; i++) {
+    int kch = fgetc(fp); if (kch == EOF) goto fail; uint8_t kind = (uint8_t)kch;
+    int ef = fgetc(fp); if (ef == EOF) goto fail; (void)ef;
+    uint64_t size_ign = 0; if (read_varuint(fp, &size_ign) != 0) goto fail; (void)size_ign;
+    switch (kind) {
+    case LSTB_KIND_INT: {
+      int64_t v = 0; if (read_varint(fp, &v) != 0) goto fail; nodes[i] = lsthunk_new_int(lsint_new((int)v)); break; }
+    case LSTB_KIND_STR: {
+      uint64_t sid = 0; if (read_varuint(fp, &sid) != 0) goto fail; if (sid >= (uint64_t)sp_cnt) goto fail;
+      const lsstr_t* s = lsstr_new(sp[sid], (lssize_t)strlen(sp[sid])); nodes[i] = lsthunk_new_str(s); break; }
+    case LSTB_KIND_SYMBOL: {
+      uint64_t yid = 0; if (read_varuint(fp, &yid) != 0) goto fail; if (yid >= (uint64_t)yp_cnt) goto fail;
+      const lsstr_t* s = lsstr_new(yp[yid], (lssize_t)strlen(yp[yid])); nodes[i] = lsthunk_new_symbol(s); break; }
+    case LSTB_KIND_ALGE: {
+      uint64_t yid = 0; if (read_varuint(fp, &yid) != 0) goto fail; if (yid >= (uint64_t)yp_cnt) goto fail;
+      uint64_t argc64 = 0; if (read_varuint(fp, &argc64) != 0) goto fail; lssize_t argc = (lssize_t)argc64;
+      lsthunk_t* t = lsmalloc(lssizeof(lsthunk_t, lt_alge) + (size_t)argc * sizeof(lsthunk_t*));
+      t->lt_type = LSTTYPE_ALGE; t->lt_whnf = t; t->lt_trace_id = g_trace_next_id++;
+      t->lt_alge.lta_constr = lsstr_new(yp[yid], (lssize_t)strlen(yp[yid]));
+      t->lt_alge.lta_argc = argc;
+      nodes[i] = t;
+      if (argc > 0) {
+        pend[i].argc = argc; pend[i].ids = (lssize_t*)malloc(sizeof(lssize_t) * (size_t)argc);
+        if (!pend[i].ids) goto fail;
+        for (lssize_t j = 0; j < argc; j++) { uint64_t idj = 0; if (read_varuint(fp, &idj) != 0) goto fail; pend[i].ids[j] = (lssize_t)idj; }
+      }
+      break; }
+    case LSTB_KIND_BOTTOM: {
+      uint64_t sid = 0; if (read_varuint(fp, &sid) != 0) goto fail; if (sid >= (uint64_t)sp_cnt) goto fail;
+      int loc_mode = fgetc(fp); if (loc_mode == EOF) goto fail; (void)loc_mode;
+      uint64_t rc64 = 0; if (read_varuint(fp, &rc64) != 0) goto fail; lssize_t rc = (lssize_t)rc64;
+      lssize_t* ids = rc ? (lssize_t*)malloc(sizeof(lssize_t) * (size_t)rc) : NULL; if (rc && !ids) goto fail;
+      for (lssize_t j = 0; j < rc; j++) { uint64_t idj = 0; if (read_varuint(fp, &idj) != 0) { free(ids); goto fail; } ids[j] = (lssize_t)idj; }
+      lsthunk_t** args = rc ? (lsthunk_t**)malloc(sizeof(lsthunk_t*) * (size_t)rc) : NULL; if (rc && !args) { free(ids); goto fail; }
+      for (lssize_t j = 0; j < rc; j++) args[j] = NULL;
+      lsthunk_t* t = lsthunk_new_bottom(sp[sid], lstrace_take_pending_or_unknown(), rc, args);
+      nodes[i] = t;
+      pend[i].argc = rc; pend[i].ids = ids; free(args);
+      break; }
+    default: goto fail;
+    }
+    if (!nodes[i]) goto fail;
+  }
+
+  for (lssize_t i = 0; i < tcount; i++) {
+    if (pend[i].argc > 0) {
+      if (nodes[i]->lt_type == LSTTYPE_ALGE) {
+        for (lssize_t j = 0; j < pend[i].argc; j++) nodes[i]->lt_alge.lta_args[j] = nodes[pend[i].ids[j]];
+      } else if (nodes[i]->lt_type == LSTTYPE_BOTTOM) {
+        for (lssize_t j = 0; j < pend[i].argc; j++) nodes[i]->lt_bottom.lt_rel.lbr_args[j] = nodes[pend[i].ids[j]];
+      }
+      free(pend[i].ids); pend[i].ids = NULL; pend[i].argc = 0;
+    }
+  }
+
+  uint64_t rc64 = 0; if (read_varuint(fp, &rc64) != 0) goto fail; lssize_t rootc = (lssize_t)rc64;
+  lsthunk_t** roots = rootc ? (lsthunk_t**)lsmalloc(sizeof(lsthunk_t*) * (size_t)rootc) : NULL;
+  for (lssize_t i = 0; i < rootc; i++) { uint64_t id = 0; if (read_varuint(fp, &id) != 0) { free(roots); goto fail; } if (id >= (uint64_t)tcount) { free(roots); goto fail; } roots[i] = nodes[id]; }
+
+  for (lssize_t i = 0; i < sp_cnt; i++) free(sp[i]); free(sp);
+  for (lssize_t i = 0; i < yp_cnt; i++) free(yp[i]); free(yp);
+  free(pend); free(nodes);
+  *out_roots = roots; *out_rootc = rootc; return 0;
+
+fail:
+  if (sp) { for (lssize_t i = 0; i < sp_cnt; i++) free(sp[i]); free(sp); }
+  if (yp) { for (lssize_t i = 0; i < yp_cnt; i++) free(yp[i]); free(yp); }
+  if (pend) { for (lssize_t i = 0; i < tcount; i++) if (pend[i].ids) free(pend[i].ids); free(pend); }
+  if (nodes) free(nodes);
+  return -1;
 }
