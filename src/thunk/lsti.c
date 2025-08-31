@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "thunk.h"
+#include "thunk_bin.h"
 
 #ifndef ENABLE_LSTI
 // If not enabled, provide stubs that return ENOSYS to keep build/link stable.
@@ -84,43 +85,40 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc, const lst
   vec_pool_t spool = {0}; // string blob: STR values and BOTTOM messages
   vec_pool_t ypool = {0}; // symbol blob: SYMBOL literals and ALGE constructors
 
-  // linear search for pools (ok for small graphs)
-  auto find_pool = [](vec_pool_t* p, const char* bytes, lssize_t len) -> int {
-    for (lssize_t i = 0; i < p->size; ++i) {
-      if (p->data[i].len == len && memcmp(p->data[i].bytes, bytes, (size_t)len) == 0) return (int)i;
-    }
-    return -1;
-  };
+  // naive ID lookup helper (inline loop where needed)
+  #define GET_ID(VAR_T, OUT_ID) do { \
+    int __found = -1; \
+    for (lssize_t __i = 0; __i < nodes.size; ++__i) { if (nodes.data[__i] == (VAR_T)) { __found = (int)__i; break; } } \
+    (OUT_ID) = __found; \
+  } while(0)
 
-  // helper to add string to pool; return index
-  auto add_spool = [&](const char* bytes, lssize_t len) -> int {
-    if (!bytes || len < 0) return -1;
-    int idx = find_pool(&spool, bytes, len);
-    if (idx >= 0) return idx;
-    pool_ent_t e; e.bytes = bytes; e.len = len; e.off = 0u;
-    VEC_PUSH(spool, e, pool_ent_t);
-    return (int)(spool.size - 1);
-  };
-  auto add_ypool = [&](const lsstr_t* s) -> int {
-    if (!s) return -1;
-    const char* buf = lsstr_get_buf(s);
-    lssize_t len = lsstr_get_len(s);
-    int idx = find_pool(&ypool, buf, len);
-    if (idx >= 0) return idx;
-    pool_ent_t e; e.bytes = buf; e.len = len; e.off = 0u;
-    VEC_PUSH(ypool, e, pool_ent_t);
-    return (int)(ypool.size - 1);
-  };
+  // add to string pool if not exists; return index
+  #define ADD_SPOOL(BYTES, LEN, OUT_IDX) do { \
+    int __idx = -1; \
+    for (lssize_t __i = 0; __i < spool.size; ++__i) { \
+      if (spool.data[__i].len == (LEN) && memcmp(spool.data[__i].bytes, (BYTES), (size_t)(LEN)) == 0) { __idx = (int)__i; break; } \
+    } \
+    if (__idx < 0) { pool_ent_t __e; __e.bytes = (BYTES); __e.len = (LEN); __e.off = 0u; VEC_PUSH(spool, __e, pool_ent_t); __idx = (int)(spool.size - 1); } \
+    (OUT_IDX) = __idx; \
+  } while(0)
 
-  // naive ID lookup
-  auto get_id = [&](lsthunk_t* t) -> int {
-    for (lssize_t i = 0; i < nodes.size; ++i) if (nodes.data[i] == t) return (int)i;
-    return -1;
-  };
+  // add to symbol pool if not exists; return index
+  #define ADD_YPOOL(LSSTR, OUT_IDX) do { \
+    const lsstr_t* __s = (LSSTR); \
+    int __idx = -1; \
+    if (__s) { \
+      const char* __b = lsstr_get_buf(__s); lssize_t __l = lsstr_get_len(__s); \
+      for (lssize_t __i = 0; __i < ypool.size; ++__i) { \
+        if (ypool.data[__i].len == __l && memcmp(ypool.data[__i].bytes, __b, (size_t)__l) == 0) { __idx = (int)__i; break; } \
+      } \
+      if (__idx < 0) { pool_ent_t __e; __e.bytes = __b; __e.len = __l; __e.off = 0u; VEC_PUSH(ypool, __e, pool_ent_t); __idx = (int)(ypool.size - 1); } \
+    } \
+    (OUT_IDX) = __idx; \
+  } while(0)
   // enqueue
   lssize_t qh = 0;
   for (lssize_t i = 0; i < rootc; ++i) {
-    if (roots) { if (get_id(roots[i]) < 0) VEC_PUSH(nodes, roots[i], lsthunk_t*); }
+  if (roots) { int __id; GET_ID(roots[i], __id); if (__id < 0) VEC_PUSH(nodes, roots[i], lsthunk_t*); }
   }
   while (qh < nodes.size) {
     lsthunk_t* t = nodes.data[qh++];
@@ -131,34 +129,34 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc, const lst
       }
       case LSTTYPE_STR: {
         const lsstr_t* s = lsthunk_get_str(t);
-        if (s) add_spool(lsstr_get_buf(s), lsstr_get_len(s));
+  if (s) { int __idx; ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), __idx); (void)__idx; }
         break;
       }
       case LSTTYPE_SYMBOL: {
         const lsstr_t* sym = lsthunk_get_symbol(t);
-        if (sym) add_ypool(sym);
+  if (sym) { int __idx; ADD_YPOOL(sym, __idx); (void)__idx; }
         break;
       }
       case LSTTYPE_ALGE: {
         const lsstr_t* c = lsthunk_get_constr(t);
-        if (c) add_ypool(c);
+  if (c) { int __idx; ADD_YPOOL(c, __idx); (void)__idx; }
         lssize_t ac = lsthunk_get_argc(t);
         lsthunk_t* const* as = lsthunk_get_args(t);
         for (lssize_t i = 0; i < ac; ++i) {
           lsthunk_t* ch = as[i];
-          int id = get_id(ch); if (id < 0) { VEC_PUSH(nodes, ch, lsthunk_t*); id = (int)(nodes.size-1); }
+          int id; GET_ID(ch, id); if (id < 0) { VEC_PUSH(nodes, ch, lsthunk_t*); id = (int)(nodes.size-1); }
           (void)id; // recorded later per-node
         }
         break;
       }
       case LSTTYPE_BOTTOM: {
         const char* msg = lsthunk_bottom_get_message(t);
-        if (msg) add_spool(msg, (lssize_t)strlen(msg));
+  if (msg) { int __idx; ADD_SPOOL(msg, (lssize_t)strlen(msg), __idx); (void)__idx; }
         lssize_t ac = lsthunk_bottom_get_argc(t);
         lsthunk_t* const* as = lsthunk_bottom_get_args(t);
         for (lssize_t i = 0; i < ac; ++i) {
           lsthunk_t* ch = as[i];
-          int id = get_id(ch); if (id < 0) { VEC_PUSH(nodes, ch, lsthunk_t*); id = (int)(nodes.size-1); }
+          int id; GET_ID(ch, id); if (id < 0) { VEC_PUSH(nodes, ch, lsthunk_t*); id = (int)(nodes.size-1); }
           (void)id;
         }
         break;
@@ -255,54 +253,46 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc, const lst
     memset(&hdr2, 0, sizeof(hdr2));
     switch (lsthunk_get_type(t)) {
       case LSTTYPE_INT: {
-        hdr2.kind = 5; // LSTB/LSTI shared numbering assumption: INT=5
+  hdr2.kind = (uint8_t)LSTB_KIND_INT;
         const lsint_t* iv = lsthunk_get_int(t);
         hdr2.extra = (uint32_t)lsint_get(iv);
         break;
       }
       case LSTTYPE_STR: {
-        hdr2.kind = 6; // STR
+    hdr2.kind = (uint8_t)LSTB_KIND_STR;
         const lsstr_t* s = lsthunk_get_str(t);
-        if (s) {
-          int idx = add_spool(lsstr_get_buf(s), lsstr_get_len(s));
-          hdr2.aorl = (uint32_t)lsstr_get_len(s);
-          hdr2.extra = (uint32_t)spool.data[idx].off;
-        }
+    if (s) { int idx; ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), idx); hdr2.aorl = (uint32_t)lsstr_get_len(s); hdr2.extra = (uint32_t)spool.data[idx].off; }
         break;
       }
       case LSTTYPE_SYMBOL: {
-        hdr2.kind = 7; // SYMBOL
+    hdr2.kind = (uint8_t)LSTB_KIND_SYMBOL;
         const lsstr_t* s = lsthunk_get_symbol(t);
-        if (s) {
-          int idx = add_ypool(s);
-          hdr2.aorl = (uint32_t)lsstr_get_len(s);
-          hdr2.extra = (uint32_t)ypool.data[idx].off;
-        }
+    if (s) { int idx; ADD_YPOOL(s, idx); hdr2.aorl = (uint32_t)lsstr_get_len(s); hdr2.extra = (uint32_t)ypool.data[idx].off; }
         break;
       }
       case LSTTYPE_ALGE: {
-        hdr2.kind = 0; // ALGE
+    hdr2.kind = (uint8_t)LSTB_KIND_ALGE; // numbering shared with LSTB
         const lsstr_t* c = lsthunk_get_constr(t);
-        if (c) { int idx = add_ypool(c); hdr2.extra = (uint32_t)ypool.data[idx].off; }
+    if (c) { int idx; ADD_YPOOL(c, idx); hdr2.extra = (uint32_t)ypool.data[idx].off; }
         lssize_t ac = lsthunk_get_argc(t); hdr2.aorl = (uint32_t)ac;
         if (ac > 0) {
           lsthunk_t* const* as = lsthunk_get_args(t);
           for (lssize_t k = 0; k < ac; ++k) {
-            int id = get_id(as[k]); if (id < 0) { free(rel_offs); return -EIO; }
+      int id; GET_ID(as[k], id); if (id < 0) { free(rel_offs); return -EIO; }
             uint32_t cid = (uint32_t)id; if (fwrite(&cid, 1, sizeof(cid), fp) != sizeof(cid)) { free(rel_offs); return -EIO; }
           }
         }
         break;
       }
       case LSTTYPE_BOTTOM: {
-        hdr2.kind = 9; // BOTTOM
+    hdr2.kind = (uint8_t)LSTB_KIND_BOTTOM;
         const char* msg = lsthunk_bottom_get_message(t);
-        if (msg) { int idx = add_spool(msg, (lssize_t)strlen(msg)); hdr2.extra = (uint32_t)spool.data[idx].off; }
+    if (msg) { int idx; ADD_SPOOL(msg, (lssize_t)strlen(msg), idx); hdr2.extra = (uint32_t)spool.data[idx].off; }
         lssize_t ac = lsthunk_bottom_get_argc(t); hdr2.aorl = (uint32_t)ac;
         if (ac > 0) {
           lsthunk_t* const* as = lsthunk_bottom_get_args(t);
           for (lssize_t k = 0; k < ac; ++k) {
-            int id = get_id(as[k]); if (id < 0) { free(rel_offs); return -EIO; }
+      int id; GET_ID(as[k], id); if (id < 0) { free(rel_offs); return -EIO; }
             uint32_t cid = (uint32_t)id; if (fwrite(&cid, 1, sizeof(cid), fp) != sizeof(cid)) { free(rel_offs); return -EIO; }
           }
         }
@@ -405,6 +395,9 @@ int lsti_validate(const lsti_image_t* img) {
     if (sz > (uint64_t)img->size) return -EINVAL;
     if (off > (uint64_t)img->size) return -EINVAL;
     if (off + sz > (uint64_t)img->size) return -EINVAL;
+    // alignment check
+    uint64_t mask = ((uint64_t)1 << hdr->align_log2) - 1u;
+    if ((off & mask) != 0) return -EINVAL;
     (void)sect[i].kind; // unknown kinds are allowed; skip
   }
   return 0;
