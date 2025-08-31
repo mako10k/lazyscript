@@ -1,7 +1,7 @@
 AUTOMAKE_OPTIONS = subdir-objects
 SUBDIRS = common expr misc parser pat thunk coreir llvmir plugins
 
-bin_PROGRAMS = lazyscript lazyscript_format lsllvmir_dump lazyscriptc lscoreir
+bin_PROGRAMS = lazyscript lazyscript_format lsllvmir_dump lazyscriptc lscoreir lslsti_check
 
 lazy_script_common_libs = \
     parser/liblsparser.la \
@@ -65,6 +65,25 @@ lscoreir_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
 lscoreir_LDADD = $(lazy_script_common_libs)
 lscoreir_SOURCES = \
     tools/lscoreir_main.c \
+    runtime/effects.c \
+    lazyscript.h \
+    lstypes.h
+
+lslsti_check_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
+# Arrange libraries so providers come after users for static linking
+lslsti_check_LDADD = \
+    parser/liblsparser.la \
+    thunk/liblsthunk.la \
+    pat/liblspat.la \
+    expr/liblsexpr.la \
+    coreir/liblscoreir.la \
+    llvmir/liblsllvmir.la \
+    misc/liblsmisc.la \
+    common/liblscommon.la \
+    $(GC_LIBS)
+lslsti_check_SOURCES = \
+    tools/lslsti_check.c \
+    runtime/trace.c \
     runtime/effects.c \
     lazyscript.h \
     lstypes.h

@@ -327,7 +327,8 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc, const lst
   uint32_t count32 = (uint32_t)rootc;
   if (fwrite(&count32, 1, sizeof(count32), fp) != sizeof(count32)) return -EIO;
   for (lssize_t i = 0; i < rootc; ++i) {
-    int id = get_id(roots[i]); if (id < 0) return -EIO; uint32_t rid = (uint32_t)id;
+  int id = -1; for (lssize_t j = 0; j < nodes.size; ++j) { if (nodes.data[j] == roots[i]) { id = (int)j; break; } }
+  if (id < 0) return -EIO; uint32_t rid = (uint32_t)id;
     if (fwrite(&rid, 1, sizeof(rid), fp) != sizeof(rid)) return -EIO;
   }
   long roots_end = ftell(fp); if (roots_end < 0) return -EIO;
