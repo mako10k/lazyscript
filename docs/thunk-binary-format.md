@@ -264,24 +264,37 @@ struct LSTI_Section { u32 kind; u32 reserved; u64 file_off; u64 size; };
 ```
 
 ### 主要セクション
-- STRING_BLOB: 連結文字列バッファ（UTF-8）。各エントリは u32 オフセット指し。
-- SYMBOL_BLOB: 同上。
+- STRING_BLOB: 連結文字列バッファ（UTF-8）。テーブルは持たず raw 連結のみ。
+  - 参照側（STR/BOTTOM など）が offset(u32) と len(u32) を併せて保持する。
+- SYMBOL_BLOB: 同上（シンボル名やコンストラクタ名）。
+  - 参照側（SYMBOL/ALGE など）が offset(u32) と len(u32) を併せて保持する。
 - PATTERN_TAB: 固定ヘッダ + 可変部。参照は u32 offset/ID。
-- THUNK_TAB: 各ノードは固定ヘッダ（kind:u8, flags:u8, argc:u32 等）+ 可変部。子は u32 ID または u32 相対オフセット。
+- THUNK_TAB: 各ノードは固定ヘッダ（kind:u8, flags:u8, arity_or_len:u32, extra:u32）+ 可変部。
 - ROOTS: u32 count + u32 ids[]。
 - TYPE_TAB: 型参照テーブル（LSTB と同様の種別、ペイロードは u32 オフセット/長）。
 
-### ノード固定ヘッダ（例）
+### ノード固定ヘッダ（v1 subset 実装）
 ```
 struct LSTI_Thunk {
   u8  kind;   // LSTB と同一割当
   u8  flags;  // WHNF/has_type など
   u16 pad;
-  u32 arity_or_len;  // ALGE=argc, STR=byte_len, BOTTOM=related_count など
-  u32 extra;         // ALGE=constr sym id, STR=offset, SYMBOL=offset, TYPE=type id
-  // 続けて可変領域（例: args[u32 id] * argc）
+  u32 arity_or_len;  // 用途は kind で異なる（下表）
+  u32 extra;         // 用途は kind で異なる（下表）
+  // 続けて可変領域（必要に応じて）
 };
 ```
+
+v1 subset での意味付け（本実装準拠）
+- INT: arity_or_len=0, extra=32bit 値（将来 i64 拡張可）; 可変部なし
+- STR: arity_or_len=len, extra=offset（STRING_BLOB 内）; 可変部なし
+- SYMBOL: arity_or_len=len, extra=offset（SYMBOL_BLOB 内）; 可変部なし
+- ALGE: arity_or_len=argc, extra=offset（SYMBOL_BLOB 内のコンストラクタ名）
+  - 可変部: u32 constr_len; u32 child_ids[argc]
+- BOTTOM: arity_or_len=related_count, extra=offset（STRING_BLOB 内のメッセージ）
+  - 可変部: u32 msg_len; u32 related_ids[related_count]
+
+備考: 参照元が len を保持するため、BLOB セクションには索引テーブルを置かない。validator は offset+len が各 BLOB サイズ内に収まることを検証する。
 
 ### 互換性/注意
 - アーキ依存（LE/整列/ワード幅）。異なる環境間の可搬性は保証しない。
