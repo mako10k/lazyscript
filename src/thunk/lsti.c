@@ -251,65 +251,74 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc, const lst
     lsthunk_t* t = nodes.data[i];
     struct { uint8_t kind, flags; uint16_t pad; uint32_t aorl; uint32_t extra; } hdr2;
     memset(&hdr2, 0, sizeof(hdr2));
+    // Precompute header fields
+    enum { PAY_NONE, PAY_ALGE, PAY_BOTTOM } paykind = PAY_NONE;
+    uint32_t pay_len_or_reserved = 0; // length field for ALGE constr or BOTTOM msg
+    const uint32_t* child_ids = NULL; // not used directly; we write on the fly
     switch (lsthunk_get_type(t)) {
       case LSTTYPE_INT: {
-  hdr2.kind = (uint8_t)LSTB_KIND_INT;
+        hdr2.kind = (uint8_t)LSTB_KIND_INT;
         const lsint_t* iv = lsthunk_get_int(t);
         hdr2.extra = (uint32_t)lsint_get(iv);
         break;
       }
       case LSTTYPE_STR: {
-    hdr2.kind = (uint8_t)LSTB_KIND_STR;
+        hdr2.kind = (uint8_t)LSTB_KIND_STR;
         const lsstr_t* s = lsthunk_get_str(t);
-    if (s) { int idx; ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), idx); hdr2.aorl = (uint32_t)lsstr_get_len(s); hdr2.extra = (uint32_t)spool.data[idx].off; }
+        if (s) { int idx; ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), idx); hdr2.aorl = (uint32_t)lsstr_get_len(s); hdr2.extra = (uint32_t)spool.data[idx].off; }
         break;
       }
       case LSTTYPE_SYMBOL: {
-    hdr2.kind = (uint8_t)LSTB_KIND_SYMBOL;
+        hdr2.kind = (uint8_t)LSTB_KIND_SYMBOL;
         const lsstr_t* s = lsthunk_get_symbol(t);
-    if (s) { int idx; ADD_YPOOL(s, idx); hdr2.aorl = (uint32_t)lsstr_get_len(s); hdr2.extra = (uint32_t)ypool.data[idx].off; }
+        if (s) { int idx; ADD_YPOOL(s, idx); hdr2.aorl = (uint32_t)lsstr_get_len(s); hdr2.extra = (uint32_t)ypool.data[idx].off; }
         break;
       }
       case LSTTYPE_ALGE: {
-    hdr2.kind = (uint8_t)LSTB_KIND_ALGE; // numbering shared with LSTB
+        hdr2.kind = (uint8_t)LSTB_KIND_ALGE; // numbering shared with LSTB
         const lsstr_t* c = lsthunk_get_constr(t);
-    if (c) { int idx; ADD_YPOOL(c, idx); hdr2.extra = (uint32_t)ypool.data[idx].off; }
-        lssize_t ac = lsthunk_get_argc(t); hdr2.aorl = (uint32_t)ac;
-        if (ac > 0) {
-          lsthunk_t* const* as = lsthunk_get_args(t);
-          for (lssize_t k = 0; k < ac; ++k) {
-      int id; GET_ID(as[k], id); if (id < 0) { free(rel_offs); return -EIO; }
-            uint32_t cid = (uint32_t)id; if (fwrite(&cid, 1, sizeof(cid), fp) != sizeof(cid)) { free(rel_offs); return -EIO; }
-          }
-        }
+        if (c) { int idx; ADD_YPOOL(c, idx); hdr2.extra = (uint32_t)ypool.data[idx].off; pay_len_or_reserved = (uint32_t)lsstr_get_len(c); }
+        lssize_t ac = lsthunk_get_argc(t); hdr2.aorl = (uint32_t)ac; paykind = PAY_ALGE;
         break;
       }
       case LSTTYPE_BOTTOM: {
-    hdr2.kind = (uint8_t)LSTB_KIND_BOTTOM;
+        hdr2.kind = (uint8_t)LSTB_KIND_BOTTOM;
         const char* msg = lsthunk_bottom_get_message(t);
-    if (msg) { int idx; ADD_SPOOL(msg, (lssize_t)strlen(msg), idx); hdr2.extra = (uint32_t)spool.data[idx].off; }
-        lssize_t ac = lsthunk_bottom_get_argc(t); hdr2.aorl = (uint32_t)ac;
-        if (ac > 0) {
-          lsthunk_t* const* as = lsthunk_bottom_get_args(t);
-          for (lssize_t k = 0; k < ac; ++k) {
-      int id; GET_ID(as[k], id); if (id < 0) { free(rel_offs); return -EIO; }
-            uint32_t cid = (uint32_t)id; if (fwrite(&cid, 1, sizeof(cid), fp) != sizeof(cid)) { free(rel_offs); return -EIO; }
-          }
-        }
+        if (msg) { int idx; lssize_t mlen = (lssize_t)strlen(msg); ADD_SPOOL(msg, mlen, idx); hdr2.extra = (uint32_t)spool.data[idx].off; pay_len_or_reserved = (uint32_t)mlen; }
+        lssize_t ac = lsthunk_bottom_get_argc(t); hdr2.aorl = (uint32_t)ac; paykind = PAY_BOTTOM;
         break;
       }
       default:
         free(rel_offs); return -ENOTSUP;
     }
-  // finally write header at the beginning of entry, then ensure file position is after header/payload
-  long cur = ftell(fp); if (cur < 0) { free(rel_offs); return -EIO; }
-  if (fseek(fp, ent_off, SEEK_SET) != 0) { free(rel_offs); return -EIO; }
-  if (fwrite(&hdr2, 1, sizeof(hdr2), fp) != sizeof(hdr2)) { free(rel_offs); return -EIO; }
-  // Seek to the end of payload or at least past the header to advance file end correctly
-  long after = cur;
-  long min_after = ent_off + (long)sizeof(hdr2);
-  if (after < min_after) after = min_after;
-  if (fseek(fp, after, SEEK_SET) != 0) { free(rel_offs); return -EIO; }
+    // Write header first
+    if (fwrite(&hdr2, 1, sizeof(hdr2), fp) != sizeof(hdr2)) { free(rel_offs); return -EIO; }
+    // Then write payload depending on kind
+    if (paykind == PAY_ALGE) {
+      // write constr len, then child ids
+      if (fwrite(&pay_len_or_reserved, 1, sizeof(uint32_t), fp) != sizeof(uint32_t)) { free(rel_offs); return -EIO; }
+      lssize_t ac = (lssize_t)hdr2.aorl;
+      if (ac > 0) {
+        lsthunk_t* const* as = lsthunk_get_args(t);
+        for (lssize_t k = 0; k < ac; ++k) {
+          int id; GET_ID(as[k], id); if (id < 0) { free(rel_offs); return -EIO; }
+          uint32_t cid = (uint32_t)id; if (fwrite(&cid, 1, sizeof(cid), fp) != sizeof(cid)) { free(rel_offs); return -EIO; }
+        }
+      }
+    } else if (paykind == PAY_BOTTOM) {
+      // write message len, then related ids
+      if (fwrite(&pay_len_or_reserved, 1, sizeof(uint32_t), fp) != sizeof(uint32_t)) { free(rel_offs); return -EIO; }
+      lssize_t ac = (lssize_t)hdr2.aorl;
+      if (ac > 0) {
+        lsthunk_t* const* as = lsthunk_bottom_get_args(t);
+        for (lssize_t k = 0; k < ac; ++k) {
+          int id; GET_ID(as[k], id); if (id < 0) { free(rel_offs); return -EIO; }
+          uint32_t cid = (uint32_t)id; if (fwrite(&cid, 1, sizeof(cid), fp) != sizeof(cid)) { free(rel_offs); return -EIO; }
+        }
+      }
+    } else {
+      // no payload
+    }
   }
   long thtab_end = ftell(fp); if (thtab_end < 0) { free(rel_offs); return -EIO; }
   // backfill offset table
@@ -446,19 +455,29 @@ int lsti_validate(const lsti_image_t* img) {
       uint8_t kind = ent[0];
       uint32_t aorl = 0, extra = 0; memcpy(&aorl, ent + 4, sizeof(uint32_t)); memcpy(&extra, ent + 8, sizeof(uint32_t));
       if (kind == (uint8_t)LSTB_KIND_STR) {
-        if (!string_blob) return -EINVAL; // STR needs string blob
-        uint64_t base = string_blob->file_off, sz = string_blob->size;
-        uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > sz) return -EINVAL;
-        if (len > sz) return -EINVAL;
-        if (off + len > sz) return -EINVAL;
-        (void)base; // base checked on map
+        if (!string_blob) return -EINVAL;
+        uint64_t sz = string_blob->size; uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
+        if (off > sz || len > sz || off + len > sz) return -EINVAL;
       } else if (kind == (uint8_t)LSTB_KIND_SYMBOL) {
-        if (!symbol_blob) return -EINVAL; // SYMBOL needs symbol blob
+        if (!symbol_blob) return -EINVAL;
         uint64_t sz = symbol_blob->size; uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > sz) return -EINVAL;
-        if (len > sz) return -EINVAL;
-        if (off + len > sz) return -EINVAL;
+        if (off > sz || len > sz || off + len > sz) return -EINVAL;
+      } else if (kind == (uint8_t)LSTB_KIND_ALGE) {
+        if (!symbol_blob) return -EINVAL;
+        // payload starts after header: u32 constr_len, then child ids
+        uint32_t constr_len = 0; memcpy(&constr_len, ent + sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint16_t)+sizeof(uint32_t)+sizeof(uint32_t), sizeof(uint32_t));
+        uint64_t sz = symbol_blob->size; uint64_t off = (uint64_t)extra, len = (uint64_t)constr_len;
+        if (off > sz || len > sz || off + len > sz) return -EINVAL;
+        // ensure payload fits: 4 + 4*argc
+        uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
+        if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint16_t)+sizeof(uint32_t)+sizeof(uint32_t) + need) return -EINVAL;
+      } else if (kind == (uint8_t)LSTB_KIND_BOTTOM) {
+        if (!string_blob) return -EINVAL;
+        uint32_t msg_len = 0; memcpy(&msg_len, ent + sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint16_t)+sizeof(uint32_t)+sizeof(uint32_t), sizeof(uint32_t));
+        uint64_t sz = string_blob->size; uint64_t off = (uint64_t)extra, len = (uint64_t)msg_len;
+        if (off > sz || len > sz || off + len > sz) return -EINVAL;
+        uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
+        if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint16_t)+sizeof(uint32_t)+sizeof(uint32_t) + need) return -EINVAL;
       }
     }
   }
