@@ -4,10 +4,14 @@
 #include "lazyscript.h"
 #include "thunk/thunk.h"
 #include "thunk/lsti.h"
+#include "expr/expr.h"
+#include "expr/ealge.h"
+#include "common/malloc.h"
+#include "runtime/trace.h"
 
 int main(int argc, char** argv) {
   const char* path = (argc > 1) ? argv[1] : "./_tmp_test.lsti";
-  // Build a tiny graph: INT 42, STR "hello", SYMBOL ".Ok"
+  // Build a tiny graph: INT 42, STR "hello", SYMBOL ".Ok", ALGE (.Ok 42), BOTTOM("boom", related=[INT 42])
   lstenv_t* env = lstenv_new(NULL);
   const lsint_t* i42 = lsint_new(42);
   lsthunk_t* ti = lsthunk_new_int(i42);
@@ -15,12 +19,20 @@ int main(int argc, char** argv) {
   lsthunk_t* ts = lsthunk_new_str(s_hello);
   const lsstr_t* y_ok = lsstr_cstr(".Ok");
   lsthunk_t* ty = lsthunk_new_symbol(y_ok);
-  lsthunk_t* roots[3] = { ti, ts, ty };
+  // ALGE: (.Ok 42) using public APIs
+  const lsexpr_t* arg_e = lsexpr_new_int(i42);
+  const lsexpr_t* args1[1] = { arg_e };
+  const lsealge_t* e_ok = lsealge_new(lsstr_cstr(".Ok"), 1, args1);
+  lsthunk_t* talge = lsthunk_new_ealge(e_ok, env);
+  // BOTTOM: message and one related using public API
+  lsthunk_t* related[1] = { ts };
+  lsthunk_t* tbot = lsthunk_new_bottom("boom", lstrace_take_pending_or_unknown(), 1, related);
+  lsthunk_t* roots[5] = { ti, ts, ty, talge, tbot };
 
   FILE* fp = fopen(path, "wb");
   if (!fp) { perror("fopen"); return 1; }
   lsti_write_opts_t opt = { .align_log2 = LSTI_ALIGN_8, .flags = 0 };
-  int rc = lsti_write(fp, roots, 3, &opt);
+  int rc = lsti_write(fp, roots, 5, &opt);
   fclose(fp);
   if (rc != 0) { fprintf(stderr, "lsti_write rc=%d\n", rc); return 2; }
 
@@ -29,7 +41,7 @@ int main(int argc, char** argv) {
   if (rc != 0) { fprintf(stderr, "lsti_map rc=%d\n", rc); return 3; }
   rc = lsti_validate(&img);
   if (rc != 0) { fprintf(stderr, "lsti_validate rc=%d\n", rc); lsti_unmap(&img); return 4; }
-  // Try materialize (INT/STR/SYMBOL subset)
+  // Try materialize (now supports INT/STR/SYMBOL/ALGE/BOTTOM subset)
   lsthunk_t** out_roots = NULL; lssize_t outc = 0;
   rc = lsti_materialize(&img, &out_roots, &outc, env);
   if (rc == 0) {

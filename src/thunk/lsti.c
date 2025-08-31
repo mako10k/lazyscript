@@ -4,7 +4,10 @@
 #include <string.h>
 #include <stdio.h>
 #include "thunk.h"
+#include "common/malloc.h"
+#include "runtime/trace.h"
 #include "thunk_bin.h"
+#include <stddef.h>
 
 #ifndef ENABLE_LSTI
 // If not enabled, provide stubs that return ENOSYS to keep build/link stable.
@@ -505,6 +508,11 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   // Build an array of thunks; only INT is materialized for now; others return ENOSYS
   lsthunk_t** nodes = (lsthunk_t**)calloc(ncnt, sizeof(lsthunk_t*));
   if (!nodes) return -ENOMEM;
+  typedef struct { lssize_t argc; uint32_t* ids; } pend_t;
+  pend_t* pend = (pend_t*)calloc(ncnt, sizeof(pend_t));
+  if (!pend) { free(nodes); return -ENOMEM; }
+  const char* sbase = string_blob ? (const char*)(img->base + (lssize_t)string_blob->file_off) : NULL;
+  const char* ybase = symbol_blob ? (const char*)(img->base + (lssize_t)symbol_blob->file_off) : NULL;
   for (uint32_t i = 0; i < ncnt; ++i) {
     const uint8_t* ent = tt + offs[i];
     uint8_t kind = ent[0];
@@ -530,21 +538,72 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
         nodes[i] = lsthunk_new_symbol(s);
         break;
       }
+      case LSTB_KIND_ALGE: {
+        if (!symbol_blob) { free(nodes); free(pend); return -EINVAL; }
+        // header fields
+        uint32_t argc = 0, off = 0; memcpy(&argc, ent + 4, sizeof(uint32_t)); memcpy(&off, ent + 8, sizeof(uint32_t));
+        const uint8_t* p = ent + 12; // payload starts after header
+        uint32_t constr_len = 0; memcpy(&constr_len, p, sizeof(uint32_t)); p += 4;
+        const lsstr_t* cstr = lsstr_new(ybase + off, (lssize_t)constr_len);
+        // allocate via public API for two-phase wiring
+        lsthunk_t* t = lsthunk_alloc_alge(cstr, (lssize_t)argc);
+        nodes[i] = t;
+        if (argc > 0) {
+          pend[i].argc = (lssize_t)argc;
+          pend[i].ids = (uint32_t*)malloc(sizeof(uint32_t) * (size_t)argc);
+          if (!pend[i].ids) { free(pend); free(nodes); return -ENOMEM; }
+          for (uint32_t j = 0; j < argc; ++j) { uint32_t idj = 0; memcpy(&idj, p, sizeof(uint32_t)); p += 4; pend[i].ids[j] = idj; }
+        }
+        break;
+      }
+      case LSTB_KIND_BOTTOM: {
+        if (!string_blob) { free(nodes); free(pend); return -EINVAL; }
+        uint32_t rc = 0, off = 0; memcpy(&rc, ent + 4, sizeof(uint32_t)); memcpy(&off, ent + 8, sizeof(uint32_t));
+        const uint8_t* p = ent + 12;
+        uint32_t msg_len = 0; memcpy(&msg_len, p, sizeof(uint32_t)); p += 4;
+        // copy message into a null-terminated C string
+        char* m = (char*)lsmalloc((size_t)msg_len + 1);
+        if (msg_len > 0) memcpy(m, sbase + off, (size_t)msg_len);
+        m[msg_len] = '\0';
+        // allocate with reserved related slots via API
+        lsthunk_t* t = lsthunk_alloc_bottom(m, lstrace_take_pending_or_unknown(), (lssize_t)rc);
+        nodes[i] = t;
+        if (rc > 0) {
+          pend[i].argc = (lssize_t)rc;
+          pend[i].ids = (uint32_t*)malloc(sizeof(uint32_t) * (size_t)rc);
+          if (!pend[i].ids) { free(pend); free(nodes); return -ENOMEM; }
+          for (uint32_t j = 0; j < rc; ++j) { uint32_t idj = 0; memcpy(&idj, p, sizeof(uint32_t)); p += 4; pend[i].ids[j] = idj; }
+        }
+        break;
+      }
       default: {
-        // Not supported yet in Phase 1
-        for (uint32_t k = 0; k < i; ++k) { /* GC managed */ }
+        // Not supported in this subset
+        for (uint32_t k = 0; k < i; ++k) { /* GC managed by Boehm */ }
+        free(pend);
         free(nodes);
         return -ENOSYS;
       }
+    }
+  }
+  // Second pass: wire pending edges
+  for (uint32_t i = 0; i < ncnt; ++i) {
+    if (pend[i].argc > 0 && pend[i].ids) {
+      if (lsthunk_get_type(nodes[i]) == LSTTYPE_ALGE) {
+        for (lssize_t j = 0; j < pend[i].argc; ++j) lsthunk_set_alge_arg(nodes[i], j, nodes[pend[i].ids[j]]);
+      } else if (lsthunk_get_type(nodes[i]) == LSTTYPE_BOTTOM) {
+        for (lssize_t j = 0; j < pend[i].argc; ++j) lsthunk_set_bottom_related(nodes[i], j, nodes[pend[i].ids[j]]);
+      }
+      free(pend[i].ids); pend[i].ids = NULL; pend[i].argc = 0;
     }
   }
   // Extract roots
   const uint8_t* rp = img->base + (lssize_t)roots->file_off;
   uint32_t rcnt = 0; memcpy(&rcnt, rp, sizeof(uint32_t));
   const uint32_t* rids = (const uint32_t*)(rp + sizeof(uint32_t));
-  lsthunk_t** r = (lsthunk_t**)calloc(rcnt, sizeof(lsthunk_t*)); if (!r) { free(nodes); return -ENOMEM; }
+  lsthunk_t** r = (lsthunk_t**)calloc(rcnt, sizeof(lsthunk_t*)); if (!r) { free(pend); free(nodes); return -ENOMEM; }
   for (uint32_t i = 0; i < rcnt; ++i) r[i] = nodes[rids[i]];
   *out_roots = r; *out_rootc = (lssize_t)rcnt;
+  free(pend);
   free(nodes);
   return 0;
 }

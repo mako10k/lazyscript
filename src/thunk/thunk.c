@@ -173,6 +173,49 @@ lsthunk_t* lsthunk_bottom_merge(lsthunk_t* a, lsthunk_t* b) {
   return lsthunk_new_bottom(m, loc, cn, xs);
 }
 
+// --- Internal-friendly constructors for two-phase wiring ---
+lsthunk_t* lsthunk_alloc_alge(const lsstr_t* constr, lssize_t argc) {
+  lsthunk_t* thunk          = lsmalloc(lssizeof(lsthunk_t, lt_alge) + (argc > 0 ? (size_t)argc : 0) * sizeof(lsthunk_t*));
+  thunk->lt_type            = LSTTYPE_ALGE;
+  thunk->lt_whnf            = thunk;
+  thunk->lt_trace_id        = g_trace_next_id++;
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
+  thunk->lt_alge.lta_constr = constr;
+  thunk->lt_alge.lta_argc   = argc;
+  // Leave args uninitialized for the caller to fill via setter
+  return thunk;
+}
+
+void lsthunk_set_alge_arg(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg) {
+  if (!thunk || thunk->lt_type != LSTTYPE_ALGE) return;
+  if (idx < 0 || idx >= thunk->lt_alge.lta_argc) return;
+  thunk->lt_alge.lta_args[idx] = arg;
+}
+
+lsthunk_t* lsthunk_alloc_bottom(const char* message, lsloc_t loc, lssize_t argc) {
+  lsthunk_t* t = lsmalloc(sizeof(lsthunk_t));
+  t->lt_type = LSTTYPE_BOTTOM;
+  t->lt_whnf = t; // bottom is WHNF
+  t->lt_trace_id = g_trace_next_id++;
+  lstrace_emit_loc(loc.filename ? loc : lstrace_take_pending_or_unknown());
+  t->lt_bottom.lt_msg = message ? message : "";
+  t->lt_bottom.lt_loc = loc;
+  t->lt_bottom.lt_rel.lbr_argc = argc;
+  if (argc > 0) {
+    t->lt_bottom.lt_rel.lbr_args = lsmalloc(sizeof(lsthunk_t*) * (size_t)argc);
+    for (lssize_t i = 0; i < argc; i++) t->lt_bottom.lt_rel.lbr_args[i] = NULL;
+  } else {
+    t->lt_bottom.lt_rel.lbr_args = NULL;
+  }
+  return t;
+}
+
+void lsthunk_set_bottom_related(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg) {
+  if (!thunk || thunk->lt_type != LSTTYPE_BOTTOM) return;
+  if (idx < 0 || idx >= thunk->lt_bottom.lt_rel.lbr_argc) return;
+  thunk->lt_bottom.lt_rel.lbr_args[idx] = arg;
+}
+
 lsthunk_t* lsthunk_new_ealge(const lsealge_t* ealge, lstenv_t* tenv) {
   lssize_t               eargc = lsealge_get_argc(ealge);
   const lsexpr_t* const* eargs = lsealge_get_args(ealge);

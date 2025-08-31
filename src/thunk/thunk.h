@@ -158,6 +158,16 @@ lsthunk_t* const* lsthunk_bottom_get_args(const lsthunk_t* thunk);
 // Merge/accumulate two bottoms: concatenates messages with "; " and appends args; chooses earlier location
 lsthunk_t* lsthunk_bottom_merge(lsthunk_t* a, lsthunk_t* b);
 
+// Internal-friendly constructors for two-phase wiring (used by loaders/materializers)
+// Allocate an ALGE thunk with space for argc args; arguments are left unset for later wiring
+lsthunk_t* lsthunk_alloc_alge(const lsstr_t* constr, lssize_t argc);
+// Set the i-th argument on an ALGE thunk allocated via lsthunk_alloc_alge
+void        lsthunk_set_alge_arg(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg);
+// Allocate a BOTTOM thunk with message and reserved related slots; args left NULL for later wiring
+lsthunk_t*  lsthunk_alloc_bottom(const char* message, lsloc_t loc, lssize_t argc);
+// Set the i-th related thunk on a BOTTOM allocated via lsthunk_alloc_bottom
+void        lsthunk_set_bottom_related(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg);
+
 /**
  * Create a new thunk for an expression
  * @param expr The expression
