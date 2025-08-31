@@ -2,7 +2,7 @@
 	# ピュアモジュールを require（副作用: ロード）。戻りは unit ()
 	~r <- !require "test/pure_mod.ls";
 	# 値としてのモジュール本体は include で取得
-	~M <- (~Prelude .env .include) "test/pure_mod.ls";
+	~M <- (~prelude .env .include) "test/pure_mod.ls";
 	# エクスポートの確認
 	!println (~~to_str ((~M .Foo)));
 	!println (~~to_str (((~M .Bar) 41)));
