@@ -440,20 +440,94 @@ int lsti_validate(const lsti_image_t* img) {
   const uint32_t* rids = (const uint32_t*)(rp + sizeof(uint32_t));
   for (uint32_t i = 0; i < rcnt; ++i) { if (rids[i] >= ncnt) return -EINVAL; }
   // Optional: for STR/SYMBOL, offsets must be within corresponding blobs when present
-  if (string_blob) {
-    // nothing to do here yet (we don't encode string table of descriptors, only raw blob)
-    (void)string_blob;
-  }
-  if (symbol_blob) {
-    (void)symbol_blob;
+  if (string_blob || symbol_blob) {
+    for (uint32_t i = 0; i < ncnt; ++i) {
+      const uint8_t* ent = tt + offs[i];
+      uint8_t kind = ent[0];
+      uint32_t aorl = 0, extra = 0; memcpy(&aorl, ent + 4, sizeof(uint32_t)); memcpy(&extra, ent + 8, sizeof(uint32_t));
+      if (kind == (uint8_t)LSTB_KIND_STR) {
+        if (!string_blob) return -EINVAL; // STR needs string blob
+        uint64_t base = string_blob->file_off, sz = string_blob->size;
+        uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
+        if (off > sz) return -EINVAL;
+        if (len > sz) return -EINVAL;
+        if (off + len > sz) return -EINVAL;
+        (void)base; // base checked on map
+      } else if (kind == (uint8_t)LSTB_KIND_SYMBOL) {
+        if (!symbol_blob) return -EINVAL; // SYMBOL needs symbol blob
+        uint64_t sz = symbol_blob->size; uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
+        if (off > sz) return -EINVAL;
+        if (len > sz) return -EINVAL;
+        if (off + len > sz) return -EINVAL;
+      }
+    }
   }
   return 0;
 }
 
 int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssize_t* out_rootc, struct lstenv* prelude_env) {
-  (void)img; (void)out_roots; (void)out_rootc; (void)prelude_env;
-  // Not implemented yet
-  return -ENOSYS;
+  (void)prelude_env;
+  if (!img || !img->base || !out_roots || !out_rootc) return -EINVAL;
+  if (lsti_validate(img) != 0) return -EINVAL;
+  const lsti_header_disk_t* hdr = (const lsti_header_disk_t*)img->base;
+  const lsti_section_disk_t* sect = (const lsti_section_disk_t*)(img->base + sizeof(lsti_header_disk_t));
+  const lsti_section_disk_t *thunk_tab = NULL, *roots = NULL, *string_blob = NULL, *symbol_blob = NULL;
+  for (uint16_t i = 0; i < hdr->section_count; ++i) {
+    if (sect[i].kind == (uint32_t)LSTI_SECT_THUNK_TAB) thunk_tab = &sect[i];
+    else if (sect[i].kind == (uint32_t)LSTI_SECT_ROOTS) roots = &sect[i];
+    else if (sect[i].kind == (uint32_t)LSTI_SECT_STRING_BLOB) string_blob = &sect[i];
+    else if (sect[i].kind == (uint32_t)LSTI_SECT_SYMBOL_BLOB) symbol_blob = &sect[i];
+  }
+  if (!thunk_tab || !roots) return -EINVAL;
+  const uint8_t* tt = img->base + (lssize_t)thunk_tab->file_off;
+  uint32_t ncnt = 0; memcpy(&ncnt, tt, sizeof(uint32_t));
+  const uint64_t* offs = (const uint64_t*)(tt + sizeof(uint32_t));
+  if (ncnt == 0) { *out_roots = NULL; *out_rootc = 0; return 0; }
+  // Build an array of thunks; only INT is materialized for now; others return ENOSYS
+  lsthunk_t** nodes = (lsthunk_t**)calloc(ncnt, sizeof(lsthunk_t*));
+  if (!nodes) return -ENOMEM;
+  for (uint32_t i = 0; i < ncnt; ++i) {
+    const uint8_t* ent = tt + offs[i];
+    uint8_t kind = ent[0];
+    switch (kind) {
+      case LSTB_KIND_INT: {
+        uint32_t val = 0; memcpy(&val, ent + 8, sizeof(uint32_t));
+        nodes[i] = lsthunk_new_int(lsint_new((int)val));
+        break;
+      }
+      case LSTB_KIND_STR: {
+        if (!string_blob) { free(nodes); return -EINVAL; }
+        uint32_t len = 0, off = 0; memcpy(&len, ent + 4, sizeof(uint32_t)); memcpy(&off, ent + 8, sizeof(uint32_t));
+        const char* base = (const char*)(img->base + (lssize_t)string_blob->file_off);
+        const lsstr_t* s = lsstr_new(base + off, (lssize_t)len);
+        nodes[i] = lsthunk_new_str(s);
+        break;
+      }
+      case LSTB_KIND_SYMBOL: {
+        if (!symbol_blob) { free(nodes); return -EINVAL; }
+        uint32_t len = 0, off = 0; memcpy(&len, ent + 4, sizeof(uint32_t)); memcpy(&off, ent + 8, sizeof(uint32_t));
+        const char* base = (const char*)(img->base + (lssize_t)symbol_blob->file_off);
+        const lsstr_t* s = lsstr_new(base + off, (lssize_t)len);
+        nodes[i] = lsthunk_new_symbol(s);
+        break;
+      }
+      default: {
+        // Not supported yet in Phase 1
+        for (uint32_t k = 0; k < i; ++k) { /* GC managed */ }
+        free(nodes);
+        return -ENOSYS;
+      }
+    }
+  }
+  // Extract roots
+  const uint8_t* rp = img->base + (lssize_t)roots->file_off;
+  uint32_t rcnt = 0; memcpy(&rcnt, rp, sizeof(uint32_t));
+  const uint32_t* rids = (const uint32_t*)(rp + sizeof(uint32_t));
+  lsthunk_t** r = (lsthunk_t**)calloc(rcnt, sizeof(lsthunk_t*)); if (!r) { free(nodes); return -ENOMEM; }
+  for (uint32_t i = 0; i < rcnt; ++i) r[i] = nodes[rids[i]];
+  *out_roots = r; *out_rootc = (lssize_t)rcnt;
+  free(nodes);
+  return 0;
 }
 
 int lsti_unmap(lsti_image_t* img) {

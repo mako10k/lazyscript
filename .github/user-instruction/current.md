@@ -1,3 +1,25 @@
+---
+created: 2025-08-31T00:00:00Z
+---
+
+## Current Instruction (verbatim)
+
+コミットしてから、次の実装を進めて。
+今後の、LLVMIR化の足がかりにしたい。
+
+## Metadata
+
+- source: chat
+- integrity: This record preserves the user's exact instruction text without modification.
+- next-archive-index: 0001
+
+## Assistant Context (most-recent first)
+
+- Extend LSTI materialize to support STR and SYMBOL now; strengthen validator for blob bounds; update smoke tool to include STR/SYMBOL roots; commit changes. Propose ALGE/BOTTOM schema tweak next.
+
+## Prior Context Summary (compact)
+
+- LSTB spec and subset IO exist; LSTI writer/validator minimal implemented; current materialize supports INT only; smoke tool writes/maps/validates/materializes INT root successfully.
 created: 2025-08-31T11:59:20Z
 
 ## Current Instruction (verbatim)
