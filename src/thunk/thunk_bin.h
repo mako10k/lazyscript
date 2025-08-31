@@ -17,6 +17,7 @@ extern "C" {
 #define LSTB_F_STORE_WHNF   (1u << 0)
 #define LSTB_F_STORE_TRACE  (1u << 1)
 #define LSTB_F_STORE_LOCS   (1u << 2)
+#define LSTB_F_STORE_TYPES  (1u << 3)
 
 // Thunk kinds (table entry kinds)
 typedef enum lstb_kind {
@@ -42,6 +43,14 @@ typedef enum lstb_choice_kind {
 
 // Entry flags (per-thunk)
 #define LSTB_EF_WHNF (1u << 0)
+#define LSTB_EF_HAS_TYPE (1u << 1)
+
+// TYPE_POOL entry kinds (reservation)
+typedef enum lstb_type_kind {
+  LSTB_TK_STRING_NAME = 0,  // STRING_POOL id
+  LSTB_TK_SYMBOL_NAME = 1,  // SYMBOL_POOL id
+  LSTB_TK_OPAQUE_BLOB = 2   // opaque binary blob (reserved)
+} lstb_type_kind_t;
 
 // Forward decls (opaque types from runtime)
 typedef struct lsthunk lsthunk_t;

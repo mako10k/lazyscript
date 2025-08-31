@@ -35,13 +35,14 @@
 | version_major              | u16 (=0x0001)
 | version_minor              | u16 (=0x0001)
 | flags                      | u32 (bitfield、下記)
-| section_count              | u16 (v0.1 は固定 5)
+| section_count              | u16 (v0.1 は5以上。追加セクション可)
 +----------------------------+
 | Section[0]: STRING_POOL    |
 | Section[1]: SYMBOL_POOL    |
 | Section[2]: PATTERN_POOL   |
 | Section[3]: THUNK_TABLE    |
 | Section[4]: ROOTS          |
+| Section[5]: TYPE_POOL      |  ← 型参照の予約領域（v0.1 追加）
 | （将来: DEBUG, TRACE など） |
 +----------------------------+
 ```
@@ -50,6 +51,7 @@
   - bit0: store_whnf_cache（WHNF キャッシュを含める）
   - bit1: store_trace_id（trace_id を含める）
   - bit2: store_locs（Bottom の loc を拡張格納）
+  - bit3: store_types（型参照を格納する。未設定なら全エントリに型情報なし）
 
 ### STRING_POOL
 
@@ -91,9 +93,10 @@
     - kind: u8
       - 0=ALGE, 1=APPL, 2=CHOICE, 3=LAMBDA, 4=REF, 5=INT, 6=STR, 7=SYMBOL,
         8=BUILTIN, 9=BOTTOM
-    - flags: u8（ビット: 0=whnf, 1=reserved, 2..7=将来）
+  - flags: u8（ビット: 0=whnf, 1=has_type, 2..7=将来）
     - size: varuint（payload のバイト数。スキップ・拡張用）
     - optional: if (file.flags.store_trace_id) trace_id: varint
+  - optional: if (flags & has_type) type_id: varuint（TYPE_POOL 参照）
     - payload: kind ごと
 
 - kind ごとの payload 定義:
@@ -138,6 +141,7 @@
 備考:
 - `lt_whnf` はポインタなので保存しない。flags.whnf=1 の場合は「このノードは WHNF 済み」情報のみ保持。
 - `trace_id` は任意。ロード側で新規採番に差し替えることも可。
+- 型参照: file.flags.store_types=1 の時のみ有効。エントリごとに has_type=1 なら `type_id` を持つ。
 
 ### ROOTS（エントリポイント）
 
@@ -146,11 +150,28 @@
   - root_count: varuint
   - roots[root_count]: thunk_id(varuint)
 
+### TYPE_POOL（型参照の予約領域）
+
+- 目的: 将来の型システム導入に備え、各 Thunk に型参照を付与できるようにする。
+- v0.1 では型の解釈は未定。ここでは「識別子や将来のblobへの参照」を格納する最小仕様のみ提供。
+- layout:
+  - type_count: varuint
+  - types[type_count]: entry
+    - kind: u8
+      - 0=STRING_NAME（STRING_POOL の文字列 ID を指す）
+      - 1=SYMBOL_NAME（SYMBOL_POOL のシンボル ID を指す）
+      - 2=OPAQUE_BLOB（将来用の任意バイト列。現行は読み飛ばしのみ）
+    - payload: kind ごと
+      - STRING_NAME: str_id(varuint)
+      - SYMBOL_NAME: sym_id(varuint)
+      - OPAQUE_BLOB: blob_len(varuint), blob_bytes[blob_len]
+
 ## 互換性戦略
 
-- version_major が変わる変更は後方互換なし。minor/flags での追加は後方互換ありを原則。
+- version_major が変わる変更は後方互換なし。minor/flags/追加セクションでの追加は後方互換ありを原則。
 - 未知 kind/未知 attr ビット/未知セクションは、size フィールドでスキップ可能に設計。
 - 参照解決（REF mode==1/2）は、ロード時の環境（`~prelude` 等）に依存。解決不可はエラーかプレースホルダ Bottom 作成のどちらかを選択可能に。
+- TYPE_POOL は存在しなくてもよい（file.flags.store_types=0 の場合）。存在しても、各エントリの has_type=0 なら `type_id` は現れない。
 
 ## セキュリティと整合性
 
