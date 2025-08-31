@@ -8,4 +8,6 @@ liblsthunk_la_SOURCES = \
     tpat.c \
     tpat.h \
     thunk.c \
-    thunk.h
+    thunk.h \
+    lsti.c \
+    lsti.h
