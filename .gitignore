@@ -82,3 +82,4 @@ src/builtins/prelude.h
 _tmp_test*.lsti
 src/lslsti_check
 .github/user-instruction/
+src/lslstr_dump
