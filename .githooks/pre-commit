@@ -15,6 +15,9 @@ if [[ -z "${CLANG_FORMAT_BIN}" ]]; then
   fi
 fi
 
+# Exclude generated/third-party paths (regex)
+EXCLUDE_RE='^(src/parser/|parser/|.*generated/|vendor/|third_party/|external/)'
+
 # Get staged files we care about (Added/Copied/Modified/Renamed)
 mapfile -t files < <(git diff --cached --name-only --diff-filter=ACMR | \
   grep -E '\\.(c|h|cc|cpp|hpp)$' || true)
@@ -23,6 +26,10 @@ mapfile -t files < <(git diff --cached --name-only --diff-filter=ACMR | \
 
 fail=0
 for f in "${files[@]}"; do
+  # Skip excluded paths
+  if [[ ${f} =~ ${EXCLUDE_RE} ]]; then
+    continue
+  fi
   # Skip non-existent (in case of rename parts)
   if ! git cat-file -e ":${f}" 2>/dev/null; then
     continue
@@ -34,15 +41,22 @@ for f in "${files[@]}"; do
   "${CLANG_FORMAT_BIN}" -style=file -assume-filename "${f}" <"${tmp_staged}" >"${tmp_fmt}" \
     || { echo "pre-commit: clang-format failed on ${f}" >&2; fail=1; rm -f "${tmp_staged}" "${tmp_fmt}"; continue; }
   if ! diff -u "${tmp_staged}" "${tmp_fmt}" >/dev/null; then
-    echo "pre-commit: formatting issues in ${f}. Please run clang-format." >&2
-    fail=1
+    if [[ "${HOOK_AUTOFIX:-0}" == "1" ]]; then
+      # Write formatted content to working tree and re-stage
+      cat "${tmp_fmt}" >"${f}"
+      git add "${f}"
+      echo "pre-commit: auto-formatted ${f} (HOOK_AUTOFIX=1)" >&2
+    else
+      echo "pre-commit: formatting issues in ${f}. Please run clang-format." >&2
+      fail=1
+    fi
   fi
   rm -f "${tmp_staged}" "${tmp_fmt}"
 done
 
 if [[ ${fail} -ne 0 ]]; then
   echo "pre-commit: unformatted files detected. Commit aborted." >&2
-  echo "Hint: format staged changes with 'git clang-format --staged' or run clang-format on files." >&2
+  echo "Hint: set HOOK_AUTOFIX=1 to auto-format staged files, or run scripts/format-staged.sh." >&2
   exit 1
 fi
 
