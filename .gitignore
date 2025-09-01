@@ -85,3 +85,4 @@ src/lslsti_check
 src/lslstr_dump
 src/lslstr_roundtrip
 _tmp_rt.lsti
+src/lslstr_to_llvmir
