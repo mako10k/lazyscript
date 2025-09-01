@@ -79,6 +79,6 @@ src/builtins/prelude.h
 
 
 # local LSTI smoke outputs
-_tmp_test.lsti
+_tmp_test*.lsti
 src/lslsti_check
 .github/user-instruction/

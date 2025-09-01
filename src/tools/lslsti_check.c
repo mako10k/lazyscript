@@ -83,6 +83,40 @@ int main(int argc, char** argv) {
   } else {
     printf("materialize: rc=%d (expected for subset)\n", rc);
   }
+  // Roundtrip: write materialized roots to another file and compare bytes
+  if (rc == 0 && out_roots && outc > 0) {
+    const char* path2 = "./_tmp_test2.lsti";
+    FILE* fp2 = fopen(path2, "wb");
+    if (!fp2) {
+      perror("fopen2");
+      return 5;
+    }
+    lsti_write_opts_t opt2 = { .align_log2 = LSTI_ALIGN_8, .flags = 0 };
+    int rc2 = lsti_write(fp2, out_roots, outc, &opt2);
+    fclose(fp2);
+    if (rc2 != 0) {
+      fprintf(stderr, "lsti_write (roundtrip) rc=%d\n", rc2);
+      return 6;
+    }
+    // Compare files byte-by-byte
+    FILE* a = fopen(path, "rb");
+    FILE* b = fopen(path2, "rb");
+    if (!a || !b) {
+      perror("fopen-compare");
+      return 7;
+    }
+    int equal = 1;
+    for (;;) {
+      unsigned char ba[4096], bb[4096];
+      size_t ra = fread(ba, 1, sizeof ba, a);
+      size_t rb = fread(bb, 1, sizeof bb, b);
+      if (ra != rb) { equal = 0; break; }
+      if (ra == 0) break;
+      if (memcmp(ba, bb, ra) != 0) { equal = 0; break; }
+    }
+    fclose(a); fclose(b);
+    printf("roundtrip: %s\n", equal ? "equal" : "different");
+  }
   lsti_unmap(&img);
   (void)env; // quiet unused for now
   printf("ok: %s\n", path);
