@@ -344,21 +344,33 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     long off = ftell(fp);
     if (off < 0)
       return -EIO;
-    // reserved index header
-    uint32_t index_bytes = 0; // reserved for future indexing structure
-    if (fwrite(&index_bytes, 1, sizeof(index_bytes), fp) != sizeof(index_bytes))
-      return -EIO;
-    // assign offsets then write bytes (offsets are relative to payload start after header+index)
+    // Precompute offsets
     uint32_t cur = 0;
     for (lssize_t i = 0; i < spool.size; ++i) {
       spool.data[i].off = cur;
-      const char* b     = spool.data[i].bytes;
-      lssize_t    bl    = spool.data[i].len;
+      cur += (uint32_t)spool.data[i].len;
+    }
+    // Write index header + index body: [u32 count][(u32 off,u32 len) * count]
+    uint32_t index_bytes = (uint32_t)sizeof(uint32_t) + (uint32_t)spool.size * (uint32_t)(sizeof(uint32_t) * 2);
+    if (fwrite(&index_bytes, 1, sizeof(index_bytes), fp) != sizeof(index_bytes))
+      return -EIO;
+    uint32_t scount = (uint32_t)spool.size;
+    if (fwrite(&scount, 1, sizeof(scount), fp) != sizeof(scount))
+      return -EIO;
+    for (lssize_t i = 0; i < spool.size; ++i) {
+      uint32_t o = spool.data[i].off;
+      uint32_t l = (uint32_t)spool.data[i].len;
+      if (fwrite(&o, 1, sizeof(o), fp) != sizeof(o) || fwrite(&l, 1, sizeof(l), fp) != sizeof(l))
+        return -EIO;
+    }
+    // Write payload bytes in the same order
+    for (lssize_t i = 0; i < spool.size; ++i) {
+      const char* b = spool.data[i].bytes;
+      lssize_t    bl = spool.data[i].len;
       if (bl > 0) {
         if (fwrite(b, 1, (size_t)bl, fp) != (size_t)bl)
           return -EIO;
       }
-      cur += (uint32_t)bl;
     }
     long end = ftell(fp);
     if (end < 0)
@@ -376,20 +388,33 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     long off = ftell(fp);
     if (off < 0)
       return -EIO;
-    // reserved index header
-    uint32_t index_bytes = 0; // reserved for future indexing structure
-    if (fwrite(&index_bytes, 1, sizeof(index_bytes), fp) != sizeof(index_bytes))
-      return -EIO;
+    // Precompute offsets
     uint32_t cur = 0;
     for (lssize_t i = 0; i < ypool.size; ++i) {
       ypool.data[i].off = cur;
-      const char* b     = ypool.data[i].bytes;
-      lssize_t    bl    = ypool.data[i].len;
+      cur += (uint32_t)ypool.data[i].len;
+    }
+    // Write index header + index body: [u32 count][(u32 off,u32 len) * count]
+    uint32_t index_bytes = (uint32_t)sizeof(uint32_t) + (uint32_t)ypool.size * (uint32_t)(sizeof(uint32_t) * 2);
+    if (fwrite(&index_bytes, 1, sizeof(index_bytes), fp) != sizeof(index_bytes))
+      return -EIO;
+    uint32_t ycount = (uint32_t)ypool.size;
+    if (fwrite(&ycount, 1, sizeof(ycount), fp) != sizeof(ycount))
+      return -EIO;
+    for (lssize_t i = 0; i < ypool.size; ++i) {
+      uint32_t o = ypool.data[i].off;
+      uint32_t l = (uint32_t)ypool.data[i].len;
+      if (fwrite(&o, 1, sizeof(o), fp) != sizeof(o) || fwrite(&l, 1, sizeof(l), fp) != sizeof(l))
+        return -EIO;
+    }
+    // Write payload bytes
+    for (lssize_t i = 0; i < ypool.size; ++i) {
+      const char* b = ypool.data[i].bytes;
+      lssize_t    bl = ypool.data[i].len;
       if (bl > 0) {
         if (fwrite(b, 1, (size_t)bl, fp) != (size_t)bl)
           return -EIO;
       }
-      cur += (uint32_t)bl;
     }
     long end = ftell(fp);
     if (end < 0)
@@ -1097,12 +1122,57 @@ int lsti_validate(const lsti_image_t* img) {
     memcpy(&string_index_bytes, img->base + (lssize_t)string_blob->file_off, sizeof(uint32_t));
     if (string_blob->size < (uint64_t)sizeof(uint32_t) + string_index_bytes) return -EINVAL;
     string_payload_base = img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t) + string_index_bytes;
+    // If index present: [u32 count][(u32 off,u32 len) * count]
+    if (string_index_bytes) {
+      if (string_index_bytes < sizeof(uint32_t)) return -EINVAL;
+      const uint8_t* ip = img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t);
+      uint32_t scnt = 0; memcpy(&scnt, ip, sizeof(uint32_t));
+      uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)scnt * (uint64_t)(sizeof(uint32_t) * 2);
+      if ((uint64_t)string_index_bytes < need) return -EINVAL;
+      uint64_t payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
+      const uint8_t* p = ip + sizeof(uint32_t);
+      uint64_t prev_end = 0;
+      for (uint32_t i = 0; i < scnt; ++i) {
+        uint32_t o = 0, l = 0;
+        memcpy(&o, p, sizeof(uint32_t));
+        memcpy(&l, p + 4, sizeof(uint32_t));
+        p += 8;
+        uint64_t off = (uint64_t)o, len = (uint64_t)l;
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
+          return -EINVAL;
+        if (off < prev_end) // overlap or disorder
+          return -EINVAL;
+        prev_end = off + len;
+      }
+    }
   }
   if (symbol_blob) {
     if (symbol_blob->size < sizeof(uint32_t)) return -EINVAL;
     memcpy(&symbol_index_bytes, img->base + (lssize_t)symbol_blob->file_off, sizeof(uint32_t));
     if (symbol_blob->size < (uint64_t)sizeof(uint32_t) + symbol_index_bytes) return -EINVAL;
     symbol_payload_base = img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t) + symbol_index_bytes;
+    if (symbol_index_bytes) {
+      if (symbol_index_bytes < sizeof(uint32_t)) return -EINVAL;
+      const uint8_t* ip = img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t);
+      uint32_t ycnt = 0; memcpy(&ycnt, ip, sizeof(uint32_t));
+      uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)ycnt * (uint64_t)(sizeof(uint32_t) * 2);
+      if ((uint64_t)symbol_index_bytes < need) return -EINVAL;
+      uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
+      const uint8_t* p = ip + sizeof(uint32_t);
+      uint64_t prev_end = 0;
+      for (uint32_t i = 0; i < ycnt; ++i) {
+        uint32_t o = 0, l = 0;
+        memcpy(&o, p, sizeof(uint32_t));
+        memcpy(&l, p + 4, sizeof(uint32_t));
+        p += 8;
+        uint64_t off = (uint64_t)o, len = (uint64_t)l;
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
+          return -EINVAL;
+        if (off < prev_end)
+          return -EINVAL;
+        prev_end = off + len;
+      }
+    }
   }
   if (pattern_tab) {
     if (pattern_tab->size < sizeof(uint32_t) + sizeof(uint32_t)) return -EINVAL; // index_bytes + count
