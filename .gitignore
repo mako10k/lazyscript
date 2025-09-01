@@ -83,3 +83,5 @@ _tmp_test*.lsti
 src/lslsti_check
 .github/user-instruction/
 src/lslstr_dump
+src/lslstr_roundtrip
+_tmp_rt.lsti

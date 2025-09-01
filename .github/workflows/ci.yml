@@ -109,6 +109,15 @@ jobs:
           # Lightweight end-to-end smoke for LSTI (write→map→validate→materialize)
           src/lslsti_check
 
+      - name: "Smoke: LSTR roundtrip (semantic equality OK)"
+        env:
+          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
+        run: |
+          # Ensure test image exists (lslsti_check writes ./_tmp_test.lsti)
+          test -f _tmp_test.lsti || src/lslsti_check
+          # Accept byte equality or semantic equality (tool exits 0 in both cases)
+          src/lslstr_roundtrip _tmp_test.lsti
+
       - name: Static analysis (cppcheck/lizard)
         run: |
           # Run cppcheck and lizard via Makefile QA target; never fail build on lint

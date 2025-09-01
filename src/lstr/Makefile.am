@@ -2,6 +2,7 @@ noinst_LTLIBRARIES = liblslstr.la
 liblslstr_la_SOURCES = \
 	lstr.h \
 	thunk_to_lstr.c \
+	lstr_to_thunk.c \
 	lstr_print.c \
 	lstr_validate.c
 

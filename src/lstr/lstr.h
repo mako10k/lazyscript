@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdio.h>
+#include "lstypes.h"
+#include "thunk/thunk.h"
 
 /* Forward decls */
 typedef struct lstr_prog lstr_prog_t;
@@ -46,3 +48,6 @@ int                lstr_validate(const lstr_prog_t* p);
 
 // Convenience: build LSTR from an LSTI file path (minimal v1)
 const lstr_prog_t* lstr_from_lsti_path(const char* path);
+
+// Convert LSTR program to runtime thunks (roots)
+int lstr_materialize_to_thunks(const lstr_prog_t* p, lsthunk_t*** out_roots, lssize_t* out_rootc, lstenv_t* env);
