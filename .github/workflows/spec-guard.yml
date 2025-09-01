@@ -1,3 +1,55 @@
+name: spec-guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verify:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect spec/grammar changes
+        id: diff
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          git --no-pager diff --name-only "$base".."$head" | tee changed.txt
+          need_guard=0
+          if grep -E '^(src/parser/parser\.y|docs/)' changed.txt >/dev/null; then
+            need_guard=1
+          fi
+          echo "need_guard=$need_guard" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure label present when spec/grammar changes detected
+        if: steps.diff.outputs.need_guard == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          label_required="spec-change"
+          labels=$(gh api repos/$REPO/issues/$PR/labels --jq '.[].name' | tr '\n' ' ')
+          echo "PR labels: $labels"
+          if ! echo " $labels " | grep -q " $label_required "; then
+            echo "::error::Missing required label: $label_required for spec/grammar changes" >&2
+            exit 1
+          fi
+
+      - name: Ensure CODEOWNERS review required (informational)
+        if: steps.diff.outputs.need_guard == '1'
+        run: |
+          echo "Spec/grammar changed. CODEOWNERS must approve: see .github/CODEOWNERS"
 name: Spec Guard
 
 on:

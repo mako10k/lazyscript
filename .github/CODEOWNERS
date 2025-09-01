@@ -1,0 +1,10 @@
+# Spec and grammar changes must be reviewed by the project owner
+/src/parser/parser.y @mako10k
+/docs/** @mako10k
+# Require owner approval for language spec and grammar changes
+docs/parser-bnf.md  @mako10k
+docs/spec/**        @mako10k
+src/parser/lexer.l  @mako10k
+src/parser/parser.y @mako10k
+# Require review if someone tries to reintroduce legacy host prelude files
+src/builtins/prelude.*  @mako10k
