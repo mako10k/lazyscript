@@ -3,6 +3,8 @@
 #include "lstr/lstr.h"
 #include "thunk/thunk.h"
 #include "common/str.h"
+#include <ctype.h>
+#include <string.h>
 
 // Minimal LSTR -> LLVM IR (text) emitter
 // - Input: LSTI image path (default: ./_tmp_test.lsti)
@@ -56,6 +58,42 @@ static void emit_ir_main_puts(FILE* out, size_t n){
   fprintf(out, "  %%1 = call i32 @puts(ptr %%0)\n");
   fprintf(out, "  ret i32 0\n");
   fprintf(out, "}\n");
+}
+
+static void mangle_ref_name(const lsstr_t* name, char* out, size_t outsz){
+  // Very simple mangling: prefix "fn_" and map non [A-Za-z0-9_] to '_'
+  if (!out || outsz==0) return;
+  size_t pos = 0;
+  const char* s = lsstr_get_buf(name);
+  lssize_t n = lsstr_get_len(name);
+  if (outsz > 3){ out[pos++]='f'; out[pos++]='n'; out[pos++]='_'; }
+  for(lssize_t i=0;i<n && pos+1<outsz;i++){
+    unsigned char c = (unsigned char)s[i];
+    if (isalnum(c) || c=='_') out[pos++]=(char)c; else out[pos++]='_';
+  }
+  out[pos]='\0';
+}
+
+static void emit_ir_decl_ext(FILE* out, const char* fname, int argc){
+  fprintf(out, "declare i32 @%s(", fname);
+  for(int i=0;i<argc;i++){
+    if(i) fputs(", ", out);
+    fputs("i32", out);
+  }
+  fputs(")\n\n", out);
+}
+
+static void emit_ir_main_call_ext_i32(FILE* out, const char* fname, int argc, const int* args){
+  fprintf(out, "define i32 @main() {\n");
+  fprintf(out, "entry:\n");
+  fputs("  %0 = call i32 @", out); fputs(fname, out); fputc('(', out);
+  for(int i=0;i<argc;i++){
+    if(i) fputs(", ", out);
+    fprintf(out, "i32 %d", args[i]);
+  }
+  fputs(")\n", out);
+  fputs("  ret i32 %0\n", out);
+  fputs("}\n", out);
 }
 
 int main(int argc, char** argv){
@@ -113,6 +151,37 @@ int main(int argc, char** argv){
   emit_ir_decl_puts(stdout);
   emit_ir_global_str(stdout, s, n);
   emit_ir_main_puts(stdout, n);
+        break;
+      }
+      case LSTTYPE_REF: {
+        const lsstr_t* nm = lsthunk_get_ref_name(r0);
+        if (nm){
+          char m[256]; mangle_ref_name(nm, m, sizeof m);
+          emit_ir_decl_ext(stdout, m, 0);
+          emit_ir_main_call_ext_i32(stdout, m, 0, NULL);
+          break;
+        }
+        emit_ir_main_ret_i32(stdout, 0);
+        break;
+      }
+      case LSTTYPE_APPL: {
+        lsthunk_t* fn = lsthunk_get_appl_func(r0);
+        if (fn && lsthunk_get_type(fn)==LSTTYPE_REF){
+          const lsstr_t* nm = lsthunk_get_ref_name(fn);
+          lssize_t ac = lsthunk_get_argc(r0);
+          lsthunk_t* const* av = lsthunk_get_args(r0);
+          // Only support all-int arguments for now
+          int ok=1; for(lssize_t i=0;i<ac;i++){ if(!(av && av[i] && lsthunk_get_type(av[i])==LSTTYPE_INT)){ ok=0; break; } }
+          if (ok && nm){
+            int bufc = (ac>0 && ac<16)? (int)ac : 0; // cap for stack array safety
+            int argv[16]; for(int i=0;i<bufc;i++){ const lsint_t* iv = lsthunk_get_int(av[i]); argv[i] = iv ? lsint_get(iv) : 0; }
+            char m[256]; mangle_ref_name(nm, m, sizeof m);
+            emit_ir_decl_ext(stdout, m, bufc);
+            emit_ir_main_call_ext_i32(stdout, m, bufc, argv);
+            break;
+          }
+        }
+        emit_ir_main_ret_i32(stdout, 0);
         break;
       }
       default:

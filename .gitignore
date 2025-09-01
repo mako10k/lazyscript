@@ -1,3 +1,6 @@
+############################################
+# Autotools: generated/build-system files  #
+############################################
 aclocal.m4
 autoscan.log
 compile
@@ -10,79 +13,92 @@ configure
 configure.scan
 depcomp
 install-sh
+ltmain.sh
+libtool
 Makefile
 Makefile.in
 stamp-h1
-ltmain.sh
-libtool
-
-m4/*.m4
-!/m4/ax_prog_doxygen.m4
+ar-lib
 autom4te.cache/
 missing
 ylwrap
-ar-lib
 
-lex.yy.c
+# m4 macros (keep specific macro tracked)
+m4/*.m4
+!/m4/ax_prog_doxygen.m4
 
-/doc/
-
+############################################
+# Build artifacts (objects, libs, libtool) #
+############################################
 .deps/
 .libs/
+**/.dirstamp
+*.o
+*.lo
+*.a
+*.la
+*.log
+*.trs
+null.d
 
-src/lazyscript
-src/lazyscript_format
-src/lazyscriptc
-src/lscoreir
-src/lsllvmir_dump
+############################################
+# Parser/Bison/Flex generated sources       #
+############################################
+lex.yy.c
 src/parser/lexer.c
 src/parser/lexer.h
 src/parser/parser.c
 src/parser/parser.h
 src/parser/parser.output
 
-*~
-*.o
-*.lo
-*.a
-*.la
-null.d
-*.log
-*.trs
+############################################
+# Built binaries (not tracked)             #
+############################################
+src/lazyscript
+src/lazyscript_format
+src/lslsti_check
+src/lslstr_dump
+src/lslstr_roundtrip
+src/lslstr_to_llvmir
+# legacy/retired tools
+src/lazyscriptc
+src/lscoreir
+src/lsllvmir_dump
 
+############################################
+# Temp files and editor cruft              #
+############################################
+*~
+
+############################################
+# Configure tests scratch                  #
+############################################
 /confdefs.h
 /conftest.h
 /conftest.c
 /conftest.err
 conftest.l
 
+############################################
+# IDE/CI metadata                          #
+############################################
 /.vscode/
-# Ignore most of GitHub metadata, but allow workflows to be tracked
+/.ci_artifacts/
+
+# Ignore most of GitHub metadata, but keep workflows
 /.github/*
 !/.github/workflows/
 !/.github/workflows/**
 
-/.ci_artifacts/
-
-
-# Logs and test harness artifacts
+############################################
+# Logs & test harness outputs              #
+############################################
 logs/
 /test-suite.log
 
-# Autotools stamps (should not be tracked)
-**/.dirstamp
-
-
-# Forbid legacy host prelude (plugin-only policy)
-src/builtins/prelude.c
-src/builtins/prelude.h
-
-
-# local LSTI smoke outputs
+############################################
+# Local LSTI/LSTR tooling scratch          #
+############################################
 _tmp_test*.lsti
-src/lslsti_check
-.github/user-instruction/
-src/lslstr_dump
-src/lslstr_roundtrip
 _tmp_rt.lsti
-src/lslstr_to_llvmir
+.github/user-instruction/
