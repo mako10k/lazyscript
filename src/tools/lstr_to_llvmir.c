@@ -50,6 +50,25 @@ static void emit_ir_global_str(FILE* out, const char* cstr, size_t n){
   fprintf(out, "\\00\"\n\n");
 }
 
+static void emit_ir_global_named_str(FILE* out, const char* gname, const char* cstr, size_t n){
+  // Emit named private constant: @gname = private unnamed_addr constant [N x i8] c"...\00"
+  fprintf(out, "@%s = private unnamed_addr constant [%zu x i8] c\"", gname, n + 1);
+  for(size_t i=0;i<n;i++){
+    unsigned char ch = (unsigned char)cstr[i];
+    switch(ch){
+      case '\\': fprintf(out, "\\\\"); break;
+      case '"': fprintf(out, "\\\""); break;
+      case '\n': fprintf(out, "\\0A"); break;
+      case '\r': fprintf(out, "\\0D"); break;
+      case '\t': fprintf(out, "\\09"); break;
+      default:
+        if (ch >= 32 && ch <= 126) { fputc(ch, out); }
+        else { fprintf(out, "\\%02X", ch); }
+    }
+  }
+  fprintf(out, "\\00\"\n\n");
+}
+
 static void emit_ir_main_puts(FILE* out, size_t n){
   // gep to the head of @.str and call puts
   fprintf(out, "define i32 @main() {\n");
@@ -96,6 +115,25 @@ static void emit_ir_main_call_ext_i32(FILE* out, const char* fname, int argc, co
   fputs("}\n", out);
 }
 
+static void mangle_sym_ir_label(const char* s, size_t n, char* out, size_t outsz){
+  // Build a safe label for IR identifiers: map non [A-Za-z0-9_.] to '_'
+  if (!out || outsz==0) return;
+  size_t pos = 0;
+  for(size_t i=0;i<n && pos+1<outsz;i++){
+    unsigned char c = (unsigned char)s[i];
+    if (isalnum(c) || c=='_' || c=='.') out[pos++]=(char)c; else out[pos++]='_';
+  }
+  out[pos] = '\0';
+}
+
+static void emit_ir_main_bind_sym_and_ret0(FILE* out, const char* reg, const char* gname, size_t n){
+  fprintf(out, "define i32 @main() {\n");
+  fprintf(out, "entry:\n");
+  fprintf(out, "  %%%s = getelementptr inbounds ([%zu x i8], ptr @%s, i64 0, i64 0)\n", reg, n + 1, gname);
+  fprintf(out, "  ret i32 0\n");
+  fprintf(out, "}\n");
+}
+
 int main(int argc, char** argv){
   const char* path = (argc > 1) ? argv[1] : "./_tmp_test.lsti";
   long root_index = 0;
@@ -132,6 +170,11 @@ int main(int argc, char** argv){
       case LSTTYPE_ALGE: {
         const lsstr_t* c = lsthunk_get_constr(r0);
         lssize_t ac = lsthunk_get_argc(r0);
+        // Bool-like zero-arg constructors: 'true'/'false'
+        if (c && ac == 0) {
+          if (lsstrcmp(c, lsstr_cstr("true")) == 0 || lsstrcmp(c, lsstr_cstr(".true")) == 0) { emit_ir_main_ret_i32(stdout, 1); break; }
+          if (lsstrcmp(c, lsstr_cstr("false")) == 0 || lsstrcmp(c, lsstr_cstr(".false")) == 0) { emit_ir_main_ret_i32(stdout, 0); break; }
+        }
         // Result-like Ok payloads
         if (c && lsstrcmp(c, lsstr_cstr(".Ok")) == 0 && ac == 1) {
           lsthunk_t* const* args = lsthunk_get_args(r0);
@@ -157,10 +200,24 @@ int main(int argc, char** argv){
         break;
       }
       case LSTTYPE_SYMBOL: {
-        const lsstr_t* sym = lsthunk_get_symbol(r0);
-        if (sym) {
-          if (lsstrcmp(sym, lsstr_cstr(".True")) == 0) { emit_ir_main_ret_i32(stdout, 1); break; }
-          if (lsstrcmp(sym, lsstr_cstr(".False")) == 0) { emit_ir_main_ret_i32(stdout, 0); break; }
+        const lsstr_t* sv = lsthunk_get_symbol(r0);
+        if (sv) {
+          const char* s = lsstr_get_buf(sv);
+          size_t n = (size_t)lsstr_get_len(sv);
+          // Strip leading '.' from textual content when emitting the string value
+          const char* text = s;
+          size_t textn = n;
+          if (textn > 0 && text[0] == '.') { text++; textn--; }
+          // Build IR-friendly label base
+          char labelbuf[256]; mangle_sym_ir_label(text, textn, labelbuf, sizeof labelbuf);
+          // Global name and register name
+          char gname[300]; snprintf(gname, sizeof gname, "sym.%s", labelbuf);
+          char reg[300]; snprintf(reg, sizeof reg, "sym.%s", labelbuf);
+          // Emit global for symbol text
+          emit_ir_global_named_str(stdout, gname, text, textn);
+          // Bind pointer in main and return 0
+          emit_ir_main_bind_sym_and_ret0(stdout, reg, gname, textn);
+          break;
         }
         emit_ir_main_ret_i32(stdout, 0);
         break;
