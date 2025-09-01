@@ -264,18 +264,29 @@ struct LSTI_Section { u32 kind; u32 reserved; u64 file_off; u64 size; };
 ```
 
 ### 主要セクション
-- STRING_BLOB: 連結文字列バッファ（UTF-8）。テーブルは持たず raw 連結のみ。
+ STRING_BLOB: 連結文字列バッファ（UTF-8）。テーブルは持たず raw 連結のみ。
   - 参照側（STR/BOTTOM など）が offset(u32) と len(u32) を併せて保持する。
-- SYMBOL_BLOB: 同上（シンボル名やコンストラクタ名）。
   - 参照側（SYMBOL/ALGE など）が offset(u32) と len(u32) を併せて保持する。
-- PATTERN_TAB: 固定ヘッダ + 可変部。参照は u32 offset/ID。
+ PATTERN_TAB: 固定ヘッダ + 可変部。参照は u32 offset/ID。
+  - レイアウト（実装済 v1 subset）:
+    - u32 count
+    - u64 entry_off[count]（セクション先頭からの相対オフセット）
+    - entries[count]: 各 entry は先頭に kind:u8（LSPTYPE_* と同値）を持ち、payload は以下。
+      - ALGE: u32 constr_len, u32 constr_off（SYMBOL_BLOB 内）, u32 argc, u32 child_ids[argc]
+      - AS:   u32 ref_pat_id, u32 inner_pat_id
+      - INT:  i64 value
+      - STR:  u32 str_len, u32 str_off（STRING_BLOB 内）
+      - REF:  u32 name_len, u32 name_off（SYMBOL_BLOB 内）
+      - WILDCARD: なし
+      - OR:   u32 left_id, u32 right_id
+      - CARET:u32 inner_id
 - THUNK_TAB: 各ノードは固定ヘッダ（kind:u8, flags:u8, arity_or_len:u32, extra:u32）+ 可変部。
-- ROOTS: u32 count + u32 ids[]。
 - TYPE_TAB: 型参照テーブル（LSTB と同様の種別、ペイロードは u32 オフセット/長）。
-
+ LAMBDA: arity_or_len=param_pat_id（PATTERN_TAB のエントリ ID）, extra=body_thunk_id
+  - 可変部: なし（param は PATTERN_TAB で復元、body は第2段で接続）
 ### ノード固定ヘッダ（v1 subset 実装）
 ```
-struct LSTI_Thunk {
+ - PATTERN_TAB は任意セクションだが、LAMBDA が存在する場合は必須。validator は LAMBDA の param_pat_id が PATTERN_TAB.count 未満であることを検証する。
   u8  kind;   // LSTB と同一割当
   u8  flags;  // WHNF/has_type など
   u16 pad;

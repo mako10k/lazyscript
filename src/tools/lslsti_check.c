@@ -41,7 +41,13 @@ int main(int argc, char** argv) {
   // Use a local dummy func to avoid linking real builtins.
   lsthunk_t* tbi =
       lsthunk_new_builtin_attr(lsstr_cstr("prelude.print"), 1, lsdummy_builtin, NULL, 0);
-  lsthunk_t* roots[6]   = { ti, ts, ty, talge, tbot, tbi };
+  // LAMBDA: \x -> x  （param = REF x, body = REF x）
+  const lsref_t*  xr    = lsref_new(lsstr_cstr("x"), lstrace_take_pending_or_unknown());
+  lstpat_t*       xpat  = lstpat_new_ref(xr);
+  lsthunk_t*      lam   = lsthunk_alloc_lambda(xpat);
+  lsthunk_t*      xref  = lsthunk_new_ref(xr, env);
+  lsthunk_set_lambda_body(lam, xref);
+  lsthunk_t* roots[7]   = { ti, ts, ty, talge, tbot, tbi, lam };
 
   FILE*      fp = fopen(path, "wb");
   if (!fp) {
@@ -49,7 +55,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   lsti_write_opts_t opt = { .align_log2 = LSTI_ALIGN_8, .flags = 0 };
-  int               rc  = lsti_write(fp, roots, 6, &opt);
+  int               rc  = lsti_write(fp, roots, 7, &opt);
   fclose(fp);
   if (rc != 0) {
     fprintf(stderr, "lsti_write rc=%d\n", rc);
@@ -68,7 +74,7 @@ int main(int argc, char** argv) {
     lsti_unmap(&img);
     return 4;
   }
-  // Try materialize (now supports INT/STR/SYMBOL/ALGE/BOTTOM subset)
+  // Try materialize (now supports INT/STR/SYMBOL/ALGE/BOTTOM/APPL/CHOICE/REF/LAMBDA subset)
   lsthunk_t** out_roots = NULL;
   lssize_t    outc      = 0;
   rc                    = lsti_materialize(&img, &out_roots, &outc, env);
