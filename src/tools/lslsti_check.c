@@ -8,6 +8,15 @@
 #include "expr/ealge.h"
 #include "common/malloc.h"
 #include "runtime/trace.h"
+// Note: We don't need real runtime builtins here; provide a local dummy.
+
+// Local dummy builtin function (never actually evaluated in this smoke)
+static lsthunk_t* lsdummy_builtin(lssize_t argc, lsthunk_t* const* args, void* data) {
+  (void)argc;
+  (void)args;
+  (void)data;
+  return lsthunk_bottom_here("dummy-builtin should not run in lslsti_check");
+}
 
 int main(int argc, char** argv) {
   const char* path = (argc > 1) ? argv[1] : "./_tmp_test.lsti";
@@ -28,7 +37,11 @@ int main(int argc, char** argv) {
   // BOTTOM: message and one related using public API
   lsthunk_t* related[1] = { ts };
   lsthunk_t* tbot       = lsthunk_new_bottom("boom", lstrace_take_pending_or_unknown(), 1, related);
-  lsthunk_t* roots[5]   = { ti, ts, ty, talge, tbot };
+  // BUILTIN: prelude.print (arity 1) — writer will encode as REF("prelude.print")
+  // Use a local dummy func to avoid linking real builtins.
+  lsthunk_t* tbi =
+      lsthunk_new_builtin_attr(lsstr_cstr("prelude.print"), 1, lsdummy_builtin, NULL, 0);
+  lsthunk_t* roots[6]   = { ti, ts, ty, talge, tbot, tbi };
 
   FILE*      fp = fopen(path, "wb");
   if (!fp) {
@@ -36,7 +49,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   lsti_write_opts_t opt = { .align_log2 = LSTI_ALIGN_8, .flags = 0 };
-  int               rc  = lsti_write(fp, roots, 5, &opt);
+  int               rc  = lsti_write(fp, roots, 6, &opt);
   fclose(fp);
   if (rc != 0) {
     fprintf(stderr, "lsti_write rc=%d\n", rc);
