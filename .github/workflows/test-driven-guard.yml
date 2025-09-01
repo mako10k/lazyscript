@@ -1,0 +1,51 @@
+name: test-driven-guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verify:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect code changes and failing-tests-driven label
+        id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git --no-pager diff --name-only "$BASE".."$HEAD" | tee changed.txt
+          changes_code=0
+          if grep -E '^src/' changed.txt >/dev/null; then
+            changes_code=1
+          fi
+          echo "changes_code=$changes_code" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce approval label for test-driven code changes
+        if: steps.diff.outputs.changes_code == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # If author declares test-driven via label, then require explicit approval label too
+          labels=$(gh api repos/$REPO/issues/$PR/labels --jq '.[].name' | tr '\n' ' ')
+          echo "PR labels: $labels"
+          if echo " $labels " | grep -q " test-driven "; then
+            if ! echo " $labels " | grep -q " test-driven-approved "; then
+              echo "::error::Missing required label: test-driven-approved for test-driven code changes" >&2
+              exit 1
+            fi
+          fi
