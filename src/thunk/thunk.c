@@ -254,6 +254,95 @@ void lsthunk_set_bottom_related(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg) 
   thunk->lt_bottom.lt_rel.lbr_args[idx] = arg;
 }
 
+// --- APPL helpers (two-phase wiring) --------------------------------------
+
+lsthunk_t* lsthunk_alloc_appl(lssize_t argc) {
+  if (argc < 0)
+    return NULL;
+  lsthunk_t* t   = lsmalloc(lssizeof(lsthunk_t, lt_appl) + (size_t)argc * sizeof(lsthunk_t*));
+  t->lt_type     = LSTTYPE_APPL;
+  t->lt_whnf     = NULL;
+  t->lt_trace_id = g_trace_next_id++;
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
+  t->lt_appl.lta_func = NULL;
+  t->lt_appl.lta_argc = argc;
+  for (lssize_t i = 0; i < argc; i++)
+    t->lt_appl.lta_args[i] = NULL;
+  return t;
+}
+
+void lsthunk_set_appl_func(lsthunk_t* thunk, lsthunk_t* func) {
+  if (!thunk || thunk->lt_type != LSTTYPE_APPL)
+    return;
+  thunk->lt_appl.lta_func = func;
+}
+
+void lsthunk_set_appl_arg(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg) {
+  if (!thunk || thunk->lt_type != LSTTYPE_APPL)
+    return;
+  if (idx < 0 || idx >= thunk->lt_appl.lta_argc)
+    return;
+  thunk->lt_appl.lta_args[idx] = arg;
+}
+
+lsthunk_t* lsthunk_get_appl_func(const lsthunk_t* thunk) {
+  if (!thunk || thunk->lt_type != LSTTYPE_APPL)
+    return NULL;
+  return thunk->lt_appl.lta_func;
+}
+
+// --- CHOICE helpers -------------------------------------------------------
+
+lsthunk_t* lsthunk_alloc_choice(int kind) {
+  lsthunk_t* t   = lsmalloc(lssizeof(lsthunk_t, lt_choice));
+  t->lt_type     = LSTTYPE_CHOICE;
+  t->lt_whnf     = NULL;
+  t->lt_trace_id = g_trace_next_id++;
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
+  t->lt_choice.ltc_left  = NULL;
+  t->lt_choice.ltc_right = NULL;
+  t->lt_choice.ltc_kind  = kind;
+  return t;
+}
+
+void lsthunk_set_choice_left(lsthunk_t* thunk, lsthunk_t* left) {
+  if (!thunk || thunk->lt_type != LSTTYPE_CHOICE)
+    return;
+  thunk->lt_choice.ltc_left = left;
+}
+
+void lsthunk_set_choice_right(lsthunk_t* thunk, lsthunk_t* right) {
+  if (!thunk || thunk->lt_type != LSTTYPE_CHOICE)
+    return;
+  thunk->lt_choice.ltc_right = right;
+}
+
+int lsthunk_get_choice_kind(const lsthunk_t* thunk) {
+  if (!thunk || thunk->lt_type != LSTTYPE_CHOICE)
+    return 0;
+  return thunk->lt_choice.ltc_kind;
+}
+
+lsthunk_t* lsthunk_get_choice_left(const lsthunk_t* thunk) {
+  if (!thunk || thunk->lt_type != LSTTYPE_CHOICE)
+    return NULL;
+  return thunk->lt_choice.ltc_left;
+}
+
+lsthunk_t* lsthunk_get_choice_right(const lsthunk_t* thunk) {
+  if (!thunk || thunk->lt_type != LSTTYPE_CHOICE)
+    return NULL;
+  return thunk->lt_choice.ltc_right;
+}
+
+// --- REF helper -----------------------------------------------------------
+
+const lsstr_t* lsthunk_get_ref_name(const lsthunk_t* thunk) {
+  if (!thunk || thunk->lt_type != LSTTYPE_REF)
+    return NULL;
+  return lsref_get_name(thunk->lt_ref.ltr_ref);
+}
+
 lsthunk_t* lsthunk_new_ealge(const lsealge_t* ealge, lstenv_t* tenv) {
   lssize_t               eargc = lsealge_get_argc(ealge);
   const lsexpr_t* const* eargs = lsealge_get_args(ealge);

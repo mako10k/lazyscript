@@ -7,6 +7,7 @@
 #include "common/malloc.h"
 #include "runtime/trace.h"
 #include "thunk_bin.h"
+#include "common/ref.h"
 #include <stddef.h>
 
 #ifndef ENABLE_LSTI
@@ -244,6 +245,55 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       }
       break;
     }
+    case LSTTYPE_APPL: {
+      // enqueue func and args
+      lsthunk_t* func = lsthunk_get_appl_func(t);
+      if (func) {
+        int id;
+        GET_ID(func, id);
+        if (id < 0) {
+          VEC_PUSH(nodes, func, lsthunk_t*);
+        }
+      }
+      lssize_t          ac = lsthunk_get_argc(t);
+      lsthunk_t* const* as = lsthunk_get_args(t);
+      for (lssize_t i = 0; i < ac; ++i) {
+        lsthunk_t* ch = as[i];
+        int        id;
+        GET_ID(ch, id);
+        if (id < 0) {
+          VEC_PUSH(nodes, ch, lsthunk_t*);
+        }
+      }
+      break;
+    }
+    case LSTTYPE_CHOICE: {
+      lsthunk_t* l = lsthunk_get_choice_left(t);
+      lsthunk_t* r = lsthunk_get_choice_right(t);
+      if (l) {
+        int id;
+        GET_ID(l, id);
+        if (id < 0)
+          VEC_PUSH(nodes, l, lsthunk_t*);
+      }
+      if (r) {
+        int id;
+        GET_ID(r, id);
+        if (id < 0)
+          VEC_PUSH(nodes, r, lsthunk_t*);
+      }
+      break;
+    }
+    case LSTTYPE_REF: {
+      // external-by-name only for now: add name to symbol pool
+      const lsstr_t* name = lsthunk_get_ref_name(t);
+      if (name) {
+        int __idx;
+        ADD_YPOOL(name, __idx);
+        (void)__idx;
+      }
+      break;
+    }
     case LSTTYPE_BOTTOM: {
       const char* msg = lsthunk_bottom_get_message(t);
       if (msg) {
@@ -430,6 +480,44 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       }
       break;
     }
+    case LSTTYPE_APPL: {
+      hdr2.kind = (uint8_t)LSTB_KIND_APPL;
+      // header: aorl = argc, extra = func_id, payload: arg ids
+      lsthunk_t* func = lsthunk_get_appl_func(t);
+      int        fid  = -1;
+      if (func) {
+        GET_ID(func, fid);
+      }
+      if (fid < 0) {
+        free(rel_offs);
+        return -EIO;
+      }
+      lssize_t ac = lsthunk_get_argc(t);
+      hdr2.aorl   = (uint32_t)ac;
+      hdr2.extra  = (uint32_t)fid;
+      break;
+    }
+    case LSTTYPE_CHOICE: {
+      hdr2.kind = (uint8_t)LSTB_KIND_CHOICE;
+      // aorl = choice_kind, payload: left_id, right_id
+      hdr2.aorl = (uint32_t)lsthunk_get_choice_kind(t);
+      hdr2.extra = 0;
+      break;
+    }
+    case LSTTYPE_REF: {
+      hdr2.kind         = (uint8_t)LSTB_KIND_REF;
+      const lsstr_t* s  = lsthunk_get_ref_name(t);
+      if (s) {
+        int idx;
+        ADD_YPOOL(s, idx);
+        hdr2.aorl  = (uint32_t)lsstr_get_len(s);
+        hdr2.extra = (uint32_t)ypool.data[idx].off;
+      } else {
+        free(rel_offs);
+        return -EIO;
+      }
+      break;
+    }
     case LSTTYPE_ALGE: {
       hdr2.kind        = (uint8_t)LSTB_KIND_ALGE; // numbering shared with LSTB
       const lsstr_t* c = lsthunk_get_constr(t);
@@ -492,7 +580,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
           }
         }
       }
-    } else if (paykind == PAY_BOTTOM) {
+  } else if (paykind == PAY_BOTTOM) {
       // write message len, then related ids
       if (fwrite(&pay_len_or_reserved, 1, sizeof(uint32_t), fp) != sizeof(uint32_t)) {
         free(rel_offs);
@@ -516,7 +604,42 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
         }
       }
     } else {
-      // no payload
+      // If APPL: payload is arg ids; if CHOICE: payload is 2 ids; if REF/INT/STR/SYMBOL: none
+      if (lsthunk_get_type(t) == LSTTYPE_APPL) {
+        lssize_t          ac = (lssize_t)hdr2.aorl;
+        lsthunk_t* const* as = lsthunk_get_args(t);
+        for (lssize_t k = 0; k < ac; ++k) {
+          int id;
+          GET_ID(as[k], id);
+          if (id < 0) {
+            free(rel_offs);
+            return -EIO;
+          }
+          uint32_t cid = (uint32_t)id;
+          if (fwrite(&cid, 1, sizeof(cid), fp) != sizeof(cid)) {
+            free(rel_offs);
+            return -EIO;
+          }
+        }
+      } else if (lsthunk_get_type(t) == LSTTYPE_CHOICE) {
+        lsthunk_t* l = lsthunk_get_choice_left(t);
+        lsthunk_t* r = lsthunk_get_choice_right(t);
+        int        lid = -1, rid = -1;
+        if (l) GET_ID(l, lid);
+        if (r) GET_ID(r, rid);
+        if (lid < 0 || rid < 0) {
+          free(rel_offs);
+          return -EIO;
+        }
+        uint32_t l32 = (uint32_t)lid, r32 = (uint32_t)rid;
+        if (fwrite(&l32, 1, sizeof(l32), fp) != sizeof(l32) ||
+            fwrite(&r32, 1, sizeof(r32), fp) != sizeof(r32)) {
+          free(rel_offs);
+          return -EIO;
+        }
+      } else {
+        // no payload
+      }
     }
   }
   long thtab_end = ftell(fp);
@@ -764,7 +887,7 @@ int lsti_validate(const lsti_image_t* img) {
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
         if (off > sz || len > sz || off + len > sz)
           return -EINVAL;
-      } else if (kind == (uint8_t)LSTB_KIND_ALGE) {
+  } else if (kind == (uint8_t)LSTB_KIND_ALGE) {
         if (!symbol_blob)
           return -EINVAL;
         // payload starts after header: u32 constr_len, then child ids
@@ -783,7 +906,7 @@ int lsti_validate(const lsti_image_t* img) {
                                             sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) +
                                             need)
           return -EINVAL;
-      } else if (kind == (uint8_t)LSTB_KIND_BOTTOM) {
+  } else if (kind == (uint8_t)LSTB_KIND_BOTTOM) {
         if (!string_blob)
           return -EINVAL;
         uint32_t msg_len = 0;
@@ -799,6 +922,38 @@ int lsti_validate(const lsti_image_t* img) {
         if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) +
                                             sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) +
                                             need)
+          return -EINVAL;
+      } else if (kind == (uint8_t)LSTB_KIND_APPL) {
+        // payload: arg ids[argc]
+        uint64_t need = (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
+        uint64_t have = thunk_tab->size - offs[i];
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) +
+                           sizeof(uint32_t) + sizeof(uint32_t) + need)
+          return -EINVAL;
+        if (extra >= ncnt)
+          return -EINVAL; // func_id
+      } else if (kind == (uint8_t)LSTB_KIND_CHOICE) {
+        // aorl=choice_kind in 1..3; payload: left,right
+        if (aorl < 1 || aorl > 3)
+          return -EINVAL;
+        uint64_t need = 2u * (uint64_t)sizeof(uint32_t);
+        uint64_t have = thunk_tab->size - offs[i];
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) +
+                           sizeof(uint32_t) + sizeof(uint32_t) + need)
+          return -EINVAL;
+        // we'll check ids range in materializer, but bounds here too
+        const uint8_t* p = ent + 12;
+        uint32_t       lid = 0, rid = 0;
+        memcpy(&lid, p, sizeof(uint32_t));
+        memcpy(&rid, p + 4, sizeof(uint32_t));
+        if (lid >= ncnt || rid >= ncnt)
+          return -EINVAL;
+      } else if (kind == (uint8_t)LSTB_KIND_REF) {
+        if (!symbol_blob)
+          return -EINVAL;
+        uint64_t sz  = symbol_blob->size;
+        uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
+        if (off > sz || len > sz || off + len > sz)
           return -EINVAL;
       }
     }
@@ -844,8 +999,10 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   if (!nodes)
     return -ENOMEM;
   typedef struct {
-    lssize_t  argc;
-    uint32_t* ids;
+    uint8_t   kind;   // 0=none,1=ALGE,2=BOTTOM,3=APPL,4=CHOICE
+    lssize_t  argc;   // ALGE/BOTTOM/APP: number of IDs in ids[]; CHOICE: 2
+    uint32_t* ids;    // children ids (APP=args; CHOICE=[left,right])
+    uint32_t  extra;  // APP=function id
   } pend_t;
   pend_t* pend = (pend_t*)calloc(ncnt, sizeof(pend_t));
   if (!pend) {
@@ -859,7 +1016,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   for (uint32_t i = 0; i < ncnt; ++i) {
     const uint8_t* ent  = tt + offs[i];
     uint8_t        kind = ent[0];
-    switch (kind) {
+  switch (kind) {
     case LSTB_KIND_INT: {
       uint32_t val = 0;
       memcpy(&val, ent + 8, sizeof(uint32_t));
@@ -911,6 +1068,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       lsthunk_t* t = lsthunk_alloc_alge(cstr, (lssize_t)argc);
       nodes[i]     = t;
       if (argc > 0) {
+        pend[i].kind = 1;
         pend[i].argc = (lssize_t)argc;
         pend[i].ids  = (uint32_t*)malloc(sizeof(uint32_t) * (size_t)argc);
         if (!pend[i].ids) {
@@ -949,6 +1107,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       lsthunk_t* t = lsthunk_alloc_bottom(m, lstrace_take_pending_or_unknown(), (lssize_t)rc);
       nodes[i]     = t;
       if (rc > 0) {
+        pend[i].kind = 2;
         pend[i].argc = (lssize_t)rc;
         pend[i].ids  = (uint32_t*)malloc(sizeof(uint32_t) * (size_t)rc);
         if (!pend[i].ids) {
@@ -965,6 +1124,83 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       }
       break;
     }
+    case LSTB_KIND_APPL: {
+      // header fields: aorl=argc, extra=func_id; payload: args ids
+      uint32_t argc = 0, fid = 0;
+      memcpy(&argc, ent + 4, sizeof(uint32_t));
+      memcpy(&fid, ent + 8, sizeof(uint32_t));
+      const uint8_t* p = ent + 12;
+      lsthunk_t*     t = lsthunk_alloc_appl((lssize_t)argc);
+      if (!t) {
+        free(pend);
+        free(nodes);
+        return -ENOMEM;
+      }
+      nodes[i]     = t;
+      pend[i].kind = 3;
+      pend[i].argc = (lssize_t)argc;
+      pend[i].extra = fid;
+      if (argc > 0) {
+        pend[i].ids = (uint32_t*)malloc(sizeof(uint32_t) * (size_t)argc);
+        if (!pend[i].ids) {
+          free(pend);
+          free(nodes);
+          return -ENOMEM;
+        }
+        for (uint32_t j = 0; j < argc; ++j) {
+          uint32_t idj = 0;
+          memcpy(&idj, p, sizeof(uint32_t));
+          p += 4;
+          pend[i].ids[j] = idj;
+        }
+      } else {
+        pend[i].ids = NULL;
+      }
+      break;
+    }
+    case LSTB_KIND_CHOICE: {
+      // aorl=choice_kind; payload: left,right ids
+      uint32_t ck = 0;
+      memcpy(&ck, ent + 4, sizeof(uint32_t));
+      const uint8_t* p = ent + 12;
+      uint32_t       lid = 0, rid = 0;
+      memcpy(&lid, p, sizeof(uint32_t));
+      memcpy(&rid, p + 4, sizeof(uint32_t));
+      lsthunk_t* t = lsthunk_alloc_choice((int)ck);
+      if (!t) {
+        free(pend);
+        free(nodes);
+        return -ENOMEM;
+      }
+      nodes[i]      = t;
+      pend[i].kind  = 4;
+      pend[i].argc  = 2;
+      pend[i].ids   = (uint32_t*)malloc(sizeof(uint32_t) * 2);
+      if (!pend[i].ids) {
+        free(pend);
+        free(nodes);
+        return -ENOMEM;
+      }
+      pend[i].ids[0] = lid;
+      pend[i].ids[1] = rid;
+      break;
+    }
+    case LSTB_KIND_REF: {
+      // aorl=len, extra=offset into SYMBOL_BLOB
+      if (!symbol_blob) {
+        free(pend);
+        free(nodes);
+        return -EINVAL;
+      }
+      uint32_t len = 0, off = 0;
+      memcpy(&len, ent + 4, sizeof(uint32_t));
+      memcpy(&off, ent + 8, sizeof(uint32_t));
+      const char*    base = (const char*)(img->base + (lssize_t)symbol_blob->file_off);
+      const lsstr_t* s    = lsstr_new(base + off, (lssize_t)len);
+      const lsref_t* r    = lsref_new(s, lstrace_take_pending_or_unknown());
+      nodes[i]            = lsthunk_new_ref(r, prelude_env);
+      break;
+    }
     default: {
       // Not supported in this subset
       for (uint32_t k = 0; k < i; ++k) { /* GC managed by Boehm */
@@ -977,16 +1213,25 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   }
   // Second pass: wire pending edges
   for (uint32_t i = 0; i < ncnt; ++i) {
-    if (pend[i].argc > 0 && pend[i].ids) {
-      if (lsthunk_get_type(nodes[i]) == LSTTYPE_ALGE) {
+    if ((pend[i].argc > 0 && pend[i].ids) || pend[i].kind == 3 || pend[i].kind == 4) {
+      if (pend[i].kind == 1 && lsthunk_get_type(nodes[i]) == LSTTYPE_ALGE) {
         for (lssize_t j = 0; j < pend[i].argc; ++j)
           lsthunk_set_alge_arg(nodes[i], j, nodes[pend[i].ids[j]]);
-      } else if (lsthunk_get_type(nodes[i]) == LSTTYPE_BOTTOM) {
+      } else if (pend[i].kind == 2 && lsthunk_get_type(nodes[i]) == LSTTYPE_BOTTOM) {
         for (lssize_t j = 0; j < pend[i].argc; ++j)
           lsthunk_set_bottom_related(nodes[i], j, nodes[pend[i].ids[j]]);
+      } else if (pend[i].kind == 3 && lsthunk_get_type(nodes[i]) == LSTTYPE_APPL) {
+        lsthunk_set_appl_func(nodes[i], nodes[pend[i].extra]);
+        for (lssize_t j = 0; j < pend[i].argc; ++j)
+          lsthunk_set_appl_arg(nodes[i], j, nodes[pend[i].ids[j]]);
+      } else if (pend[i].kind == 4 && lsthunk_get_type(nodes[i]) == LSTTYPE_CHOICE) {
+        lsthunk_set_choice_left(nodes[i], nodes[pend[i].ids[0]]);
+        lsthunk_set_choice_right(nodes[i], nodes[pend[i].ids[1]]);
       }
-      free(pend[i].ids);
-      pend[i].ids  = NULL;
+      if (pend[i].ids) {
+        free(pend[i].ids);
+        pend[i].ids = NULL;
+      }
       pend[i].argc = 0;
     }
   }

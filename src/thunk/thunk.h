@@ -170,6 +170,26 @@ lsthunk_t* lsthunk_alloc_bottom(const char* message, lsloc_t loc, lssize_t argc)
 // Set the i-th related thunk on a BOTTOM allocated via lsthunk_alloc_bottom
 void lsthunk_set_bottom_related(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg);
 
+// Allocate an APPL thunk with reserved argument slots; func is set later via setter
+lsthunk_t* lsthunk_alloc_appl(lssize_t argc);
+void       lsthunk_set_appl_func(lsthunk_t* thunk, lsthunk_t* func);
+void       lsthunk_set_appl_arg(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg);
+
+// Allocate a CHOICE thunk; left/right are set later. kind follows lstb_choice_kind_t values.
+lsthunk_t* lsthunk_alloc_choice(int kind);
+void       lsthunk_set_choice_left(lsthunk_t* thunk, lsthunk_t* left);
+void       lsthunk_set_choice_right(lsthunk_t* thunk, lsthunk_t* right);
+
+// Lightweight getters used by serializers
+// When thunk is APPL, return function child (may be NULL for partially wired)
+lsthunk_t*       lsthunk_get_appl_func(const lsthunk_t* thunk);
+// Choice helpers
+int              lsthunk_get_choice_kind(const lsthunk_t* thunk);
+lsthunk_t*       lsthunk_get_choice_left(const lsthunk_t* thunk);
+lsthunk_t*       lsthunk_get_choice_right(const lsthunk_t* thunk);
+// Ref name accessor (external/builtin by name serialization)
+const lsstr_t*   lsthunk_get_ref_name(const lsthunk_t* thunk);
+
 /**
  * Create a new thunk for an expression
  * @param expr The expression
