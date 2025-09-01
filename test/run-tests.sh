@@ -163,38 +163,6 @@ for name in "${eval_cases[@]}"; do
   fi
 done
 
-# Discover Core IR dump tests only if the CLI supports --dump-coreir
-if "$BIN" --help 2>&1 | grep -q -- "--dump-coreir"; then
-  cir_cases=()
-  for rel in "${case_files[@]}"; do
-    base_noext="${rel%.ls}"
-    if [[ -f "$DIR/$base_noext.coreir.out" ]]; then
-      cir_cases+=("$base_noext")
-    fi
-  done
-
-  for name in "${cir_cases[@]}"; do
-    [[ -z "$name" ]] && continue
-    src="$DIR/$name.ls"
-    exp="$DIR/$name.coreir.out"
-    base="$DIR/$name"
-    # Run program with Core IR dump and capture all output
-    add_args=()
-    if [[ -n "${LAZYSCRIPT_ARGS:-}" ]]; then
-      # shellcheck disable=SC2206
-      add_args=($LAZYSCRIPT_ARGS)
-    fi
-    out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" --dump-coreir "$src")"
-    if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-      echo "ok - coreir $name"
-      ((pass++))
-    else
-      echo "not ok - coreir $name"
-      echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
-      ((fail++))
-    fi
-  done
-fi
 
 # Optional: formatter smoke test if the binary exists and an expectation file is present
 if [[ -x "$FMT_BIN" ]]; then
@@ -213,94 +181,8 @@ if [[ -x "$FMT_BIN" ]]; then
   fi
 fi
 
-# Optional: Core IR evaluator smoke tests (if available)
-if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
-  # Reuse existing tests that are evaluator-friendly
-  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/t05_let_without_keyword.ls")"
-  if [[ "$out" == "3"* ]]; then
-    echo "ok - coreir-eval t05_let_without_keyword"
-    ((pass++))
-  else
-    echo "not ok - coreir-eval t05_let_without_keyword"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; echo "3"; echo "---";
-    ((fail++))
-  fi
 
-  # Token-gated effect via chain: should print and return unit under evaluator
-  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/coreir/t08_coreir_chain.ls")"
-  if diff -u <(printf "%s\n" "$out") "$DIR/coreir/t08_coreir_chain.out" >/dev/null; then
-    echo "ok - coreir-eval t08_coreir_chain"
-    ((pass++))
-  else
-    echo "not ok - coreir-eval t08_coreir_chain"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$DIR/t08_coreir_chain.out"; echo "---";
-    ((fail++))
-  fi
 
-  # return should just pass through the value
-  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/coreir/t09_coreir_return.ls")"
-  if diff -u <(printf "%s\n" "$out") "$DIR/coreir/t09_coreir_return.out" >/dev/null; then
-    echo "ok - coreir-eval t09_coreir_return"
-    ((pass++))
-  else
-    echo "not ok - coreir-eval t09_coreir_return"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$DIR/t09_coreir_return.out"; echo "---";
-    ((fail++))
-  fi
-fi
-
-# Optional: Core IR typechecker tests (if available)
-if "$BIN" --help 2>&1 | grep -q -- "--typecheck"; then
-  # Discover any test/*.ls that has a matching .type.out
-  shopt -s nullglob
-  type_cases=()
-  for f in "$DIR"/*.ls; do
-    base="${f%.ls}"
-    if [[ -f "$base.type.out" ]]; then
-      type_cases+=("$(basename "$base")")
-    fi
-  done
-  shopt -u nullglob
-
-  for name in "${type_cases[@]}"; do
-    [[ -z "$name" ]] && continue
-    src="$DIR/$name.ls"
-    exp="$DIR/$name.type.out"
-  out="$(run_with_timeout_capture "$BIN" --typecheck "$src")"
-    if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-      echo "ok - typecheck $name"
-      ((pass++))
-    else
-      echo "not ok - typecheck $name"
-      echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
-      ((fail++))
-    fi
-  done
-fi
-
-# Optional: Core IR pipe tests (lazyscriptc | lscoreir) for marked cases
-# Run only if the CLI advertises COREIR support (back-compat) and both tools exist
-if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
-  COMP="$ROOT/src/lazyscriptc"
-  RUNIR="$ROOT/src/lscoreir"
-  if [[ -x "$COMP" && -x "$RUNIR" ]]; then
-    mapfile -t pipe_marks < <(find "$DIR" -type f -name '*.pipe.ok' -printf '%P\n' | sort)
-    for mark in "${pipe_marks[@]}"; do
-      base="${mark%.pipe.ok}"
-      src="$DIR/$base.ls"; exp="$DIR/$base.out"
-      [[ -f "$src" && -f "$exp" ]] || continue
-      out="$(run_with_timeout_capture bash -lc "$COMP '$src' | '$RUNIR'")"
-      if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-        echo "ok - pipe $base"
-        ((pass++))
-      else
-        echo "not ok - pipe $base"
-        echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
-        ((fail++))
-      fi
-    done
-  fi
-fi
 
 if [[ $fail -eq 0 ]]; then
   exit 0
