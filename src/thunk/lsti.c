@@ -424,7 +424,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     symbol_entry.size     = (uint64_t)(end - off);
   }
 
-  // Write PATTERN_TAB: [u32 count][u64 entry_off[count]] + entries
+  // Write PATTERN_TAB: index=[u32 count][u64 entry_off[count]]; payload=entries
   lsti_section_disk_t ptab_entry = { 0 };
   if (has_ppool) {
     if (fpad_to_align(fp, align_log2) != 0)
@@ -432,11 +432,10 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     long ptab_off = ftell(fp);
     if (ptab_off < 0)
       return -EIO;
-    // reserved index header for future use
-    uint32_t ptab_index_bytes = 0;
+    uint32_t pcnt = (uint32_t)ppool.size;
+    uint32_t ptab_index_bytes = (uint32_t)sizeof(uint32_t) + (uint32_t)pcnt * (uint32_t)sizeof(uint64_t);
     if (fwrite(&ptab_index_bytes, 1, sizeof(ptab_index_bytes), fp) != sizeof(ptab_index_bytes))
       return -EIO;
-    uint32_t pcnt = (uint32_t)ppool.size;
     if (fwrite(&pcnt, 1, sizeof(pcnt), fp) != sizeof(pcnt))
       return -EIO;
     long poffs_pos = ftell(fp);
@@ -599,7 +598,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       free(poffs);
       return -EIO;
     }
-    free(poffs);
+  free(poffs);
     ptab_entry.kind     = (uint32_t)LSTI_SECT_PATTERN_TAB;
     ptab_entry.file_off = (uint64_t)ptab_off;
     ptab_entry.size     = (uint64_t)(ptab_end - ptab_off);
@@ -1072,6 +1071,15 @@ int lsti_validate(const lsti_image_t* img) {
       break; // tolerate unknown sections for forward-compat
     }
   }
+  // Sections must not overlap each other
+  for (uint16_t i = 0; i < hdr->section_count; ++i) {
+    for (uint16_t j = (uint16_t)(i + 1); j < hdr->section_count; ++j) {
+      uint64_t a0 = sect[i].file_off, a1 = sect[i].file_off + sect[i].size;
+      uint64_t b0 = sect[j].file_off, b1 = sect[j].file_off + sect[j].size;
+      if (!(a1 <= b0 || b1 <= a0))
+        return -EINVAL; // overlap detected
+    }
+  }
   // Minimal required sections
   if (!thunk_tab || !roots)
     return -EINVAL;
@@ -1117,6 +1125,8 @@ int lsti_validate(const lsti_image_t* img) {
   const uint8_t* string_payload_base = NULL;
   const uint8_t* symbol_payload_base = NULL;
   const uint8_t* pattern_payload_base = NULL;
+  uint32_t       pattern_count = 0;
+  uint64_t       pattern_index_header_bytes = 0; // sizeof(u32) + index body size when present
   if (string_blob) {
     if (string_blob->size < sizeof(uint32_t)) return -EINVAL;
     memcpy(&string_index_bytes, img->base + (lssize_t)string_blob->file_off, sizeof(uint32_t));
@@ -1175,10 +1185,121 @@ int lsti_validate(const lsti_image_t* img) {
     }
   }
   if (pattern_tab) {
-    if (pattern_tab->size < sizeof(uint32_t) + sizeof(uint32_t)) return -EINVAL; // index_bytes + count
+    if (pattern_tab->size < sizeof(uint32_t)) return -EINVAL; // need at least index header size
     memcpy(&pattern_index_bytes, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
-    if (pattern_tab->size < (uint64_t)sizeof(uint32_t) + pattern_index_bytes + sizeof(uint32_t)) return -EINVAL;
-    pattern_payload_base = img->base + (lssize_t)pattern_tab->file_off + sizeof(uint32_t) + pattern_index_bytes;
+  if (pattern_index_bytes) {
+      // index: [u32 count][u64 offs[count]]
+      if (pattern_tab->size < (uint64_t)sizeof(uint32_t) + (uint64_t)pattern_index_bytes) return -EINVAL;
+      if (pattern_index_bytes < sizeof(uint32_t)) return -EINVAL;
+      const uint8_t* ip = img->base + (lssize_t)pattern_tab->file_off + sizeof(uint32_t);
+      if ((uint64_t)(ip - img->base) + sizeof(uint32_t) > img->size) return -EINVAL;
+      uint32_t pcnt = 0; memcpy(&pcnt, ip, sizeof(uint32_t));
+      uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)pcnt * (uint64_t)sizeof(uint64_t);
+      if ((uint64_t)pattern_index_bytes < need) return -EINVAL;
+      // basic bounds on offsets
+      const uint64_t* offs = (const uint64_t*)(ip + sizeof(uint32_t));
+      uint64_t header_bytes = (uint64_t)sizeof(uint32_t) + (uint64_t)pattern_index_bytes; // index header + body
+      for (uint32_t i = 0; i < pcnt; ++i) {
+        uint64_t eo = offs[i];
+        if (eo < header_bytes || eo >= pattern_tab->size)
+          return -EINVAL;
+      }
+      pattern_payload_base       = img->base + (lssize_t)pattern_tab->file_off + header_bytes;
+      pattern_index_header_bytes = header_bytes;
+      pattern_count              = pcnt;
+    } else {
+      // legacy: payload starts right after [u32 0] + [u32 count]
+      if (pattern_tab->size < (uint64_t)sizeof(uint32_t) + sizeof(uint32_t)) return -EINVAL;
+      // legacy layout: [u32 0][u32 count][u64 offs[count]] then entries
+      const uint8_t* ip = img->base + (lssize_t)pattern_tab->file_off + sizeof(uint32_t);
+      memcpy(&pattern_count, ip, sizeof(uint32_t));
+      pattern_index_header_bytes = (uint64_t)sizeof(uint32_t) + (uint64_t)sizeof(uint32_t) +
+                                   (uint64_t)pattern_count * (uint64_t)sizeof(uint64_t);
+      if (pattern_tab->size < pattern_index_header_bytes)
+        return -EINVAL;
+      pattern_payload_base = img->base + (lssize_t)pattern_tab->file_off + pattern_index_header_bytes;
+    }
+  }
+  // If PATTERN_TAB present, validate each entry's minimal structure and referenced bounds
+  if (pattern_tab && pattern_count > 0) {
+    const uint8_t* pt_section = img->base + (lssize_t)pattern_tab->file_off;
+    const uint64_t*po = NULL;
+    if (pattern_index_bytes) {
+      const uint8_t* ip = pt_section + sizeof(uint32_t);
+      po = (const uint64_t*)(ip + sizeof(uint32_t));
+    } else {
+      const uint8_t* ip = pt_section + sizeof(uint32_t);
+      po = (const uint64_t*)(ip + sizeof(uint32_t));
+    }
+    uint64_t s_payload_sz = string_blob ? (string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes) : 0;
+    uint64_t y_payload_sz = symbol_blob ? (symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes) : 0;
+    for (uint32_t i = 0; i < pattern_count; ++i) {
+      uint64_t eo = po[i];
+      if (eo < pattern_index_header_bytes || eo >= pattern_tab->size)
+        return -EINVAL;
+      const uint8_t* ent = pt_section + eo;
+      uint64_t remain = pattern_tab->size - eo;
+      if (remain < 1) return -EINVAL;
+      uint8_t pk = ent[0];
+      const uint8_t* q = ent + 1;
+      switch (pk) {
+      case LSPTYPE_ALGE: {
+        if (remain < 1 + 12) return -EINVAL;
+        uint32_t clen=0, coff=0, argc=0;
+        memcpy(&clen, q, 4); memcpy(&coff, q+4, 4); memcpy(&argc, q+8, 4);
+        if (remain < 1 + 12 + (uint64_t)argc * 4u) return -EINVAL;
+        if (!symbol_blob) return -EINVAL;
+        if ((uint64_t)coff > y_payload_sz || (uint64_t)clen > y_payload_sz || (uint64_t)coff + (uint64_t)clen > y_payload_sz)
+          return -EINVAL;
+        // child ids will be validated in thunk phase; here we can't check range against pcnt
+        break;
+      }
+      case LSPTYPE_AS: {
+        if (remain < 1 + 8) return -EINVAL;
+        uint32_t rid=0,iid=0; memcpy(&rid, q, 4); memcpy(&iid, q+4, 4);
+        if (rid >= pattern_count || iid >= pattern_count) return -EINVAL;
+        break;
+      }
+      case LSPTYPE_INT: {
+        if (remain < 1 + 8) return -EINVAL; // 64-bit int
+        break;
+      }
+      case LSPTYPE_STR: {
+        if (remain < 1 + 8) return -EINVAL;
+        if (!string_blob) return -EINVAL;
+        uint32_t slen=0, soff=0; memcpy(&slen, q, 4); memcpy(&soff, q+4, 4);
+        if ((uint64_t)soff > s_payload_sz || (uint64_t)slen > s_payload_sz || (uint64_t)soff + (uint64_t)slen > s_payload_sz)
+          return -EINVAL;
+        break;
+      }
+      case LSPTYPE_REF: {
+        if (remain < 1 + 8) return -EINVAL;
+        if (!symbol_blob) return -EINVAL;
+        uint32_t ylen=0, yoff=0; memcpy(&ylen, q, 4); memcpy(&yoff, q+4, 4);
+        if ((uint64_t)yoff > y_payload_sz || (uint64_t)ylen > y_payload_sz || (uint64_t)yoff + (uint64_t)ylen > y_payload_sz)
+          return -EINVAL;
+        break;
+      }
+      case LSPTYPE_WILDCARD: {
+        // no payload
+        break;
+      }
+      case LSPTYPE_OR: {
+        if (remain < 1 + 8) return -EINVAL;
+        uint32_t l=0,r=0; memcpy(&l, q, 4); memcpy(&r, q+4, 4);
+        if (l >= pattern_count || r >= pattern_count) return -EINVAL;
+        break;
+      }
+      case LSPTYPE_CARET: {
+        if (remain < 1 + 4) return -EINVAL;
+        uint32_t i0=0; memcpy(&i0, q, 4);
+        if (i0 >= pattern_count) return -EINVAL;
+        break;
+      }
+      default:
+        return -EINVAL;
+      }
+    }
   }
   // Optional: for STR/SYMBOL, offsets must be within corresponding blobs when present
   if (string_blob || symbol_blob) {
@@ -1188,103 +1309,101 @@ int lsti_validate(const lsti_image_t* img) {
       uint32_t       aorl = 0, extra = 0;
       memcpy(&aorl, ent + 4, sizeof(uint32_t));
       memcpy(&extra, ent + 8, sizeof(uint32_t));
-      if (kind == (uint8_t)LSTB_KIND_STR) {
-        if (!string_blob)
-          return -EINVAL;
-        // payload size excludes the 4B header and index
+      // basic header size must fit
+      if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t))
+        return -EINVAL;
+      switch (kind) {
+      case LSTB_KIND_STR: {
+        if (!string_blob) return -EINVAL;
         uint64_t payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
-          return -EINVAL;
-      } else if (kind == (uint8_t)LSTB_KIND_SYMBOL) {
-        if (!symbol_blob)
-          return -EINVAL;
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz) return -EINVAL;
+        break;
+      }
+      case LSTB_KIND_SYMBOL: {
+        if (!symbol_blob) return -EINVAL;
         uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
-          return -EINVAL;
-  } else if (kind == (uint8_t)LSTB_KIND_ALGE) {
-        if (!symbol_blob)
-          return -EINVAL;
-        // payload starts after header: u32 constr_len, then child ids
-        uint32_t constr_len = 0;
-        memcpy(&constr_len,
-               ent + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) +
-                   sizeof(uint32_t),
-               sizeof(uint32_t));
-  uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
-  uint64_t off = (uint64_t)extra, len = (uint64_t)constr_len;
-  if (off > payload_sz || len > payload_sz || off + len > payload_sz)
-          return -EINVAL;
-        // ensure payload fits: 4 + 4*argc
-        uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
-        if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) +
-                                            sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) +
-                                            need)
-          return -EINVAL;
-  } else if (kind == (uint8_t)LSTB_KIND_BOTTOM) {
-  if (!string_blob)
-          return -EINVAL;
-        uint32_t msg_len = 0;
-        memcpy(&msg_len,
-               ent + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) +
-                   sizeof(uint32_t),
-               sizeof(uint32_t));
-  uint64_t payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
-  uint64_t off = (uint64_t)extra, len = (uint64_t)msg_len;
-  if (off > payload_sz || len > payload_sz || off + len > payload_sz)
-          return -EINVAL;
-        uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
-        if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) +
-                                            sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) +
-                                            need)
-          return -EINVAL;
-      } else if (kind == (uint8_t)LSTB_KIND_APPL) {
-        // payload: arg ids[argc]
-        uint64_t need = (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
-        uint64_t have = thunk_tab->size - offs[i];
-        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) +
-                           sizeof(uint32_t) + sizeof(uint32_t) + need)
-          return -EINVAL;
-        if (extra >= ncnt)
-          return -EINVAL; // func_id
-      } else if (kind == (uint8_t)LSTB_KIND_CHOICE) {
-        // aorl=choice_kind in 1..3; payload: left,right
-        if (aorl < 1 || aorl > 3)
-          return -EINVAL;
-        uint64_t need = 2u * (uint64_t)sizeof(uint32_t);
-        uint64_t have = thunk_tab->size - offs[i];
-        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) +
-                           sizeof(uint32_t) + sizeof(uint32_t) + need)
-          return -EINVAL;
-        // we'll check ids range in materializer, but bounds here too
-        const uint8_t* p = ent + 12;
-        uint32_t       lid = 0, rid = 0;
-        memcpy(&lid, p, sizeof(uint32_t));
-        memcpy(&rid, p + 4, sizeof(uint32_t));
-        if (lid >= ncnt || rid >= ncnt)
-          return -EINVAL;
-      } else if (kind == (uint8_t)LSTB_KIND_REF) {
-        if (!symbol_blob)
-          return -EINVAL;
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz) return -EINVAL;
+        break;
+      }
+      case LSTB_KIND_INT: {
+        // immediate int encoded in header fields; nothing further to validate here
+        break;
+      }
+      case LSTB_KIND_REF: {
+        if (!symbol_blob) return -EINVAL;
         uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
-          return -EINVAL;
-      } else if (kind == (uint8_t)LSTB_KIND_LAMBDA) {
-        // header stores indices: aorl=pat_id, extra=body_id; ensure pat_id < pcount and body_id < ncnt
-        if (!pattern_tab)
-          return -EINVAL;
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz) return -EINVAL;
+        break;
+      }
+      case LSTB_KIND_LAMBDA: {
+        if (!pattern_tab) return -EINVAL;
         uint32_t pid = 0, bid = 0;
         memcpy(&pid, ent + 4, sizeof(uint32_t));
         memcpy(&bid, ent + 8, sizeof(uint32_t));
-        // pattern_tab structure: [u32 index_bytes][u32 count][u64 offs[count]]
-        if (pattern_tab->size < sizeof(uint32_t) + sizeof(uint32_t))
+        if (pid >= pattern_count || bid >= ncnt) return -EINVAL;
+        break;
+      }
+      case LSTB_KIND_ALGE: {
+        if (!symbol_blob) return -EINVAL;
+        uint64_t have = thunk_tab->size - offs[i];
+        uint64_t need = (uint64_t)sizeof(uint32_t) /*constr_len*/ + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + need)
           return -EINVAL;
-        uint32_t pcnt = 0;
-        memcpy(&pcnt, pattern_payload_base, sizeof(uint32_t));
-        if (pid >= pcnt || bid >= ncnt)
+        // check constructor bytes within symbol payload
+        uint32_t constr_len = 0; memcpy(&constr_len, ent + 12, sizeof(uint32_t));
+        uint64_t y_payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
+        uint64_t off = (uint64_t)extra, len = (uint64_t)constr_len;
+        if (off > y_payload_sz || len > y_payload_sz || off + len > y_payload_sz) return -EINVAL;
+        // child ids in-range
+        const uint8_t* p = ent + 12 + 4;
+        for (uint32_t j = 0; j < aorl; ++j) {
+          uint32_t idj = 0; memcpy(&idj, p, sizeof(uint32_t)); p += 4;
+          if (idj >= ncnt) return -EINVAL;
+        }
+        break;
+      }
+      case LSTB_KIND_BOTTOM: {
+        if (!string_blob) return -EINVAL;
+        uint64_t have = thunk_tab->size - offs[i];
+        uint64_t need = (uint64_t)sizeof(uint32_t) /*msg_len*/ + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + need)
           return -EINVAL;
+        uint32_t msg_len = 0; memcpy(&msg_len, ent + 12, sizeof(uint32_t));
+        uint64_t s_payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
+        uint64_t off = (uint64_t)extra, len = (uint64_t)msg_len;
+        if (off > s_payload_sz || len > s_payload_sz || off + len > s_payload_sz) return -EINVAL;
+        const uint8_t* p = ent + 12 + 4;
+        for (uint32_t j = 0; j < aorl; ++j) {
+          uint32_t idj = 0; memcpy(&idj, p, sizeof(uint32_t)); p += 4;
+          if (idj >= ncnt) return -EINVAL;
+        }
+        break;
+      }
+      case LSTB_KIND_APPL: {
+        uint64_t need = (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
+        uint64_t have = thunk_tab->size - offs[i];
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + need)
+          return -EINVAL;
+        if (extra >= ncnt) return -EINVAL; // func_id
+        const uint8_t* p = ent + 12;
+        for (uint32_t j = 0; j < aorl; ++j) { uint32_t idj = 0; memcpy(&idj, p, sizeof(uint32_t)); p += 4; if (idj >= ncnt) return -EINVAL; }
+        break;
+      }
+      case LSTB_KIND_CHOICE: {
+        if (aorl < 1 || aorl > 3) return -EINVAL;
+        uint64_t need = 2u * (uint64_t)sizeof(uint32_t);
+        uint64_t have = thunk_tab->size - offs[i];
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + need)
+          return -EINVAL;
+        const uint8_t* p = ent + 12; uint32_t lid = 0, rid = 0; memcpy(&lid, p, sizeof(uint32_t)); memcpy(&rid, p + 4, sizeof(uint32_t));
+        if (lid >= ncnt || rid >= ncnt) return -EINVAL;
+        break;
+      }
+      default:
+        return -EINVAL;
       }
     }
   }
@@ -1360,9 +1479,18 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   if (pattern_tab) {
     uint32_t ib = 0; memcpy(&ib, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
     pt_section = img->base + (lssize_t)pattern_tab->file_off;
-    pt         = pt_section + sizeof(uint32_t) + ib; // payload base
-    memcpy(&pcnt, pt, sizeof(uint32_t));
-    po = (const uint64_t*)(pt + sizeof(uint32_t));
+    if (ib) {
+      // index area contains [u32 count][u64 offs[count]]; payload after header+ib
+      const uint8_t* ip = pt_section + sizeof(uint32_t);
+      memcpy(&pcnt, ip, sizeof(uint32_t));
+      po = (const uint64_t*)(ip + sizeof(uint32_t));
+      pt = pt_section + sizeof(uint32_t) + ib; // payload base
+    } else {
+      // legacy: payload [u32 count][u64 offs[count]] immediately
+      pt = pt_section + sizeof(uint32_t);
+      memcpy(&pcnt, pt, sizeof(uint32_t));
+      po = (const uint64_t*)(pt + sizeof(uint32_t));
+    }
   }
   for (uint32_t i = 0; i < ncnt; ++i) {
     const uint8_t* ent  = tt + offs[i];

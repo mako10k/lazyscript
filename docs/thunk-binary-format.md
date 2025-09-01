@@ -265,16 +265,19 @@ struct LSTI_Section { u32 kind; u32 reserved; u64 file_off; u64 size; };
 
 ### 主要セクション
  STRING_BLOB: 連結文字列バッファ（UTF-8）。各セクション先頭に予約ヘッダを置く。
-  - reserved: u32 index_bytes（将来のインデックス配置用バイト数。現状は 0）
+  - reserved: u32 index_bytes（インデックス領域サイズ。0 の場合は未配置）
+  - index（任意）: [u32 count][(u32 off,u32 len) × count] （off/len は payload 相対）
   - payload: index_bytes 直後から raw 連結。
-  - 参照側（STR/BOTTOM など）が offset(u32) と len(u32) を併せて保持する。
+  - 参照側（STR/BOTTOM など）は offset(u32) と len(u32) を保持する。index は任意の補助テーブル（validator は整合性検証に使用）。
  SYMBOL_BLOB: 文字列と同様（シンボル名やコンストラクタ名）。
   - reserved: u32 index_bytes（同上）
+  - index（任意）: [u32 count][(u32 off,u32 len) × count] （payload 相対）
   - payload: index_bytes 直後から raw 連結。
-  - 参照側（SYMBOL/ALGE など）が offset(u32) と len(u32) を併せて保持する。
+  - 参照側（SYMBOL/ALGE など）は offset(u32) と len(u32) を保持する（index は任意）。
  PATTERN_TAB: 固定ヘッダ + 可変部。先頭に予約ヘッダを置く。参照は u32 offset/ID。
   - reserved: u32 index_bytes（同上）
-  - payload: [u32 count][u64 entry_off[count]] + entries
+  - index: [u32 count][u64 entry_off[count]]（entry_off はセクション先頭からの相対オフセット）
+  - payload: entries（index の直後から）
   - レイアウト（実装済 v1 subset）:
     - u32 count
     - u64 entry_off[count]（セクション先頭からの相対オフセット）
@@ -312,7 +315,19 @@ v1 subset での意味付け（本実装準拠）
 - BOTTOM: arity_or_len=related_count, extra=offset（STRING_BLOB 内のメッセージ）
   - 可変部: u32 msg_len; u32 related_ids[related_count]
 
-備考: 参照元が len を保持するため、BLOB セクションには索引テーブルを置かない。validator は offset+len が各 BLOB サイズ内に収まることを検証する。
+備考: BLOB セクションには任意の索引テーブルを置ける。参照元は len/offset を保持するため index は必須ではないが、存在する場合は validator が以下を検証する。
+ - index のヘッダ/件数に整合するエントリ長
+ - 各 (off,len) が payload 範囲内かつオーバーラップしない（非減少）
+ - 参照する offset/len が payload 範囲内
+
+Validator 追加規則（本実装）
+- セクション間の file 範囲が重複しないこと
+- THUNK_TAB: [u32 count][u64 offs[count]] の後方に各エントリがあり、固定ヘッダ（10B+）が収まること
+- ROOTS: 各 root id < THUNK_TAB.count
+- PATTERN_TAB: index 上の全 entry_off が index 領域直後以降にあり、各エントリの最小サイズを満たすこと
+- STR/SYMBOL/ALGE/BOTTOM/REF: off+len が該当 BLOB の payload 内
+- APPL/ALGE/BOTTOM/CHOICE: 埋め込まれた子 thunk id が [0,count) 範囲
+- LAMBDA: param_pat_id < PATTERN_TAB.count かつ body_id < THUNK_TAB.count（PATTERN_TAB が必須）
 
 ### 互換性/注意
 - アーキ依存（LE/整列/ワード幅）。異なる環境間の可搬性は保証しない。
