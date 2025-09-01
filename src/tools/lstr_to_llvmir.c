@@ -131,13 +131,30 @@ int main(int argc, char** argv){
       }
       case LSTTYPE_ALGE: {
         const lsstr_t* c = lsthunk_get_constr(r0);
-        if (c && lsstrcmp(c, lsstr_cstr(".Ok")) == 0 && lsthunk_get_argc(r0) == 1) {
+        lssize_t ac = lsthunk_get_argc(r0);
+        // Bool-like constructors
+        if (c && ac == 0) {
+          if (lsstrcmp(c, lsstr_cstr(".True")) == 0) { emit_ir_main_ret_i32(stdout, 1); break; }
+          if (lsstrcmp(c, lsstr_cstr(".False")) == 0) { emit_ir_main_ret_i32(stdout, 0); break; }
+        }
+        // Result-like Ok payloads
+        if (c && lsstrcmp(c, lsstr_cstr(".Ok")) == 0 && ac == 1) {
           lsthunk_t* const* args = lsthunk_get_args(r0);
-          if (args && args[0] && lsthunk_get_type(args[0]) == LSTTYPE_INT){
-            const lsint_t* iv = lsthunk_get_int(args[0]);
-            int retv = iv ? lsint_get(iv) : 0;
-            emit_ir_main_ret_i32(stdout, retv);
-            break;
+          if (args && args[0]){
+            if (lsthunk_get_type(args[0]) == LSTTYPE_INT){
+              const lsint_t* iv = lsthunk_get_int(args[0]);
+              int retv = iv ? lsint_get(iv) : 0;
+              emit_ir_main_ret_i32(stdout, retv);
+              break;
+            } else if (lsthunk_get_type(args[0]) == LSTTYPE_STR){
+              const lsstr_t* sv = lsthunk_get_str(args[0]);
+              const char* s = sv ? lsstr_get_buf(sv) : "";
+              size_t n = sv ? (size_t)lsstr_get_len(sv) : 0;
+              emit_ir_decl_puts(stdout);
+              emit_ir_global_str(stdout, s, n);
+              emit_ir_main_puts(stdout, n);
+              break;
+            }
           }
         }
         // Fallback

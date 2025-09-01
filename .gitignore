@@ -60,6 +60,8 @@ src/lslsti_check
 src/lslstr_dump
 src/lslstr_roundtrip
 src/lstr_to_llvmir
+# old name (kept ignored to avoid accidental add)
+src/lslstr_to_llvmir
 # legacy/retired tools
 src/lazyscriptc
 src/lscoreir
