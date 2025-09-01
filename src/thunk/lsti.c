@@ -136,34 +136,25 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
   vec_pool_t spool = { 0 }; // string blob: STR values and BOTTOM messages
   vec_pool_t ypool = { 0 }; // symbol blob: SYMBOL literals and ALGE constructors
 
-// naive ID lookup helper (inline loop where needed)
-#define GET_ID(VAR_T, OUT_ID)                                                                      \
-  do {                                                                                             \
-    int __found = -1;                                                                              \
-    for (lssize_t __i = 0; __i < nodes.size; ++__i) {                                              \
-      if (nodes.data[__i] == (VAR_T)) {                                                            \
-        __found = (int)__i;                                                                        \
-        break;                                                                                     \
-      }                                                                                            \
-    }                                                                                              \
-    (OUT_ID) = __found;                                                                            \
-  } while (0)
-
-// add to string pool if not exists; return index
+  // add to string pool if not exists; return index
 #define ADD_SPOOL(BYTES, LEN, OUT_IDX)                                                             \
   do {                                                                                             \
-    int __idx = -1;                                                                                \
-    for (lssize_t __i = 0; __i < spool.size; ++__i) {                                              \
-      if (spool.data[__i].len == (LEN) &&                                                          \
-          memcmp(spool.data[__i].bytes, (BYTES), (size_t)(LEN)) == 0) {                            \
-        __idx = (int)__i;                                                                          \
-        break;                                                                                     \
+    const char* __b = (const char*)(BYTES);                                                        \
+    lssize_t    __l = (LEN);                                                                       \
+    int         __idx = -1;                                                                        \
+    if (__b && __l >= 0) {                                                                         \
+      for (lssize_t __i = 0; __i < spool.size; ++__i) {                                            \
+        if (spool.data[__i].len == __l &&                                                          \
+            ((__l == 0) || memcmp(spool.data[__i].bytes, __b, (size_t)__l) == 0)) {                \
+          __idx = (int)__i;                                                                        \
+          break;                                                                                   \
+        }                                                                                          \
       }                                                                                            \
     }                                                                                              \
     if (__idx < 0) {                                                                               \
       pool_ent_t __e;                                                                              \
-      __e.bytes = (BYTES);                                                                         \
-      __e.len   = (LEN);                                                                           \
+      __e.bytes = __b;                                                                             \
+      __e.len   = __l;                                                                             \
       __e.off   = 0u;                                                                              \
       VEC_PUSH(spool, __e, pool_ent_t);                                                            \
       __idx = (int)(spool.size - 1);                                                               \
@@ -171,16 +162,17 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     (OUT_IDX) = __idx;                                                                             \
   } while (0)
 
-// add to symbol pool if not exists; return index
+  // add to symbol pool if not exists; return index
 #define ADD_YPOOL(LSSTR, OUT_IDX)                                                                  \
   do {                                                                                             \
-    const lsstr_t* __s   = (LSSTR);                                                                \
+    const lsstr_t* __s = (LSSTR);                                                                  \
     int            __idx = -1;                                                                     \
     if (__s) {                                                                                     \
       const char* __b = lsstr_get_buf(__s);                                                        \
       lssize_t    __l = lsstr_get_len(__s);                                                        \
       for (lssize_t __i = 0; __i < ypool.size; ++__i) {                                            \
-        if (ypool.data[__i].len == __l && memcmp(ypool.data[__i].bytes, __b, (size_t)__l) == 0) {  \
+        if (ypool.data[__i].len == __l &&                                                          \
+            ((__l == 0) || memcmp(ypool.data[__i].bytes, __b, (size_t)__l) == 0)) {                \
           __idx = (int)__i;                                                                        \
           break;                                                                                   \
         }                                                                                          \
@@ -196,181 +188,118 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     }                                                                                              \
     (OUT_IDX) = __idx;                                                                             \
   } while (0)
-  // enqueue
+
+  // find existing node id in nodes or -1
+#define GET_ID(TH, OUT_ID)                                                                         \
+  do {                                                                                             \
+    int __found = -1;                                                                              \
+    for (lssize_t __j = 0; __j < nodes.size; ++__j) {                                              \
+      if (nodes.data[__j] == (TH)) {                                                               \
+        __found = (int)__j;                                                                        \
+        break;                                                                                     \
+      }                                                                                            \
+    }                                                                                              \
+    (OUT_ID) = __found;                                                                            \
+  } while (0)
+
+  // enqueue roots (dedup)
   lssize_t qh = 0;
   for (lssize_t i = 0; i < rootc; ++i) {
-    if (roots) {
+    if (roots && roots[i]) {
       int __id;
       GET_ID(roots[i], __id);
       if (__id < 0)
         VEC_PUSH(nodes, roots[i], lsthunk_t*);
     }
   }
+  // BFS to collect reachable thunks and fill pools
   while (qh < nodes.size) {
     lsthunk_t* t = nodes.data[qh++];
     switch (lsthunk_get_type(t)) {
     case LSTTYPE_INT: {
-      (void)lsint_get(lsthunk_get_int(t));
+      // no pool entries
       break;
     }
     case LSTTYPE_STR: {
       const lsstr_t* s = lsthunk_get_str(t);
       if (s) {
-        int __idx;
-        ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), __idx);
-        (void)__idx;
+        int __idx; ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), __idx); (void)__idx;
       }
       break;
     }
     case LSTTYPE_SYMBOL: {
       const lsstr_t* sym = lsthunk_get_symbol(t);
-      if (sym) {
-        int __idx;
-        ADD_YPOOL(sym, __idx);
-        (void)__idx;
-      }
+      if (sym) { int __idx; ADD_YPOOL(sym, __idx); (void)__idx; }
       break;
     }
     case LSTTYPE_ALGE: {
       const lsstr_t* c = lsthunk_get_constr(t);
-      if (c) {
-        int __idx;
-        ADD_YPOOL(c, __idx);
-        (void)__idx;
-      }
-      lssize_t          ac = lsthunk_get_argc(t);
+      if (c) { int __idx; ADD_YPOOL(c, __idx); (void)__idx; }
+      lssize_t ac = lsthunk_get_argc(t);
       lsthunk_t* const* as = lsthunk_get_args(t);
       for (lssize_t i = 0; i < ac; ++i) {
-        lsthunk_t* ch = as[i];
-        int        id;
-        GET_ID(ch, id);
-        if (id < 0) {
-          VEC_PUSH(nodes, ch, lsthunk_t*);
-          id = (int)(nodes.size - 1);
-        }
-        (void)id; // recorded later per-node
+        lsthunk_t* ch = as[i]; int id; GET_ID(ch, id); if (id < 0) VEC_PUSH(nodes, ch, lsthunk_t*);
       }
       break;
     }
     case LSTTYPE_APPL: {
-      // enqueue func and args
       lsthunk_t* func = lsthunk_get_appl_func(t);
-      if (func) {
-        int id;
-        GET_ID(func, id);
-        if (id < 0) {
-          VEC_PUSH(nodes, func, lsthunk_t*);
-        }
-      }
-      lssize_t          ac = lsthunk_get_argc(t);
+      if (func) { int id; GET_ID(func, id); if (id < 0) VEC_PUSH(nodes, func, lsthunk_t*); }
+      lssize_t ac = lsthunk_get_argc(t);
       lsthunk_t* const* as = lsthunk_get_args(t);
       for (lssize_t i = 0; i < ac; ++i) {
-        lsthunk_t* ch = as[i];
-        int        id;
-        GET_ID(ch, id);
-        if (id < 0) {
-          VEC_PUSH(nodes, ch, lsthunk_t*);
-        }
+        lsthunk_t* ch = as[i]; int id; GET_ID(ch, id); if (id < 0) VEC_PUSH(nodes, ch, lsthunk_t*);
       }
       break;
     }
     case LSTTYPE_LAMBDA: {
-      // Collect param pattern and enqueue body
-      lstpat_t*  p = lsthunk_get_param(t);
-      // naive pattern pool dedup by pointer (ok within single process)
-      int        pidx = -1;
-      for (lssize_t i = 0; i < ppool.size; ++i) {
-        if (ppool.data[i] == p) {
-          pidx = (int)i;
-          break;
-        }
-      }
+      // collect param pattern into pattern pool (dedup by pointer)
+      lstpat_t* p = lsthunk_get_param(t);
+      int pidx = -1;
+      for (lssize_t i = 0; i < ppool.size; ++i) { if (ppool.data[i] == p) { pidx = (int)i; break; } }
       if (pidx < 0) {
         if (ppool.size == ppool.cap) {
           lssize_t ncap = ppool.cap ? ppool.cap * 2 : 8;
-          void*    np   = realloc(ppool.data, (size_t)ncap * sizeof(lstpat_t*));
-          if (!np)
-            return -ENOMEM;
-          ppool.data = (lstpat_t**)np;
-          ppool.cap  = ncap;
+          void* np = realloc(ppool.data, (size_t)ncap * sizeof(lstpat_t*));
+          if (!np) return -ENOMEM;
+          ppool.data = (lstpat_t**)np; ppool.cap = ncap;
         }
         ppool.data[ppool.size++] = p;
       }
       lsthunk_t* b = lsthunk_get_body(t);
-      if (b) {
-        int id;
-        GET_ID(b, id);
-        if (id < 0)
-          VEC_PUSH(nodes, b, lsthunk_t*);
-      }
+      if (b) { int id; GET_ID(b, id); if (id < 0) VEC_PUSH(nodes, b, lsthunk_t*); }
       break;
     }
     case LSTTYPE_CHOICE: {
       lsthunk_t* l = lsthunk_get_choice_left(t);
       lsthunk_t* r = lsthunk_get_choice_right(t);
-      if (l) {
-        int id;
-        GET_ID(l, id);
-        if (id < 0)
-          VEC_PUSH(nodes, l, lsthunk_t*);
-      }
-      if (r) {
-        int id;
-        GET_ID(r, id);
-        if (id < 0)
-          VEC_PUSH(nodes, r, lsthunk_t*);
-      }
+      if (l) { int id; GET_ID(l, id); if (id < 0) VEC_PUSH(nodes, l, lsthunk_t*); }
+      if (r) { int id; GET_ID(r, id); if (id < 0) VEC_PUSH(nodes, r, lsthunk_t*); }
       break;
     }
     case LSTTYPE_REF: {
-      // external-by-name only for now: add name to symbol pool
       const lsstr_t* name = lsthunk_get_ref_name(t);
-      if (name) {
-        int __idx;
-        ADD_YPOOL(name, __idx);
-        (void)__idx;
-      }
+      if (name) { int __idx; ADD_YPOOL(name, __idx); (void)__idx; }
       break;
     }
     case LSTTYPE_BUILTIN: {
-      // Encode builtin as REF by name for LSTI v1 subset
       const lsstr_t* bname = lsthunk_get_builtin_name(t);
-      if (bname) {
-        int __idx;
-        ADD_YPOOL(bname, __idx);
-        (void)__idx;
-      }
+      if (bname) { int __idx; ADD_YPOOL(bname, __idx); (void)__idx; }
       break;
     }
     case LSTTYPE_BOTTOM: {
       const char* msg = lsthunk_bottom_get_message(t);
-      if (msg) {
-        int __idx;
-        ADD_SPOOL(msg, (lssize_t)strlen(msg), __idx);
-        (void)__idx;
-      }
-      lssize_t          ac = lsthunk_bottom_get_argc(t);
+      if (msg) { int __idx; ADD_SPOOL(msg, (lssize_t)strlen(msg), __idx); (void)__idx; }
+      lssize_t ac = lsthunk_bottom_get_argc(t);
       lsthunk_t* const* as = lsthunk_bottom_get_args(t);
       for (lssize_t i = 0; i < ac; ++i) {
-        lsthunk_t* ch = as[i];
-        int        id;
-        GET_ID(ch, id);
-        if (id < 0) {
-          VEC_PUSH(nodes, ch, lsthunk_t*);
-          id = (int)(nodes.size - 1);
-        }
-        (void)id;
+        lsthunk_t* ch = as[i]; int id; GET_ID(ch, id); if (id < 0) VEC_PUSH(nodes, ch, lsthunk_t*);
       }
       break;
     }
     default:
-      // Unsupported in Phase 1
-      // Clean up
-      free(nodes.data);
-      free(spool.data);
-  free(ypool.data);
-  free(ppool.data);
-  return -ENOTSUP; // LAMBDA not yet supported in LSTI writer
+      // ignore unsupported kinds in writer (shouldn't happen)
+      break;
     }
   }
 
@@ -415,7 +344,11 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     long off = ftell(fp);
     if (off < 0)
       return -EIO;
-    // assign offsets then write bytes
+    // reserved index header
+    uint32_t index_bytes = 0; // reserved for future indexing structure
+    if (fwrite(&index_bytes, 1, sizeof(index_bytes), fp) != sizeof(index_bytes))
+      return -EIO;
+    // assign offsets then write bytes (offsets are relative to payload start after header+index)
     uint32_t cur = 0;
     for (lssize_t i = 0; i < spool.size; ++i) {
       spool.data[i].off = cur;
@@ -443,6 +376,10 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     long off = ftell(fp);
     if (off < 0)
       return -EIO;
+    // reserved index header
+    uint32_t index_bytes = 0; // reserved for future indexing structure
+    if (fwrite(&index_bytes, 1, sizeof(index_bytes), fp) != sizeof(index_bytes))
+      return -EIO;
     uint32_t cur = 0;
     for (lssize_t i = 0; i < ypool.size; ++i) {
       ypool.data[i].off = cur;
@@ -469,6 +406,10 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       return -EIO;
     long ptab_off = ftell(fp);
     if (ptab_off < 0)
+      return -EIO;
+    // reserved index header for future use
+    uint32_t ptab_index_bytes = 0;
+    if (fwrite(&ptab_index_bytes, 1, sizeof(ptab_index_bytes), fp) != sizeof(ptab_index_bytes))
       return -EIO;
     uint32_t pcnt = (uint32_t)ppool.size;
     if (fwrite(&pcnt, 1, sizeof(pcnt), fp) != sizeof(pcnt))
@@ -1146,6 +1087,29 @@ int lsti_validate(const lsti_image_t* img) {
     if (rids[i] >= ncnt)
       return -EINVAL;
   }
+  // Read reserved index headers for blobs/tables
+  uint32_t string_index_bytes = 0, symbol_index_bytes = 0, pattern_index_bytes = 0;
+  const uint8_t* string_payload_base = NULL;
+  const uint8_t* symbol_payload_base = NULL;
+  const uint8_t* pattern_payload_base = NULL;
+  if (string_blob) {
+    if (string_blob->size < sizeof(uint32_t)) return -EINVAL;
+    memcpy(&string_index_bytes, img->base + (lssize_t)string_blob->file_off, sizeof(uint32_t));
+    if (string_blob->size < (uint64_t)sizeof(uint32_t) + string_index_bytes) return -EINVAL;
+    string_payload_base = img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t) + string_index_bytes;
+  }
+  if (symbol_blob) {
+    if (symbol_blob->size < sizeof(uint32_t)) return -EINVAL;
+    memcpy(&symbol_index_bytes, img->base + (lssize_t)symbol_blob->file_off, sizeof(uint32_t));
+    if (symbol_blob->size < (uint64_t)sizeof(uint32_t) + symbol_index_bytes) return -EINVAL;
+    symbol_payload_base = img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t) + symbol_index_bytes;
+  }
+  if (pattern_tab) {
+    if (pattern_tab->size < sizeof(uint32_t) + sizeof(uint32_t)) return -EINVAL; // index_bytes + count
+    memcpy(&pattern_index_bytes, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
+    if (pattern_tab->size < (uint64_t)sizeof(uint32_t) + pattern_index_bytes + sizeof(uint32_t)) return -EINVAL;
+    pattern_payload_base = img->base + (lssize_t)pattern_tab->file_off + sizeof(uint32_t) + pattern_index_bytes;
+  }
   // Optional: for STR/SYMBOL, offsets must be within corresponding blobs when present
   if (string_blob || symbol_blob) {
     for (uint32_t i = 0; i < ncnt; ++i) {
@@ -1157,16 +1121,17 @@ int lsti_validate(const lsti_image_t* img) {
       if (kind == (uint8_t)LSTB_KIND_STR) {
         if (!string_blob)
           return -EINVAL;
-        uint64_t sz  = string_blob->size;
+        // payload size excludes the 4B header and index
+        uint64_t payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > sz || len > sz || off + len > sz)
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
           return -EINVAL;
       } else if (kind == (uint8_t)LSTB_KIND_SYMBOL) {
         if (!symbol_blob)
           return -EINVAL;
-        uint64_t sz  = symbol_blob->size;
+        uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > sz || len > sz || off + len > sz)
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
           return -EINVAL;
   } else if (kind == (uint8_t)LSTB_KIND_ALGE) {
         if (!symbol_blob)
@@ -1177,9 +1142,9 @@ int lsti_validate(const lsti_image_t* img) {
                ent + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) +
                    sizeof(uint32_t),
                sizeof(uint32_t));
-        uint64_t sz  = symbol_blob->size;
-        uint64_t off = (uint64_t)extra, len = (uint64_t)constr_len;
-        if (off > sz || len > sz || off + len > sz)
+  uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
+  uint64_t off = (uint64_t)extra, len = (uint64_t)constr_len;
+  if (off > payload_sz || len > payload_sz || off + len > payload_sz)
           return -EINVAL;
         // ensure payload fits: 4 + 4*argc
         uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
@@ -1188,16 +1153,16 @@ int lsti_validate(const lsti_image_t* img) {
                                             need)
           return -EINVAL;
   } else if (kind == (uint8_t)LSTB_KIND_BOTTOM) {
-        if (!string_blob)
+  if (!string_blob)
           return -EINVAL;
         uint32_t msg_len = 0;
         memcpy(&msg_len,
                ent + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) +
                    sizeof(uint32_t),
                sizeof(uint32_t));
-        uint64_t sz  = string_blob->size;
-        uint64_t off = (uint64_t)extra, len = (uint64_t)msg_len;
-        if (off > sz || len > sz || off + len > sz)
+  uint64_t payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
+  uint64_t off = (uint64_t)extra, len = (uint64_t)msg_len;
+  if (off > payload_sz || len > payload_sz || off + len > payload_sz)
           return -EINVAL;
         uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
         if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) +
@@ -1229,12 +1194,12 @@ int lsti_validate(const lsti_image_t* img) {
         memcpy(&rid, p + 4, sizeof(uint32_t));
         if (lid >= ncnt || rid >= ncnt)
           return -EINVAL;
-  } else if (kind == (uint8_t)LSTB_KIND_REF) {
+      } else if (kind == (uint8_t)LSTB_KIND_REF) {
         if (!symbol_blob)
           return -EINVAL;
-        uint64_t sz  = symbol_blob->size;
+        uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > sz || len > sz || off + len > sz)
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
           return -EINVAL;
       } else if (kind == (uint8_t)LSTB_KIND_LAMBDA) {
         // header stores indices: aorl=pat_id, extra=body_id; ensure pat_id < pcount and body_id < ncnt
@@ -1243,11 +1208,11 @@ int lsti_validate(const lsti_image_t* img) {
         uint32_t pid = 0, bid = 0;
         memcpy(&pid, ent + 4, sizeof(uint32_t));
         memcpy(&bid, ent + 8, sizeof(uint32_t));
-        // pattern_tab structure: [u32 count][u64 offs[count]]; validate idx range only here
-        if (pattern_tab->size < sizeof(uint32_t))
+        // pattern_tab structure: [u32 index_bytes][u32 count][u64 offs[count]]
+        if (pattern_tab->size < sizeof(uint32_t) + sizeof(uint32_t))
           return -EINVAL;
         uint32_t pcnt = 0;
-        memcpy(&pcnt, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
+        memcpy(&pcnt, pattern_payload_base, sizeof(uint32_t));
         if (pid >= pcnt || bid >= ncnt)
           return -EINVAL;
       }
@@ -1306,16 +1271,26 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
     free(nodes);
     return -ENOMEM;
   }
-  const char* sbase =
-      string_blob ? (const char*)(img->base + (lssize_t)string_blob->file_off) : NULL;
-  const char* ybase =
-      symbol_blob ? (const char*)(img->base + (lssize_t)symbol_blob->file_off) : NULL;
+  // blob payload bases after index headers
+  const char* sbase = NULL;
+  const char* ybase = NULL;
+  if (string_blob) {
+    uint32_t ib = 0; memcpy(&ib, img->base + (lssize_t)string_blob->file_off, sizeof(uint32_t));
+    sbase = (const char*)(img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t) + ib);
+  }
+  if (symbol_blob) {
+    uint32_t ib = 0; memcpy(&ib, img->base + (lssize_t)symbol_blob->file_off, sizeof(uint32_t));
+    ybase = (const char*)(img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t) + ib);
+  }
   // parse pattern table if present
   uint32_t       pcnt = 0;
   const uint8_t* pt   = NULL;
   const uint64_t*po   = NULL;
+  const uint8_t* pt_section = NULL; // section base (for entry offsets)
   if (pattern_tab) {
-    pt = img->base + (lssize_t)pattern_tab->file_off;
+    uint32_t ib = 0; memcpy(&ib, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
+    pt_section = img->base + (lssize_t)pattern_tab->file_off;
+    pt         = pt_section + sizeof(uint32_t) + ib; // payload base
     memcpy(&pcnt, pt, sizeof(uint32_t));
     po = (const uint64_t*)(pt + sizeof(uint32_t));
   }
@@ -1337,8 +1312,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       uint32_t len = 0, off = 0;
       memcpy(&len, ent + 4, sizeof(uint32_t));
       memcpy(&off, ent + 8, sizeof(uint32_t));
-      const char*    base = (const char*)(img->base + (lssize_t)string_blob->file_off);
-      const lsstr_t* s    = lsstr_new(base + off, (lssize_t)len);
+      const lsstr_t* s    = lsstr_new(sbase + off, (lssize_t)len);
       nodes[i]            = lsthunk_new_str(s);
       break;
     }
@@ -1350,8 +1324,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       uint32_t len = 0, off = 0;
       memcpy(&len, ent + 4, sizeof(uint32_t));
       memcpy(&off, ent + 8, sizeof(uint32_t));
-      const char*    base = (const char*)(img->base + (lssize_t)symbol_blob->file_off);
-      const lsstr_t* s    = lsstr_new(base + off, (lssize_t)len);
+      const lsstr_t* s    = lsstr_new(ybase + off, (lssize_t)len);
       nodes[i]            = lsthunk_new_symbol(s);
       break;
     }
@@ -1501,8 +1474,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       uint32_t len = 0, off = 0;
       memcpy(&len, ent + 4, sizeof(uint32_t));
       memcpy(&off, ent + 8, sizeof(uint32_t));
-      const char*    base = (const char*)(img->base + (lssize_t)symbol_blob->file_off);
-      const lsstr_t* s    = lsstr_new(base + off, (lssize_t)len);
+  const lsstr_t* s    = lsstr_new(ybase + off, (lssize_t)len);
       const lsref_t* r    = lsref_new(s, lstrace_take_pending_or_unknown());
       nodes[i]            = lsthunk_new_ref(r, prelude_env);
       break;
@@ -1518,8 +1490,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       uint32_t len = 0, off = 0;
       memcpy(&len, ent + 4, sizeof(uint32_t));
       memcpy(&off, ent + 8, sizeof(uint32_t));
-      const char*    base = (const char*)(img->base + (lssize_t)symbol_blob->file_off);
-      const lsstr_t* s    = lsstr_new(base + off, (lssize_t)len);
+  const lsstr_t* s    = lsstr_new(ybase + off, (lssize_t)len);
       const lsref_t* r    = lsref_new(s, lstrace_take_pending_or_unknown());
       nodes[i]            = lsthunk_new_ref(r, prelude_env);
       break;
@@ -1540,14 +1511,14 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
         return -EINVAL;
       }
       // decode pattern entry at pt+po[pid]
-      const uint8_t* pp = pt + po[pid];
+  const uint8_t* pp = pt_section + po[pid];
       uint8_t        pk = pp[0];
       // recursive lambda to decode pattern by index
       // We'll cache decoded patterns by index for potential sharing
       static lstpat_t** pdec = NULL;
       static uint32_t   pdec_cap = 0;
       if (pdec_cap < pcnt) {
-        pdec = (lstpat_t**)realloc(pdec, sizeof(lspat_t*) * pcnt);
+        pdec = (lstpat_t**)realloc(pdec, sizeof(lstpat_t*) * pcnt);
         for (uint32_t x = pdec_cap; x < pcnt; ++x)
           pdec[x] = NULL;
         pdec_cap = pcnt;
@@ -1559,7 +1530,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
           return NULL;
         if (pdec && pdec[idx])
           return pdec[idx];
-        const uint8_t* ppe = pt + po[idx];
+  const uint8_t* ppe = pt_section + po[idx];
         uint8_t        kind = ppe[0];
         ppe++;
         switch (kind) {

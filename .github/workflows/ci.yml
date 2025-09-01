@@ -102,6 +102,13 @@ jobs:
         run: |
           test/run-tests.sh
 
+      - name: "Smoke: LSTI writer/loader (lslsti_check)"
+        env:
+          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
+        run: |
+          # Lightweight end-to-end smoke for LSTI (write→map→validate→materialize)
+          src/lslsti_check
+
       - name: Static analysis (cppcheck/lizard)
         run: |
           # Run cppcheck and lizard via Makefile QA target; never fail build on lint

@@ -264,10 +264,17 @@ struct LSTI_Section { u32 kind; u32 reserved; u64 file_off; u64 size; };
 ```
 
 ### 主要セクション
- STRING_BLOB: 連結文字列バッファ（UTF-8）。テーブルは持たず raw 連結のみ。
+ STRING_BLOB: 連結文字列バッファ（UTF-8）。各セクション先頭に予約ヘッダを置く。
+  - reserved: u32 index_bytes（将来のインデックス配置用バイト数。現状は 0）
+  - payload: index_bytes 直後から raw 連結。
   - 参照側（STR/BOTTOM など）が offset(u32) と len(u32) を併せて保持する。
+ SYMBOL_BLOB: 文字列と同様（シンボル名やコンストラクタ名）。
+  - reserved: u32 index_bytes（同上）
+  - payload: index_bytes 直後から raw 連結。
   - 参照側（SYMBOL/ALGE など）が offset(u32) と len(u32) を併せて保持する。
- PATTERN_TAB: 固定ヘッダ + 可変部。参照は u32 offset/ID。
+ PATTERN_TAB: 固定ヘッダ + 可変部。先頭に予約ヘッダを置く。参照は u32 offset/ID。
+  - reserved: u32 index_bytes（同上）
+  - payload: [u32 count][u64 entry_off[count]] + entries
   - レイアウト（実装済 v1 subset）:
     - u32 count
     - u64 entry_off[count]（セクション先頭からの相対オフセット）
@@ -286,7 +293,7 @@ struct LSTI_Section { u32 kind; u32 reserved; u64 file_off; u64 size; };
   - 可変部: なし（param は PATTERN_TAB で復元、body は第2段で接続）
 ### ノード固定ヘッダ（v1 subset 実装）
 ```
- - PATTERN_TAB は任意セクションだが、LAMBDA が存在する場合は必須。validator は LAMBDA の param_pat_id が PATTERN_TAB.count 未満であることを検証する。
+ - PATTERN_TAB は任意セクションだが、LAMBDA が存在する場合は必須。validator は LAMBDA の param_pat_id が PATTERN_TAB.count 未満であることを検証する。また、各 BLOB/TAB は先頭の index_bytes を考慮して payload 範囲を検証する。
   u8  kind;   // LSTB と同一割当
   u8  flags;  // WHNF/has_type など
   u16 pad;
