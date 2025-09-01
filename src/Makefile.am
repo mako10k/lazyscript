@@ -1,7 +1,7 @@
 AUTOMAKE_OPTIONS = subdir-objects
 SUBDIRS = common expr misc parser pat thunk lstr plugins
 
-bin_PROGRAMS = lazyscript lazyscript_format lslsti_check lslstr_dump lslstr_roundtrip lslstr_to_llvmir
+bin_PROGRAMS = lazyscript lazyscript_format lslsti_check lslstr_dump lslstr_roundtrip lstr_to_llvmir
 
 lazy_script_common_libs = \
     parser/liblsparser.la \
@@ -98,8 +98,8 @@ lslstr_roundtrip_SOURCES = \
     lazyscript.h \
     lstypes.h
 
-lslstr_to_llvmir_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-lslstr_to_llvmir_LDADD = \
+lstr_to_llvmir_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
+lstr_to_llvmir_LDADD = \
     lstr/liblslstr.la \
     parser/liblsparser.la \
     thunk/liblsthunk.la \
@@ -108,8 +108,8 @@ lslstr_to_llvmir_LDADD = \
     misc/liblsmisc.la \
     common/liblscommon.la \
     $(GC_LIBS)
-lslstr_to_llvmir_SOURCES = \
-    tools/lslstr_to_llvmir.c \
+lstr_to_llvmir_SOURCES = \
+    tools/lstr_to_llvmir.c \
     runtime/trace.c \
     runtime/effects.c \
     lazyscript.h \
