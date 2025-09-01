@@ -115,6 +115,22 @@ static void emit_ir_main_call_ext_i32(FILE* out, const char* fname, int argc, co
   fputs("}\n", out);
 }
 
+static void mangle_ns_sym_name(const lsstr_t* ns, const lsstr_t* sym, char* out, size_t outsz){
+  // Build name: fn_<ns>_<sym> (sym leading '.' removed). Non [A-Za-z0-9_] -> '_'
+  if (!out || outsz==0) return;
+  size_t pos=0;
+  if (outsz>3){ out[pos++]='f'; out[pos++]='n'; out[pos++]='_'; }
+  // ns part
+  const char* nsb = lsstr_get_buf(ns); lssize_t nsn = lsstr_get_len(ns);
+  for(lssize_t i=0;i<nsn && pos+1<outsz;i++){ unsigned char c=(unsigned char)nsb[i]; out[pos++] = (isalnum(c)||c=='_')? (char)c : '_'; }
+  if (pos+1<outsz) out[pos++]='_';
+  // sym part (strip leading '.')
+  const char* sb = lsstr_get_buf(sym); lssize_t sn = lsstr_get_len(sym);
+  if (sn>0 && sb[0]=='.'){ sb++; sn--; }
+  for(lssize_t i=0;i<sn && pos+1<outsz;i++){ unsigned char c=(unsigned char)sb[i]; out[pos++] = (isalnum(c)||c=='_')? (char)c : '_'; }
+  out[pos]='\0';
+}
+
 static void mangle_sym_ir_label(const char* s, size_t n, char* out, size_t outsz){
   // Build a safe label for IR identifiers: map non [A-Za-z0-9_.] to '_'
   if (!out || outsz==0) return;
@@ -218,10 +234,11 @@ int main(int argc, char** argv){
       }
       case LSTTYPE_APPL: {
         lsthunk_t* fn = lsthunk_get_appl_func(r0);
+        lssize_t ac = lsthunk_get_argc(r0);
+        lsthunk_t* const* av = lsthunk_get_args(r0);
+        // Case A: direct REF call
         if (fn && lsthunk_get_type(fn)==LSTTYPE_REF){
           const lsstr_t* nm = lsthunk_get_ref_name(fn);
-          lssize_t ac = lsthunk_get_argc(r0);
-          lsthunk_t* const* av = lsthunk_get_args(r0);
           // Only support all-int arguments for now
           int ok=1; for(lssize_t i=0;i<ac;i++){ if(!(av && av[i] && lsthunk_get_type(av[i])==LSTTYPE_INT)){ ok=0; break; } }
           if (ok && nm){
@@ -231,6 +248,26 @@ int main(int argc, char** argv){
             emit_ir_decl_ext(stdout, m, bufc);
             emit_ir_main_call_ext_i32(stdout, m, bufc, argv);
             break;
+          }
+        }
+        // Case B: namespace selection APPL(REF ns, [SYMBOL sym]) applied to args
+        if (fn && lsthunk_get_type(fn)==LSTTYPE_APPL){
+          lsthunk_t* sel_fn = lsthunk_get_appl_func(fn);
+          lssize_t sel_ac = lsthunk_get_argc(fn);
+          lsthunk_t* const* sel_av = lsthunk_get_args(fn);
+          if (sel_fn && lsthunk_get_type(sel_fn)==LSTTYPE_REF && sel_ac==1 && sel_av && sel_av[0] && lsthunk_get_type(sel_av[0])==LSTTYPE_SYMBOL){
+            const lsstr_t* nsn = lsthunk_get_ref_name(sel_fn);
+            const lsstr_t* symn = lsthunk_get_symbol(sel_av[0]);
+            // Only support all-int arguments for now (for the outer call)
+            int ok=1; for(lssize_t i=0;i<ac;i++){ if(!(av && av[i] && lsthunk_get_type(av[i])==LSTTYPE_INT)){ ok=0; break; } }
+            if (ok && nsn && symn){
+              int bufc = (ac>0 && ac<16)? (int)ac : 0;
+              int argv[16]; for(int i=0;i<bufc;i++){ const lsint_t* iv = lsthunk_get_int(av[i]); argv[i] = iv ? lsint_get(iv) : 0; }
+              char m[256]; mangle_ns_sym_name(nsn, symn, m, sizeof m);
+              emit_ir_decl_ext(stdout, m, bufc);
+              emit_ir_main_call_ext_i32(stdout, m, bufc, argv);
+              break;
+            }
           }
         }
         emit_ir_main_ret_i32(stdout, 0);
