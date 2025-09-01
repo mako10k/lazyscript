@@ -389,6 +389,8 @@ expr4:
   | eappl { $$ = lsexpr_with_loc(lsexpr_new_appl($1), @$); }
   | ealge { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
   | lamchain { $$ = $1; }
+  /* Grouped lambda-choice: allow ( \x -> a | \y -> b ) as a single expression */
+  | '(' lamchain ')' { $$ = $2; }
     ;
 
 ealge:
