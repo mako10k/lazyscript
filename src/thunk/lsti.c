@@ -294,6 +294,16 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       }
       break;
     }
+    case LSTTYPE_BUILTIN: {
+      // Encode builtin as REF by name for LSTI v1 subset
+      const lsstr_t* bname = lsthunk_get_builtin_name(t);
+      if (bname) {
+        int __idx;
+        ADD_YPOOL(bname, __idx);
+        (void)__idx;
+      }
+      break;
+    }
     case LSTTYPE_BOTTOM: {
       const char* msg = lsthunk_bottom_get_message(t);
       if (msg) {
@@ -321,7 +331,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       free(nodes.data);
       free(spool.data);
       free(ypool.data);
-      return -ENOTSUP;
+  return -ENOTSUP; // LAMBDA not yet supported in LSTI writer
     }
   }
 
@@ -518,6 +528,21 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       }
       break;
     }
+    case LSTTYPE_BUILTIN: {
+      // Serialize builtin as REF to its name; arity/attrs are resolved via prelude env on load
+      hdr2.kind        = (uint8_t)LSTB_KIND_REF;
+      const lsstr_t* s = lsthunk_get_builtin_name(t);
+      if (s) {
+        int idx;
+        ADD_YPOOL(s, idx);
+        hdr2.aorl  = (uint32_t)lsstr_get_len(s);
+        hdr2.extra = (uint32_t)ypool.data[idx].off;
+      } else {
+        free(rel_offs);
+        return -EIO;
+      }
+      break;
+    }
     case LSTTYPE_ALGE: {
       hdr2.kind        = (uint8_t)LSTB_KIND_ALGE; // numbering shared with LSTB
       const lsstr_t* c = lsthunk_get_constr(t);
@@ -549,7 +574,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     }
     default:
       free(rel_offs);
-      return -ENOTSUP;
+  return -ENOTSUP; // LAMBDA not yet supported in LSTI writer
     }
     // Write header first
     if (fwrite(&hdr2, 1, sizeof(hdr2), fp) != sizeof(hdr2)) {
@@ -1187,6 +1212,23 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
     }
     case LSTB_KIND_REF: {
       // aorl=len, extra=offset into SYMBOL_BLOB
+      if (!symbol_blob) {
+        free(pend);
+        free(nodes);
+        return -EINVAL;
+      }
+      uint32_t len = 0, off = 0;
+      memcpy(&len, ent + 4, sizeof(uint32_t));
+      memcpy(&off, ent + 8, sizeof(uint32_t));
+      const char*    base = (const char*)(img->base + (lssize_t)symbol_blob->file_off);
+      const lsstr_t* s    = lsstr_new(base + off, (lssize_t)len);
+      const lsref_t* r    = lsref_new(s, lstrace_take_pending_or_unknown());
+      nodes[i]            = lsthunk_new_ref(r, prelude_env);
+      break;
+    }
+    case LSTB_KIND_BUILTIN: {
+      // For v1 subset, BUILTIN entries are not emitted; writers encode as REF to name.
+      // If encountered (forward-compat), treat like REF by name.
       if (!symbol_blob) {
         free(pend);
         free(nodes);
