@@ -11,6 +11,42 @@
 #include <string.h>
 
 static lstr_expr_t* to_expr_from_thunk(lsthunk_t* t);
+static lstr_pat_t*  to_pat_from_lstpat(lstpat_t* p);
+static lstr_pat_t* new_pat(lstr_pat_kind_t k){ lstr_pat_t* p=(lstr_pat_t*)calloc(1,sizeof(lstr_pat_t)); if(p) p->kind=k; return p; }
+
+static lstr_pat_t* to_pat_from_lstpat(lstpat_t* p){
+  if (!p) return new_pat(LSTR_PAT_WILDCARD);
+  switch (lstpat_get_type(p)){
+    case LSPTYPE_ALGE: {
+      lstr_pat_t* q = new_pat(LSTR_PAT_CONSTR);
+      q->as.constr.name = lstpat_get_constr(p);
+      lssize_t argc = lstpat_get_argc(p);
+      q->as.constr.argc = (size_t)argc;
+      if (argc>0){
+        q->as.constr.args = (lstr_pat_t**)calloc((size_t)argc, sizeof(lstr_pat_t*));
+        lstpat_t* const* args = lstpat_get_args(p);
+        for (lssize_t i=0;i<argc;i++) q->as.constr.args[i] = to_pat_from_lstpat(args[i]);
+      }
+      return q;
+    }
+    case LSPTYPE_AS: {
+      lstr_pat_t* q = new_pat(LSTR_PAT_AS);
+      lstpat_t* refp = lstpat_get_ref(p);
+      const lsstr_t* rn = lstpat_get_refname(refp);
+      if (rn){ q->as.as_pat.ref_pat = new_pat(LSTR_PAT_VAR); q->as.as_pat.ref_pat->as.var_name = rn; }
+      else { q->as.as_pat.ref_pat = to_pat_from_lstpat(refp); }
+      q->as.as_pat.inner = to_pat_from_lstpat(lstpat_get_aspattern(p));
+      return q;
+    }
+    case LSPTYPE_INT: { lstr_pat_t* q=new_pat(LSTR_PAT_INT); q->as.i=(long long)lsint_get(lstpat_get_int(p)); return q; }
+    case LSPTYPE_STR: { lstr_pat_t* q=new_pat(LSTR_PAT_STR); q->as.s=lstpat_get_str(p); return q; }
+    case LSPTYPE_REF: { lstr_pat_t* q=new_pat(LSTR_PAT_VAR); q->as.var_name=lstpat_get_refname(p); return q; }
+    case LSPTYPE_WILDCARD: return new_pat(LSTR_PAT_WILDCARD);
+    case LSPTYPE_OR: { lstr_pat_t* q=new_pat(LSTR_PAT_OR); q->as.or_pat.left=to_pat_from_lstpat(lstpat_get_or_left(p)); q->as.or_pat.right=to_pat_from_lstpat(lstpat_get_or_right(p)); return q; }
+    case LSPTYPE_CARET: { lstr_pat_t* q=new_pat(LSTR_PAT_CARET); q->as.caret_inner=to_pat_from_lstpat(lstpat_get_caret_inner(p)); return q; }
+    default: return new_pat(LSTR_PAT_WILDCARD);
+  }
+}
 
 static lstr_val_t* new_val(lstr_val_kind_t k){ lstr_val_t* v = (lstr_val_t*)calloc(1,sizeof(lstr_val_t)); if(v) v->kind=k; return v; }
 static lstr_expr_t* new_expr(lstr_exp_kind_t k){ lstr_expr_t* e = (lstr_expr_t*)calloc(1,sizeof(lstr_expr_t)); if(e) e->kind=k; return e; }
@@ -65,14 +101,7 @@ static lstr_val_t* to_val_from_thunk(lsthunk_t* t){
     case LSTTYPE_LAMBDA: {
       lstr_val_t* v = new_val(LSTR_VAL_LAM);
       lstpat_t* p = lsthunk_get_param(t);
-      // Convert param: REF -> VAR name, otherwise wildcard
-      lstr_pat_t* lp = (lstr_pat_t*)calloc(1, sizeof(lstr_pat_t));
-      if (lp){
-        const lsstr_t* rn = lstpat_get_refname(p);
-        if (rn){ lp->kind = LSTR_PAT_VAR; lp->as.var_name = rn; }
-        else { lp->kind = LSTR_PAT_WILDCARD; }
-      }
-      v->as.lam.param = lp;
+      v->as.lam.param = to_pat_from_lstpat(p);
       v->as.lam.body = to_expr_from_thunk(lsthunk_get_body(t));
       return v;
     }
