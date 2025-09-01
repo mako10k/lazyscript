@@ -87,7 +87,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     return -EOVERFLOW;
 
   // -----------------
-  // Build graph and pools (minimal): support INT/STR/SYMBOL/ALGE/BOTTOM
+  // Build graph and pools: now support INT/STR/SYMBOL/ALGE/BOTTOM/APPL/CHOICE/REF and LAMBDA
   // -----------------
   typedef struct vec_th {
     lsthunk_t** data;
@@ -110,6 +110,13 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     pool_ent_t* data;
     lssize_t    size, cap;
   } vec_pool_t;
+  // Pattern pool (flat unique list); we store pointers to thunk-side patterns for dedup during
+  // write, but materializer will not reuse these pointers.
+  typedef struct vec_pat {
+    lstpat_t** data;
+    lssize_t   size, cap;
+  } vec_pat_t;
+  vec_pat_t ppool = { 0 };
 
 #define VEC_PUSH(vec, val, type)                                                                   \
   do {                                                                                             \
@@ -267,6 +274,37 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       }
       break;
     }
+    case LSTTYPE_LAMBDA: {
+      // Collect param pattern and enqueue body
+      lstpat_t*  p = lsthunk_get_param(t);
+      // naive pattern pool dedup by pointer (ok within single process)
+      int        pidx = -1;
+      for (lssize_t i = 0; i < ppool.size; ++i) {
+        if (ppool.data[i] == p) {
+          pidx = (int)i;
+          break;
+        }
+      }
+      if (pidx < 0) {
+        if (ppool.size == ppool.cap) {
+          lssize_t ncap = ppool.cap ? ppool.cap * 2 : 8;
+          void*    np   = realloc(ppool.data, (size_t)ncap * sizeof(lstpat_t*));
+          if (!np)
+            return -ENOMEM;
+          ppool.data = (lstpat_t**)np;
+          ppool.cap  = ncap;
+        }
+        ppool.data[ppool.size++] = p;
+      }
+      lsthunk_t* b = lsthunk_get_body(t);
+      if (b) {
+        int id;
+        GET_ID(b, id);
+        if (id < 0)
+          VEC_PUSH(nodes, b, lsthunk_t*);
+      }
+      break;
+    }
     case LSTTYPE_CHOICE: {
       lsthunk_t* l = lsthunk_get_choice_left(t);
       lsthunk_t* r = lsthunk_get_choice_right(t);
@@ -330,7 +368,8 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       // Clean up
       free(nodes.data);
       free(spool.data);
-      free(ypool.data);
+  free(ypool.data);
+  free(ppool.data);
   return -ENOTSUP; // LAMBDA not yet supported in LSTI writer
     }
   }
@@ -341,9 +380,12 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
   int sect_count = 2; // THUNK_TAB + ROOTS
   int has_spool  = (spool.size > 0);
   int has_ypool  = (ypool.size > 0);
+  int has_ppool  = (ppool.size > 0);
   if (has_spool)
     ++sect_count;
   if (has_ypool)
+    ++sect_count;
+  if (has_ppool)
     ++sect_count;
   // Header
   lsti_header_disk_t hdr;
@@ -418,6 +460,183 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     symbol_entry.kind     = (uint32_t)LSTI_SECT_SYMBOL_BLOB;
     symbol_entry.file_off = (uint64_t)off;
     symbol_entry.size     = (uint64_t)(end - off);
+  }
+
+  // Write PATTERN_TAB: [u32 count][u64 entry_off[count]] + entries
+  lsti_section_disk_t ptab_entry = { 0 };
+  if (has_ppool) {
+    if (fpad_to_align(fp, align_log2) != 0)
+      return -EIO;
+    long ptab_off = ftell(fp);
+    if (ptab_off < 0)
+      return -EIO;
+    uint32_t pcnt = (uint32_t)ppool.size;
+    if (fwrite(&pcnt, 1, sizeof(pcnt), fp) != sizeof(pcnt))
+      return -EIO;
+    long poffs_pos = ftell(fp);
+    if (poffs_pos < 0)
+      return -EIO;
+    for (uint32_t i = 0; i < pcnt; ++i) {
+      uint64_t z = 0;
+      if (fwrite(&z, 1, sizeof(z), fp) != sizeof(z))
+        return -EIO;
+    }
+    uint64_t* poffs = (uint64_t*)malloc(sizeof(uint64_t) * pcnt);
+    if (!poffs)
+      return -ENOMEM;
+    for (uint32_t i = 0; i < pcnt; ++i) {
+      long ent_off = ftell(fp);
+      if (ent_off < 0) {
+        free(poffs);
+        return -EIO;
+      }
+      poffs[i] = (uint64_t)(ent_off - ptab_off);
+      const lstpat_t* p = ppool.data[i];
+      // pat entry: u8 kind + payload (SYMBOL/STRING refs by len/offset; thunk ids not allowed)
+      uint8_t kind = (uint8_t)lstpat_get_type(p);
+      if (fwrite(&kind, 1, sizeof(kind), fp) != sizeof(kind)) {
+        free(poffs);
+        return -EIO;
+      }
+      switch (kind) {
+      case LSPTYPE_ALGE: {
+        const lsstr_t* c = lstpat_get_constr(p);
+        int            yi;
+        ADD_YPOOL(c, yi);
+        uint32_t clen = (uint32_t)lsstr_get_len(c);
+        uint32_t coff = (uint32_t)ypool.data[yi].off;
+        uint32_t argc = (uint32_t)lstpat_get_argc(p);
+        if (fwrite(&clen, 1, 4, fp) != 4 || fwrite(&coff, 1, 4, fp) != 4 ||
+            fwrite(&argc, 1, 4, fp) != 4)
+          return -EIO;
+        lstpat_t* const* args = lstpat_get_args(p);
+        for (uint32_t j = 0; j < argc; ++j) {
+          // find child index in pool
+          int cidx = -1;
+          for (lssize_t k = 0; k < ppool.size; ++k)
+            if (ppool.data[k] == args[j]) {
+              cidx = (int)k;
+              break;
+            }
+          if (cidx < 0)
+            return -EIO; // children must be in pool already
+          uint32_t cid = (uint32_t)cidx;
+          if (fwrite(&cid, 1, 4, fp) != 4)
+            return -EIO;
+        }
+        break;
+      }
+      case LSPTYPE_AS: {
+        // payload: ref_pat_id, inner_pat_id (both pool indices)
+        lstpat_t* pref = lstpat_get_ref(p);
+        lstpat_t* pin  = lstpat_get_aspattern(p);
+        int       idr = -1, idi = -1;
+        for (lssize_t k = 0; k < ppool.size; ++k) {
+          if (ppool.data[k] == pref)
+            idr = (int)k;
+          if (ppool.data[k] == pin)
+            idi = (int)k;
+        }
+        if (idr < 0 || idi < 0)
+          return -EIO;
+        uint32_t r32 = (uint32_t)idr, i32 = (uint32_t)idi;
+        if (fwrite(&r32, 1, 4, fp) != 4 || fwrite(&i32, 1, 4, fp) != 4)
+          return -EIO;
+        break;
+      }
+      case LSPTYPE_INT: {
+        int64_t v = (int64_t)lsint_get(lstpat_get_int(p));
+        if (fwrite(&v, 1, sizeof(v), fp) != sizeof(v))
+          return -EIO;
+        break;
+      }
+      case LSPTYPE_STR: {
+        const lsstr_t* s = lstpat_get_str(p);
+        int            si;
+        ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), si);
+        uint32_t slen = (uint32_t)lsstr_get_len(s);
+        uint32_t soff = (uint32_t)spool.data[si].off;
+        if (fwrite(&slen, 1, 4, fp) != 4 || fwrite(&soff, 1, 4, fp) != 4)
+          return -EIO;
+        break;
+      }
+      case LSPTYPE_REF: {
+        // encode by symbol name using thunk-side accessor
+        const lsstr_t* s = lstpat_get_refname(p);
+        int            yi;
+        ADD_YPOOL(s, yi);
+        uint32_t ylen = (uint32_t)lsstr_get_len(s);
+        uint32_t yoff = (uint32_t)ypool.data[yi].off;
+        if (fwrite(&ylen, 1, 4, fp) != 4 || fwrite(&yoff, 1, 4, fp) != 4)
+          return -EIO;
+        break;
+      }
+      case LSPTYPE_WILDCARD: {
+        // no payload
+        break;
+      }
+      case LSPTYPE_OR: {
+        // payload: left_id, right_id
+        lstpat_t* l = lstpat_get_or_left(p);
+        lstpat_t* r = lstpat_get_or_right(p);
+        int       il = -1, ir = -1;
+        for (lssize_t k = 0; k < ppool.size; ++k) {
+          if (ppool.data[k] == l)
+            il = (int)k;
+          if (ppool.data[k] == r)
+            ir = (int)k;
+        }
+        if (il < 0 || ir < 0)
+          return -EIO;
+        uint32_t l32 = (uint32_t)il, r32 = (uint32_t)ir;
+        if (fwrite(&l32, 1, 4, fp) != 4 || fwrite(&r32, 1, 4, fp) != 4)
+          return -EIO;
+        break;
+      }
+      case LSPTYPE_CARET: {
+        // payload: inner_id
+        lstpat_t* in = lstpat_get_caret_inner(p);
+        int       ii = -1;
+        for (lssize_t k = 0; k < ppool.size; ++k)
+          if (ppool.data[k] == in) {
+            ii = (int)k;
+            break;
+          }
+        if (ii < 0)
+          return -EIO;
+        uint32_t i32 = (uint32_t)ii;
+        if (fwrite(&i32, 1, 4, fp) != 4)
+          return -EIO;
+        break;
+      }
+      default:
+        free(poffs);
+        return -ENOTSUP;
+      }
+    }
+    long ptab_end = ftell(fp);
+    if (ptab_end < 0) {
+      free(poffs);
+      return -EIO;
+    }
+    if (fseek(fp, poffs_pos, SEEK_SET) != 0) {
+      free(poffs);
+      return -EIO;
+    }
+    for (uint32_t i = 0; i < pcnt; ++i) {
+      if (fwrite(&poffs[i], 1, sizeof(uint64_t), fp) != sizeof(uint64_t)) {
+        free(poffs);
+        return -EIO;
+      }
+    }
+    if (fseek(fp, ptab_end, SEEK_SET) != 0) {
+      free(poffs);
+      return -EIO;
+    }
+    free(poffs);
+    ptab_entry.kind     = (uint32_t)LSTI_SECT_PATTERN_TAB;
+    ptab_entry.file_off = (uint64_t)ptab_off;
+    ptab_entry.size     = (uint64_t)(ptab_end - ptab_off);
   }
 
   // Write THUNK_TAB: layout = u32 count; u64 entry_off[count]; entries with headers and var part
@@ -572,9 +791,37 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       paykind     = PAY_BOTTOM;
       break;
     }
+    case LSTTYPE_LAMBDA: {
+      // header: aorl = pat_id (index in ppool), extra = body_id
+      hdr2.kind = (uint8_t)LSTB_KIND_LAMBDA;
+      // locate param pattern index
+      lstpat_t* param = lsthunk_get_param(t);
+      int       pid   = -1;
+      for (lssize_t p = 0; p < ppool.size; ++p)
+        if (ppool.data[p] == param) {
+          pid = (int)p;
+          break;
+        }
+      if (pid < 0) {
+        free(rel_offs);
+        return -EIO;
+      }
+      lsthunk_t* body = lsthunk_get_body(t);
+      int        bid  = -1;
+      if (body) {
+        GET_ID(body, bid);
+      }
+      if (bid < 0) {
+        free(rel_offs);
+        return -EIO;
+      }
+      hdr2.aorl  = (uint32_t)pid;
+      hdr2.extra = (uint32_t)bid;
+      break;
+    }
     default:
       free(rel_offs);
-  return -ENOTSUP; // LAMBDA not yet supported in LSTI writer
+      return -ENOTSUP;
     }
     // Write header first
     if (fwrite(&hdr2, 1, sizeof(hdr2), fp) != sizeof(hdr2)) {
@@ -739,6 +986,11 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       return -EIO;
     ++idx;
   }
+  if (has_ppool) {
+    if (fwrite(&ptab_entry, 1, sizeof(ptab_entry), fp) != sizeof(ptab_entry))
+      return -EIO;
+    ++idx;
+  }
   if (fwrite(&thtab_entry, 1, sizeof(thtab_entry), fp) != sizeof(thtab_entry))
     return -EIO;
   ++idx;
@@ -753,6 +1005,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
   free(nodes.data);
   free(spool.data);
   free(ypool.data);
+  free(ppool.data);
   return 0;
 }
 
@@ -819,8 +1072,8 @@ int lsti_validate(const lsti_image_t* img) {
   const lsti_section_disk_t* sect = (const lsti_section_disk_t*)(p + sizeof(lsti_header_disk_t));
   // Gather section info and validate bounds/alignment
   uint64_t                   mask        = ((uint64_t)1 << hdr->align_log2) - 1u;
-  const lsti_section_disk_t *string_blob = NULL, *symbol_blob = NULL, *thunk_tab = NULL,
-                            *roots = NULL;
+  const lsti_section_disk_t *string_blob = NULL, *symbol_blob = NULL, *pattern_tab = NULL,
+                            *thunk_tab = NULL, *roots = NULL;
   for (uint16_t i = 0; i < hdr->section_count; ++i) {
     uint32_t kind = sect[i].kind;
     uint64_t off  = sect[i].file_off;
@@ -842,6 +1095,9 @@ int lsti_validate(const lsti_image_t* img) {
       break;
     case LSTI_SECT_THUNK_TAB:
       thunk_tab = &sect[i];
+      break;
+    case LSTI_SECT_PATTERN_TAB:
+      pattern_tab = &sect[i];
       break;
     case LSTI_SECT_ROOTS:
       roots = &sect[i];
@@ -973,12 +1229,26 @@ int lsti_validate(const lsti_image_t* img) {
         memcpy(&rid, p + 4, sizeof(uint32_t));
         if (lid >= ncnt || rid >= ncnt)
           return -EINVAL;
-      } else if (kind == (uint8_t)LSTB_KIND_REF) {
+  } else if (kind == (uint8_t)LSTB_KIND_REF) {
         if (!symbol_blob)
           return -EINVAL;
         uint64_t sz  = symbol_blob->size;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
         if (off > sz || len > sz || off + len > sz)
+          return -EINVAL;
+      } else if (kind == (uint8_t)LSTB_KIND_LAMBDA) {
+        // header stores indices: aorl=pat_id, extra=body_id; ensure pat_id < pcount and body_id < ncnt
+        if (!pattern_tab)
+          return -EINVAL;
+        uint32_t pid = 0, bid = 0;
+        memcpy(&pid, ent + 4, sizeof(uint32_t));
+        memcpy(&bid, ent + 8, sizeof(uint32_t));
+        // pattern_tab structure: [u32 count][u64 offs[count]]; validate idx range only here
+        if (pattern_tab->size < sizeof(uint32_t))
+          return -EINVAL;
+        uint32_t pcnt = 0;
+        memcpy(&pcnt, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
+        if (pid >= pcnt || bid >= ncnt)
           return -EINVAL;
       }
     }
@@ -997,7 +1267,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   const lsti_section_disk_t* sect =
       (const lsti_section_disk_t*)(img->base + sizeof(lsti_header_disk_t));
   const lsti_section_disk_t *thunk_tab = NULL, *roots = NULL, *string_blob = NULL,
-                            *symbol_blob = NULL;
+                            *symbol_blob = NULL, *pattern_tab = NULL;
   for (uint16_t i = 0; i < hdr->section_count; ++i) {
     if (sect[i].kind == (uint32_t)LSTI_SECT_THUNK_TAB)
       thunk_tab = &sect[i];
@@ -1007,6 +1277,8 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       string_blob = &sect[i];
     else if (sect[i].kind == (uint32_t)LSTI_SECT_SYMBOL_BLOB)
       symbol_blob = &sect[i];
+    else if (sect[i].kind == (uint32_t)LSTI_SECT_PATTERN_TAB)
+      pattern_tab = &sect[i];
   }
   if (!thunk_tab || !roots)
     return -EINVAL;
@@ -1038,6 +1310,15 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       string_blob ? (const char*)(img->base + (lssize_t)string_blob->file_off) : NULL;
   const char* ybase =
       symbol_blob ? (const char*)(img->base + (lssize_t)symbol_blob->file_off) : NULL;
+  // parse pattern table if present
+  uint32_t       pcnt = 0;
+  const uint8_t* pt   = NULL;
+  const uint64_t*po   = NULL;
+  if (pattern_tab) {
+    pt = img->base + (lssize_t)pattern_tab->file_off;
+    memcpy(&pcnt, pt, sizeof(uint32_t));
+    po = (const uint64_t*)(pt + sizeof(uint32_t));
+  }
   for (uint32_t i = 0; i < ncnt; ++i) {
     const uint8_t* ent  = tt + offs[i];
     uint8_t        kind = ent[0];
@@ -1243,6 +1524,159 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       nodes[i]            = lsthunk_new_ref(r, prelude_env);
       break;
     }
+    case LSTB_KIND_LAMBDA: {
+      // Create placeholder; we'll wire body later. Param comes from pattern_tab
+      if (!pattern_tab) {
+        free(pend);
+        free(nodes);
+        return -EINVAL;
+      }
+      uint32_t pid = 0, bid = 0;
+      memcpy(&pid, ent + 4, sizeof(uint32_t));
+      memcpy(&bid, ent + 8, sizeof(uint32_t));
+      if (pid >= pcnt || bid >= ncnt) {
+        free(pend);
+        free(nodes);
+        return -EINVAL;
+      }
+      // decode pattern entry at pt+po[pid]
+      const uint8_t* pp = pt + po[pid];
+      uint8_t        pk = pp[0];
+      // recursive lambda to decode pattern by index
+      // We'll cache decoded patterns by index for potential sharing
+      static lstpat_t** pdec = NULL;
+      static uint32_t   pdec_cap = 0;
+      if (pdec_cap < pcnt) {
+        pdec = (lstpat_t**)realloc(pdec, sizeof(lspat_t*) * pcnt);
+        for (uint32_t x = pdec_cap; x < pcnt; ++x)
+          pdec[x] = NULL;
+        pdec_cap = pcnt;
+      }
+      // local recursive decoder
+      lstpat_t* (*decode)(uint32_t) = NULL;
+      lstpat_t* decode_impl(uint32_t idx) {
+        if (idx >= pcnt)
+          return NULL;
+        if (pdec && pdec[idx])
+          return pdec[idx];
+        const uint8_t* ppe = pt + po[idx];
+        uint8_t        kind = ppe[0];
+        ppe++;
+        switch (kind) {
+        case LSPTYPE_ALGE: {
+          uint32_t clen = 0, coff = 0, argc = 0;
+          memcpy(&clen, ppe, 4);
+          memcpy(&coff, ppe + 4, 4);
+          memcpy(&argc, ppe + 8, 4);
+          ppe += 12;
+          const lsstr_t* constr = lsstr_new(ybase + coff, (lssize_t)clen);
+          lstpat_t*      args = NULL;
+          lstpat_t**     argp = NULL;
+          if (argc > 0) {
+            argp = (lstpat_t**)malloc(sizeof(lstpat_t*) * argc);
+            for (uint32_t j = 0; j < argc; ++j) {
+              uint32_t cidx = 0;
+              memcpy(&cidx, ppe, 4);
+              ppe += 4;
+              argp[j] = decode_impl(cidx);
+            }
+          }
+          lstpat_t* ret = lstpat_new_alge_raw(constr, (lssize_t)argc, argp);
+          if (argp)
+            free(argp);
+          if (pdec)
+            pdec[idx] = ret;
+          return ret;
+        }
+        case LSPTYPE_AS: {
+          uint32_t rid = 0, iid = 0;
+          memcpy(&rid, ppe, 4);
+          memcpy(&iid, ppe + 4, 4);
+          lstpat_t* ref = decode_impl(rid);
+          lstpat_t* in  = decode_impl(iid);
+          lstpat_t* ret = lstpat_new_as_raw(ref, in);
+          if (pdec)
+            pdec[idx] = ret;
+          return ret;
+        }
+        case LSPTYPE_INT: {
+          int64_t v = 0;
+          memcpy(&v, ppe, sizeof(v));
+          lstpat_t* ret = lstpat_new_int_raw(lsint_new((int)v));
+          if (pdec)
+            pdec[idx] = ret;
+          return ret;
+        }
+        case LSPTYPE_STR: {
+          uint32_t slen = 0, soff = 0;
+          memcpy(&slen, ppe, 4);
+          memcpy(&soff, ppe + 4, 4);
+          const lsstr_t* s   = lsstr_new(sbase + soff, (lssize_t)slen);
+          lstpat_t*      ret = lstpat_new_str_raw(s);
+          if (pdec)
+            pdec[idx] = ret;
+          return ret;
+        }
+        case LSPTYPE_REF: {
+          uint32_t ylen = 0, yoff = 0;
+          memcpy(&ylen, ppe, 4);
+          memcpy(&yoff, ppe + 4, 4);
+          const lsstr_t* s  = lsstr_new(ybase + yoff, (lssize_t)ylen);
+          const lsref_t* rr = lsref_new(s, lstrace_take_pending_or_unknown());
+          lstpat_t*      ret = lstpat_new_ref(rr);
+          if (pdec)
+            pdec[idx] = ret;
+          return ret;
+        }
+        case LSPTYPE_WILDCARD: {
+          lstpat_t* ret = lstpat_new_wild_raw();
+          if (pdec)
+            pdec[idx] = ret;
+          return ret;
+        }
+        case LSPTYPE_OR: {
+          uint32_t l = 0, r = 0;
+          memcpy(&l, ppe, 4);
+          memcpy(&r, ppe + 4, 4);
+          lstpat_t* ret = lstpat_new_or_raw(decode_impl(l), decode_impl(r));
+          if (pdec)
+            pdec[idx] = ret;
+          return ret;
+        }
+        case LSPTYPE_CARET: {
+          uint32_t i = 0;
+          memcpy(&i, ppe, 4);
+          lstpat_t* ret = lstpat_new_caret_raw(decode_impl(i));
+          if (pdec)
+            pdec[idx] = ret;
+          return ret;
+        }
+        default:
+          return NULL;
+        }
+      }
+      // assign function pointer to call recursive impl
+      decode = &decode_impl;
+      lstpat_t* param = decode(pid);
+      if (!param) {
+        free(pend);
+        free(nodes);
+        return -EINVAL;
+      }
+  // Allocate lambda thunk via internal-friendly API
+  lsthunk_t* lam = lsthunk_alloc_lambda(param);
+      nodes[i]                 = lam;
+      pend[i].kind             = 5; // lambda pending body
+      pend[i].argc             = 1;
+      pend[i].ids              = (uint32_t*)malloc(sizeof(uint32_t));
+      if (!pend[i].ids) {
+        free(pend);
+        free(nodes);
+        return -ENOMEM;
+      }
+      pend[i].ids[0] = bid;
+      break;
+    }
     default: {
       // Not supported in this subset
       for (uint32_t k = 0; k < i; ++k) { /* GC managed by Boehm */
@@ -1255,7 +1689,8 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   }
   // Second pass: wire pending edges
   for (uint32_t i = 0; i < ncnt; ++i) {
-    if ((pend[i].argc > 0 && pend[i].ids) || pend[i].kind == 3 || pend[i].kind == 4) {
+    if ((pend[i].argc > 0 && pend[i].ids) || pend[i].kind == 3 || pend[i].kind == 4 ||
+        pend[i].kind == 5) {
       if (pend[i].kind == 1 && lsthunk_get_type(nodes[i]) == LSTTYPE_ALGE) {
         for (lssize_t j = 0; j < pend[i].argc; ++j)
           lsthunk_set_alge_arg(nodes[i], j, nodes[pend[i].ids[j]]);
@@ -1269,6 +1704,9 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       } else if (pend[i].kind == 4 && lsthunk_get_type(nodes[i]) == LSTTYPE_CHOICE) {
         lsthunk_set_choice_left(nodes[i], nodes[pend[i].ids[0]]);
         lsthunk_set_choice_right(nodes[i], nodes[pend[i].ids[1]]);
+      } else if (pend[i].kind == 5 && lsthunk_get_type(nodes[i]) == LSTTYPE_LAMBDA) {
+        // set body
+        lsthunk_set_lambda_body(nodes[i], nodes[pend[i].ids[0]]);
       }
       if (pend[i].ids) {
         free(pend[i].ids);

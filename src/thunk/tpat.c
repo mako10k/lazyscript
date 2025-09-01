@@ -99,6 +99,55 @@ static lstpat_t* lstpat_new_alge_internal(const lsstr_t* constr, lssize_t argc,
   return pat;
 }
 
+// Raw constructors (for loaders/materializers)
+lstpat_t* lstpat_new_alge_raw(const lsstr_t* constr, lssize_t argc, lstpat_t* const* args) {
+  return lstpat_new_alge_internal(constr, argc, args);
+}
+
+lstpat_t* lstpat_new_as_raw(lstpat_t* ref_pat, lstpat_t* inner_pat) {
+  lstpat_t* ret     = lsmalloc(sizeof(lstpat_t));
+  ret->ltp_type     = LSPTYPE_AS;
+  ret->as.ref       = ref_pat;
+  ret->as.aspattern = inner_pat;
+  return ret;
+}
+
+lstpat_t* lstpat_new_int_raw(const lsint_t* val) {
+  lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
+  ret->ltp_type = LSPTYPE_INT;
+  ret->intval   = val;
+  return ret;
+}
+
+lstpat_t* lstpat_new_str_raw(const lsstr_t* val) {
+  lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
+  ret->ltp_type = LSPTYPE_STR;
+  ret->strval   = val;
+  return ret;
+}
+
+lstpat_t* lstpat_new_wild_raw(void) {
+  lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
+  ret->ltp_type = LSPTYPE_WILDCARD;
+  ret->w.wild   = 1;
+  return ret;
+}
+
+lstpat_t* lstpat_new_or_raw(lstpat_t* left, lstpat_t* right) {
+  lstpat_t* ret  = lsmalloc(sizeof(lstpat_t));
+  ret->ltp_type  = LSPTYPE_OR;
+  ret->orp.left  = left;
+  ret->orp.right = right;
+  return ret;
+}
+
+lstpat_t* lstpat_new_caret_raw(lstpat_t* inner) {
+  lstpat_t* ret    = lsmalloc(sizeof(lstpat_t));
+  ret->ltp_type    = LSPTYPE_CARET;
+  ret->caret.inner = inner;
+  return ret;
+}
+
 static lstpat_t* lstpat_from_lspalge(const lspalge_t* palge, lstenv_t* tenv,
                                      lstref_target_origin_t* origin) {
   (void)tenv;
@@ -278,6 +327,16 @@ const lsstr_t* lstpat_get_str(const lstpat_t* pat) {
 }
 
 int  lstpat_is_wild(const lstpat_t* pat) { return pat->ltp_type == LSPTYPE_WILDCARD; }
+
+const lsstr_t* lstpat_get_refname(const lstpat_t* pat) {
+  assert(pat->ltp_type == LSPTYPE_REF);
+  return lsref_get_name(pat->r.ref);
+}
+
+const lsref_t* lstpat_get_refref(const lstpat_t* pat) {
+  assert(pat->ltp_type == LSPTYPE_REF);
+  return pat->r.ref;
+}
 
 void lstpat_set_refbound(lstpat_t* pat, lsthunk_t* thunk) {
   assert(pat->ltp_type == LSPTYPE_REF);

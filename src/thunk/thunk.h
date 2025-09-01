@@ -180,6 +180,10 @@ lsthunk_t* lsthunk_alloc_choice(int kind);
 void       lsthunk_set_choice_left(lsthunk_t* thunk, lsthunk_t* left);
 void       lsthunk_set_choice_right(lsthunk_t* thunk, lsthunk_t* right);
 
+// Allocate a LAMBDA thunk with param pre-set; body is set later via setter
+lsthunk_t* lsthunk_alloc_lambda(lstpat_t* param);
+void       lsthunk_set_lambda_body(lsthunk_t* thunk, lsthunk_t* body);
+
 // Lightweight getters used by serializers
 // When thunk is APPL, return function child (may be NULL for partially wired)
 lsthunk_t*       lsthunk_get_appl_func(const lsthunk_t* thunk);

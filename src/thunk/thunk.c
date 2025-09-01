@@ -343,6 +343,25 @@ const lsstr_t* lsthunk_get_ref_name(const lsthunk_t* thunk) {
   return lsref_get_name(thunk->lt_ref.ltr_ref);
 }
 
+// --- LAMBDA helpers (two-phase wiring) -----------------------------------
+
+lsthunk_t* lsthunk_alloc_lambda(lstpat_t* param) {
+  lsthunk_t* t   = lsmalloc(sizeof(lsthunk_t));
+  t->lt_type     = LSTTYPE_LAMBDA;
+  t->lt_whnf     = t;
+  t->lt_trace_id = g_trace_next_id++;
+  lstrace_emit_loc(lstrace_take_pending_or_unknown());
+  t->lt_lambda.ltl_param = param;
+  t->lt_lambda.ltl_body  = NULL;
+  return t;
+}
+
+void lsthunk_set_lambda_body(lsthunk_t* thunk, lsthunk_t* body) {
+  if (!thunk || thunk->lt_type != LSTTYPE_LAMBDA)
+    return;
+  thunk->lt_lambda.ltl_body = body;
+}
+
 lsthunk_t* lsthunk_new_ealge(const lsealge_t* ealge, lstenv_t* tenv) {
   lssize_t               eargc = lsealge_get_argc(ealge);
   const lsexpr_t* const* eargs = lsealge_get_args(ealge);
