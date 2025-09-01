@@ -24,6 +24,7 @@ t81_choice_right_assoc
 t82_choice_precedence
 t83_choice_laziness_and_bottom
 t85_expr_choice_basic
+t86_lambda_choice_second_arg_bottom
 
 # Parser message wording differs since introducing '^|' and tightened '|': skip for now
 r92_parse_nonlambda_bar_invalid
