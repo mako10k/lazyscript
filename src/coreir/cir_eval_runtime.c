@@ -103,8 +103,8 @@ static const rv_t* rv_sym(const char* s) {
   return v;
 }
 static const rv_t* rv_bottom(const char* msg, int argc, const rv_t* const* args) {
-  rv_t* v     = lsmalloc(sizeof(rv_t));
-  v->kind     = RV_BOTTOM;
+  rv_t* v        = lsmalloc(sizeof(rv_t));
+  v->kind        = RV_BOTTOM;
   v->bot.message = msg;
   v->bot.argc    = argc;
   v->bot.args    = args;
@@ -143,11 +143,13 @@ static const rv_t* apply(FILE* outfp, const rv_t* f, int argc, const rv_t* const
 
 // POLICY NOTE:
 //  - Unauthorized fallback is prohibited.
-//  - Do not use fixed identifiers (prelude, builtins, internal, env, specific builtin names) in implementation logic.
+//  - Do not use fixed identifiers (prelude, builtins, internal, env, specific builtin names) in
+//  implementation logic.
 // TEMP/TODO: Import-based builtin resolution is not implemented yet for Core IR runtime.
-//            Until an explicit import/registry exists in the IR and reader, unknown variables must NOT be
-//            implicitly resolved to native functions. They remain plain symbols and will not be callable here.
-//            Follow-up: Introduce explicit import table in CIR and wire evaluator/typechecker to it.
+//            Until an explicit import/registry exists in the IR and reader, unknown variables must
+//            NOT be implicitly resolved to native functions. They remain plain symbols and will not
+//            be callable here. Follow-up: Introduce explicit import table in CIR and wire
+//            evaluator/typechecker to it.
 static const rv_t* eval_value(FILE* outfp, const lscir_value_t* v, eval_ctx_t* ctx) {
   (void)outfp;
   switch (v->kind) {
@@ -202,16 +204,33 @@ static int truthy(const rv_t* v) {
 }
 
 static void print_value_inline(FILE* outfp, const rv_t* v) {
-  if (!v) { fprintf(outfp, "<v>"); return; }
+  if (!v) {
+    fprintf(outfp, "<v>");
+    return;
+  }
   switch (v->kind) {
-  case RV_UNIT: fprintf(outfp, "()"); return;
-  case RV_INT: fprintf(outfp, "%lld", v->ival); return;
-  case RV_STR: fprintf(outfp, "%s", v->sval); return;
-  case RV_SYMBOL: fprintf(outfp, "%s", v->sym); return;
+  case RV_UNIT:
+    fprintf(outfp, "()");
+    return;
+  case RV_INT:
+    fprintf(outfp, "%lld", v->ival);
+    return;
+  case RV_STR:
+    fprintf(outfp, "%s", v->sval);
+    return;
+  case RV_SYMBOL:
+    fprintf(outfp, "%s", v->sym);
+    return;
   case RV_CONSTR: {
-    if (v->con.argc == 0) { fprintf(outfp, "%s", v->con.name ? v->con.name : "<con>"); return; }
+    if (v->con.argc == 0) {
+      fprintf(outfp, "%s", v->con.name ? v->con.name : "<con>");
+      return;
+    }
     fprintf(outfp, "(%s", v->con.name ? v->con.name : "<con>");
-    for (int j = 0; j < v->con.argc; j++) { fprintf(outfp, " "); print_value_inline(outfp, v->con.args[j]); }
+    for (int j = 0; j < v->con.argc; j++) {
+      fprintf(outfp, " ");
+      print_value_inline(outfp, v->con.args[j]);
+    }
     fprintf(outfp, ")");
     return;
   }
@@ -219,13 +238,19 @@ static void print_value_inline(FILE* outfp, const rv_t* v) {
     fprintf(outfp, "<bottom msg=\"%s\"", v->bot.message ? v->bot.message : "");
     if (v->bot.argc > 0 && v->bot.args) {
       fprintf(outfp, " args=[");
-      for (int i = 0; i < v->bot.argc; i++) { if (i) fprintf(outfp, ", "); print_value_inline(outfp, v->bot.args[i]); }
+      for (int i = 0; i < v->bot.argc; i++) {
+        if (i)
+          fprintf(outfp, ", ");
+        print_value_inline(outfp, v->bot.args[i]);
+      }
       fprintf(outfp, "]");
     }
     fprintf(outfp, ">");
     return;
   }
-  default: fprintf(outfp, "<v>"); return;
+  default:
+    fprintf(outfp, "<v>");
+    return;
   }
 }
 
@@ -361,7 +386,9 @@ static const rv_t* apply_natfun(FILE* outfp, const rv_t* nf, int argc, const rv_
     xs[nf->nf.capc + i] = args[i];
   // TODO: Native function application requires an explicit registry provided via IR imports.
   //       Current evaluator deliberately avoids any name-based behavior.
-  (void)tot; (void)xs; (void)name; // unused until registry is introduced
+  (void)tot;
+  (void)xs;
+  (void)name; // unused until registry is introduced
   return rv_unit();
 }
 
@@ -422,8 +449,8 @@ static const rv_t* eval_expr(FILE* outfp, const lscir_expr_t* e, eval_ctx_t* ctx
       for (int i = 0; i < e->effapp.argc; i++)
         xs[i] = eval_value(outfp, e->effapp.args[i], ctx);
     }
-  // TODO: Effects must be mediated via explicit effectful builtins from an import table.
-  //       No implicit symbol-based effects here.
+    // TODO: Effects must be mediated via explicit effectful builtins from an import table.
+    //       No implicit symbol-based effects here.
     return rv_unit();
   }
   case LCIR_EXP_TOKEN:
@@ -433,18 +460,18 @@ static const rv_t* eval_expr(FILE* outfp, const lscir_expr_t* e, eval_ctx_t* ctx
     for (int i = 0; i < e->match1.casec; i++) {
       const lscir_case_t* c = &e->match1.cases[i];
       // Reuse clean matcher logic: only handle trivial equality/constructors via rv_t structure
-      // For runtime path, we don’t have thunk infra here; pattern eval lives in clean evaluator only.
-      // So we limit to wildcard and variables; others require lowering.
+      // For runtime path, we don’t have thunk infra here; pattern eval lives in clean evaluator
+      // only. So we limit to wildcard and variables; others require lowering.
       if (!c->pat || c->pat->kind == LCIR_PAT_WILDCARD || c->pat->kind == LCIR_PAT_VAR) {
         eval_ctx_t sub = { .env = ctx->env, .has_token = ctx->has_token };
         // Bind var is ignored in runtime path until full env wiring exists.
         return eval_expr(outfp, c->body, &sub);
       }
     }
-  // No match -> emit a Bottom-style diagnostic and return an internal bottom carrying scrutinee
-  fprintf(stderr, "E: <bottom msg=\"match: no case\" at <unknown>:1.1: >\n");
-  const rv_t* rels[1] = { sv };
-  return rv_bottom("match: no case", 1, rels);
+    // No match -> emit a Bottom-style diagnostic and return an internal bottom carrying scrutinee
+    fprintf(stderr, "E: <bottom msg=\"match: no case\" at <unknown>:1.1: >\n");
+    const rv_t* rels[1] = { sv };
+    return rv_bottom("match: no case", 1, rels);
   }
   }
   return rv_unit();

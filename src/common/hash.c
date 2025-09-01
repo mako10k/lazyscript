@@ -156,14 +156,16 @@ static void lshash_rehash(lshash_t* hash, int new_capacity) {
 int lshash_put(lshash_t* hash, const lsstr_t* key, lshash_data_t value, lshash_data_t* old_value) {
   assert(hash != NULL);
   assert(key != NULL);
-  if (hash->lh_capacity <= 0 || hash->lh_capacity > 1<<26 || hash->lh_size < 0) {
-    lsprintf(stderr, 0, "WARN: hash corrupt pre-put cap=%d size=%d -> reset\n", hash->lh_capacity, hash->lh_size);
+  if (hash->lh_capacity <= 0 || hash->lh_capacity > 1 << 26 || hash->lh_size < 0) {
+    lsprintf(stderr, 0, "WARN: hash corrupt pre-put cap=%d size=%d -> reset\n", hash->lh_capacity,
+             hash->lh_size);
     // attempt to reset to a sane empty table
     hash->lh_capacity = 16;
-    hash->lh_size = 0;
+    hash->lh_size     = 0;
     lsfree(hash->lh_entries);
     hash->lh_entries = lsmalloc(hash->lh_capacity * sizeof(lshash_entry_t*));
-    for (int i=0;i<hash->lh_capacity;i++) hash->lh_entries[i] = NULL;
+    for (int i = 0; i < hash->lh_capacity; i++)
+      hash->lh_entries[i] = NULL;
   }
   if (hash->lh_size >= hash->lh_capacity * 0.75)
     lshash_rehash(hash, hash->lh_capacity * 2);

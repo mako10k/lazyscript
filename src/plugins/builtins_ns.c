@@ -35,15 +35,19 @@ extern lsthunk_t* lsbuiltin_prelude_include(lssize_t, lsthunk_t* const*, void*);
 
 // println: print followed by newline; returns unit
 static lsthunk_t* pl_println(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)data;
+  (void)argc;
+  (void)data;
   lsthunk_t* r = lsbuiltin_print(1, args, NULL);
-  if (!r) return NULL;
+  if (!r)
+    return NULL;
   lsprintf(stdout, 0, "\n");
   return ls_make_unit();
 }
 
 static lsthunk_t* pl_getter0(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)args; return (lsthunk_t*)data;
+  (void)argc;
+  (void)args;
+  return (lsthunk_t*)data;
 }
 
 // require/include wrappers delegating to host builtins
@@ -78,12 +82,12 @@ static lsthunk_t* pl_exit(lssize_t argc, lsthunk_t* const* args, void* data) {
 
 // Optional gating for debug helpers via env var
 static int pl_trace_enabled(void) {
-  static int init = 0;
+  static int init    = 0;
   static int enabled = 0;
   if (!init) {
     const char* v = getenv("LAZYSCRIPT_ENABLE_TRACE");
-    enabled = (v && v[0] && v[0] != '0') ? 1 : 0;
-    init = 1;
+    enabled       = (v && v[0] && v[0] != '0') ? 1 : 0;
+    init          = 1;
   }
   return enabled;
 }
@@ -104,7 +108,8 @@ static lsthunk_t* pl_trace(lssize_t argc, lsthunk_t* const* args, void* data) {
   int tid = lstrace_current();
   if (tid >= 0) {
     lstrace_span_t s = lstrace_lookup(tid);
-    lsprintf(stderr, 0, "[trace] %s:%d:%d-: ", s.filename ? s.filename : "<unknown>", s.first_line, s.first_column);
+    lsprintf(stderr, 0, "[trace] %s:%d:%d-: ", s.filename ? s.filename : "<unknown>", s.first_line,
+             s.first_column);
   } else {
     lsprintf(stderr, 0, "[trace] <no-loc>: ");
   }
@@ -119,14 +124,17 @@ static lsthunk_t* pl_trace(lssize_t argc, lsthunk_t* const* args, void* data) {
   }
   // Print separator and shallow expr (no evaluation)
   lsprintf(stderr, 0, " :: ");
-  if (expr) lsthunk_dprint(stderr, LSPREC_LOWEST, 0, expr);
+  if (expr)
+    lsthunk_dprint(stderr, LSPREC_LOWEST, 0, expr);
   lsprintf(stderr, 0, "\n");
   return expr;
 }
 
 // force: evaluate to WHNF and return the evaluated thunk
 static lsthunk_t* pl_force(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)data; assert(argc == 1); assert(args != NULL);
+  (void)data;
+  assert(argc == 1);
+  assert(args != NULL);
   if (!pl_trace_enabled()) {
     return args[0]; // disabled: no-op
   }
@@ -136,7 +144,9 @@ static lsthunk_t* pl_force(lssize_t argc, lsthunk_t* const* args, void* data) {
 
 // traceForce: like trace but forces expr to WHNF before printing; returns expr (evaluated)
 static lsthunk_t* pl_trace_force(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)data; assert(argc == 2); assert(args != NULL);
+  (void)data;
+  assert(argc == 2);
+  assert(args != NULL);
   lsthunk_t* expr = args[1];
   if (!pl_trace_enabled()) {
     return expr; // disabled: no-op (do not force)
@@ -144,10 +154,11 @@ static lsthunk_t* pl_trace_force(lssize_t argc, lsthunk_t* const* args, void* da
   // Evaluate message and expr
   lsthunk_t* msgv = lsthunk_eval0(args[0]);
   lsthunk_t* val  = lsthunk_eval0(expr);
-  int tid = lstrace_current();
+  int        tid  = lstrace_current();
   if (tid >= 0) {
     lstrace_span_t s = lstrace_lookup(tid);
-    lsprintf(stderr, 0, "[traceForce] %s:%d:%d-: ", s.filename ? s.filename : "<unknown>", s.first_line, s.first_column);
+    lsprintf(stderr, 0, "[traceForce] %s:%d:%d-: ", s.filename ? s.filename : "<unknown>",
+             s.first_line, s.first_column);
   } else {
     lsprintf(stderr, 0, "[traceForce] <no-loc>: ");
   }
@@ -160,11 +171,11 @@ static lsthunk_t* pl_trace_force(lssize_t argc, lsthunk_t* const* args, void* da
     lsprintf(stderr, 0, "<msg-eval-null>");
   }
   lsprintf(stderr, 0, " :: ");
-  if (val) lsthunk_dprint(stderr, LSPREC_LOWEST, 0, val);
+  if (val)
+    lsthunk_dprint(stderr, LSPREC_LOWEST, 0, val);
   lsprintf(stderr, 0, "\n");
   return val ? val : NULL;
 }
-
 
 // requireOpt: try require; return Some () on success, None on failure. Effectful.
 static lsthunk_t* pl_require_opt(lssize_t argc, lsthunk_t* const* args, void* data) {
@@ -174,28 +185,37 @@ static lsthunk_t* pl_require_opt(lssize_t argc, lsthunk_t* const* args, void* da
     lsprintf(stderr, 0, "E: requireOpt: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
-  if (!tenv) return ls_make_err("requireOpt: no env");
+  if (!tenv)
+    return ls_make_err("requireOpt: no env");
   // Delegate to require; map error -> None, success -> Some ()
   lsthunk_t* ret = lsbuiltin_prelude_require(1, args, tenv);
-  if (ret == NULL) return NULL;
+  if (ret == NULL)
+    return NULL;
   if (lsthunk_is_err(ret)) {
     // None
     return lsthunk_new_ealge(lsealge_new(lsstr_cstr("None"), 0, NULL), NULL);
   }
   // Some ()
-  const lsexpr_t* some_arg = lsexpr_new_alge(lsealge_new(lsstr_cstr("()"), 0, NULL));
+  const lsexpr_t* some_arg     = lsexpr_new_alge(lsealge_new(lsstr_cstr("()"), 0, NULL));
   const lsexpr_t* some_args[1] = { some_arg };
   return lsthunk_new_ealge(lsealge_new(lsstr_cstr("Some"), 1, some_args), NULL);
 }
 
 // strcat: pure string concatenation
 static lsthunk_t* pl_strcat(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)data;
-  lsthunk_t* a = lsthunk_eval0(args[0]); if (!a) return NULL;
-  lsthunk_t* b = lsthunk_eval0(args[1]); if (!b) return NULL;
+  (void)argc;
+  (void)data;
+  lsthunk_t* a = lsthunk_eval0(args[0]);
+  if (!a)
+    return NULL;
+  lsthunk_t* b = lsthunk_eval0(args[1]);
+  if (!b)
+    return NULL;
   if (lsthunk_get_type(a) != LSTTYPE_STR || lsthunk_get_type(b) != LSTTYPE_STR)
     return ls_make_err("strcat: expected string operands");
-  size_t len = 0; char* buf = NULL; FILE* fp = lsopen_memstream_gc(&buf, &len);
+  size_t len = 0;
+  char*  buf = NULL;
+  FILE*  fp  = lsopen_memstream_gc(&buf, &len);
   lsstr_print_bare(fp, LSPREC_LOWEST, 0, lsthunk_get_str(a));
   lsstr_print_bare(fp, LSPREC_LOWEST, 0, lsthunk_get_str(b));
   fclose(fp);
@@ -204,13 +224,17 @@ static lsthunk_t* pl_strcat(lssize_t argc, lsthunk_t* const* args, void* data) {
 
 // Option-like import: returns true on success, false on invalid namespace
 static lsthunk_t* pl_importOpt(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; lstenv_t* tenv = (lstenv_t*)data;
+  (void)argc;
+  lstenv_t* tenv = (lstenv_t*)data;
   if (!ls_effects_allowed()) {
     lsprintf(stderr, 0, "E: importOpt: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
-  if (!tenv) return NULL;
-  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (nsv == NULL) return NULL;
+  if (!tenv)
+    return NULL;
+  lsthunk_t* nsv = lsthunk_eval0(args[0]);
+  if (nsv == NULL)
+    return NULL;
   if (!lsns_foreach_member(nsv, pl_import_cb, tenv))
     return lsthunk_new_ealge(lsealge_new(lsstr_cstr("false"), 0, NULL), NULL);
   return lsthunk_new_ealge(lsealge_new(lsstr_cstr("true"), 0, NULL), NULL);
@@ -219,31 +243,45 @@ static lsthunk_t* pl_importOpt(lssize_t argc, lsthunk_t* const* args, void* data
 // (~prelude .env key) dispatcher to access env-scoped operations
 static lsthunk_t* pl_dispatch_env(lssize_t argc, lsthunk_t* const* args, void* data) {
   lstenv_t* tenv = (lstenv_t*)data;
-  (void)argc; if (!tenv) return ls_make_err("prelude.env: no env");
-  lsthunk_t* keyv = lsthunk_eval0(args[0]); if (!keyv) return NULL;
-  if (lsthunk_get_type(keyv) != LSTTYPE_SYMBOL) return ls_make_err("prelude.env: expected symbol");
+  (void)argc;
+  if (!tenv)
+    return ls_make_err("prelude.env: no env");
+  lsthunk_t* keyv = lsthunk_eval0(args[0]);
+  if (!keyv)
+    return NULL;
+  if (lsthunk_get_type(keyv) != LSTTYPE_SYMBOL)
+    return ls_make_err("prelude.env: expected symbol");
   const lsstr_t* s = lsthunk_get_symbol(keyv);
   if (lsstrcmp(s, lsstr_cstr(".require")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.require"), 1, pl_require, tenv, LSBATTR_EFFECT | LSBATTR_ENV_READ);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.require"), 1, pl_require, tenv,
+                                    LSBATTR_EFFECT | LSBATTR_ENV_READ);
   if (lsstrcmp(s, lsstr_cstr(".include")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.include"), 1, pl_include, tenv, LSBATTR_ENV_READ);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.include"), 1, pl_include, tenv,
+                                    LSBATTR_ENV_READ);
   if (lsstrcmp(s, lsstr_cstr(".print")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.print"), 1, lsbuiltin_print, NULL, LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.print"), 1, lsbuiltin_print, NULL,
+                                    LSBATTR_EFFECT);
   if (lsstrcmp(s, lsstr_cstr(".println")) == 0)
-  return lsthunk_new_builtin_attr(lsstr_cstr("prelude.println"), 1, pl_println, NULL, LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.println"), 1, pl_println, NULL,
+                                    LSBATTR_EFFECT);
   if (lsstrcmp(s, lsstr_cstr(".exit")) == 0)
     return lsthunk_new_builtin_attr(lsstr_cstr("prelude.exit"), 1, pl_exit, NULL, LSBATTR_EFFECT);
   if (lsstrcmp(s, lsstr_cstr(".import")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.import"), 1, pl_import, tenv, LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.import"), 1, pl_import, tenv,
+                                    LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
   if (lsstrcmp(s, lsstr_cstr(".importOpt")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.importOpt"), 1, pl_importOpt, tenv, LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.importOpt"), 1, pl_importOpt, tenv,
+                                    LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
   if (lsstrcmp(s, lsstr_cstr(".requireOpt")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.requireOpt"), 1, pl_require_opt, tenv, LSBATTR_EFFECT | LSBATTR_ENV_READ);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.requireOpt"), 1, pl_require_opt, tenv,
+                                    LSBATTR_EFFECT | LSBATTR_ENV_READ);
   if (lsstrcmp(s, lsstr_cstr(".withImport")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.withImport"), 2, pl_withImport, tenv, LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.withImport"), 2, pl_withImport, tenv,
+                                    LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
   /* .def removed */
   if (lsstrcmp(s, lsstr_cstr(".builtin")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin, tenv, LSBATTR_EFFECT | LSBATTR_ENV_READ);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.builtin"), 1, lsbuiltin_prelude_builtin,
+                                    tenv, LSBATTR_EFFECT | LSBATTR_ENV_READ);
   /* .raise removed: caret ^(expr) now has a dedicated AST/runtime */
   return ls_make_err("prelude.env: unknown key");
 }
@@ -291,7 +329,9 @@ static lsthunk_t* pl_return(lssize_t argc, lsthunk_t* const* args, void* data) {
 
 // import/withImport for plugin prelude
 static void pl_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data) {
-  lstenv_t* tenv = (lstenv_t*)data; if (!tenv) return;
+  lstenv_t* tenv = (lstenv_t*)data;
+  if (!tenv)
+    return;
   // Bind original key as-is (may start with '.')
   lstenv_put_builtin(tenv, sym, 0, pl_getter0, value);
   // If symbol starts with '.', also bind an alias without the leading dot
@@ -304,26 +344,36 @@ static void pl_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data) {
 }
 
 static lsthunk_t* pl_import(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; lstenv_t* tenv = (lstenv_t*)data;
+  (void)argc;
+  lstenv_t* tenv = (lstenv_t*)data;
   if (!ls_effects_allowed()) {
     lsprintf(stderr, 0, "E: import: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
-  if (!tenv) return NULL;
-  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (nsv == NULL) return NULL;
-  if (!lsns_foreach_member(nsv, pl_import_cb, tenv)) return ls_make_err("import: invalid namespace");
+  if (!tenv)
+    return NULL;
+  lsthunk_t* nsv = lsthunk_eval0(args[0]);
+  if (nsv == NULL)
+    return NULL;
+  if (!lsns_foreach_member(nsv, pl_import_cb, tenv))
+    return ls_make_err("import: invalid namespace");
   return ls_make_unit();
 }
 
 static lsthunk_t* pl_withImport(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; lstenv_t* tenv = (lstenv_t*)data;
+  (void)argc;
+  lstenv_t* tenv = (lstenv_t*)data;
   if (!ls_effects_allowed()) {
     lsprintf(stderr, 0, "E: withImport: effect used in pure context (enable seq/chain)\n");
     return NULL;
   }
-  if (!tenv) return NULL;
-  lsthunk_t* nsv = lsthunk_eval0(args[0]); if (nsv == NULL) return NULL;
-  if (!lsns_foreach_member(nsv, pl_import_cb, tenv)) return ls_make_err("withImport: invalid namespace");
+  if (!tenv)
+    return NULL;
+  lsthunk_t* nsv = lsthunk_eval0(args[0]);
+  if (nsv == NULL)
+    return NULL;
+  if (!lsns_foreach_member(nsv, pl_import_cb, tenv))
+    return ls_make_err("withImport: invalid namespace");
   lsthunk_t* unit = ls_make_unit();
   lsthunk_t* cont = args[1];
   return lsthunk_eval(cont, 1, &unit);
@@ -337,24 +387,35 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
   lstenv_t* tenv = (lstenv_t*)data;
   assert(argc == 1);
   assert(args != NULL);
-  lsthunk_t* namev = lsthunk_eval0(args[0]); if (!namev) return NULL;
+  lsthunk_t* namev = lsthunk_eval0(args[0]);
+  if (!namev)
+    return NULL;
   const lsstr_t* name = NULL;
-  if (lsthunk_get_type(namev) == LSTTYPE_ALGE && lsthunk_get_argc(namev) == 0) name = lsthunk_get_constr(namev);
-  else if (lsthunk_get_type(namev) == LSTTYPE_SYMBOL) name = lsthunk_get_symbol(namev);
-  else return ls_make_err("prelude: expected name symbol");
+  if (lsthunk_get_type(namev) == LSTTYPE_ALGE && lsthunk_get_argc(namev) == 0)
+    name = lsthunk_get_constr(namev);
+  else if (lsthunk_get_type(namev) == LSTTYPE_SYMBOL)
+    name = lsthunk_get_symbol(namev);
+  else
+    return ls_make_err("prelude: expected name symbol");
   if (lsstrcmp(name, lsstr_cstr(".env")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.env"), 1, pl_dispatch_env, tenv, LSBATTR_ENV_READ);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.env"), 1, pl_dispatch_env, tenv,
+                                    LSBATTR_ENV_READ);
 
   if (lsstrcmp(name, lsstr_cstr("add")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.add"), 2, lsbuiltin_add, NULL, LSBATTR_PURE);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.add"), 2, lsbuiltin_add, NULL,
+                                    LSBATTR_PURE);
   if (lsstrcmp(name, lsstr_cstr("seq")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.seq"), 2, lsbuiltin_seq, NULL, LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.seq"), 2, lsbuiltin_seq, NULL,
+                                    LSBATTR_EFFECT);
   if (lsstrcmp(name, lsstr_cstr("print")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.print"), 1, lsbuiltin_print, NULL, LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.print"), 1, lsbuiltin_print, NULL,
+                                    LSBATTR_EFFECT);
   if (lsstrcmp(name, lsstr_cstr("println")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.println"), 1, pl_println, NULL, LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.println"), 1, pl_println, NULL,
+                                    LSBATTR_EFFECT);
   if (lsstrcmp(name, lsstr_cstr("to_str")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.to_str"), 1, lsbuiltin_to_string, NULL, LSBATTR_PURE);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.to_str"), 1, lsbuiltin_to_string, NULL,
+                                    LSBATTR_PURE);
   if (lsstrcmp(name, lsstr_cstr("strcat")) == 0)
     return lsthunk_new_builtin_attr(lsstr_cstr("prelude.strcat"), 2, pl_strcat, NULL, LSBATTR_PURE);
   if (lsstrcmp(name, lsstr_cstr("exit")) == 0)
@@ -362,17 +423,22 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
   /* def removed */
   /* nsdef removed */
   if (lsstrcmp(name, lsstr_cstr("require")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.require"), 1, pl_require, tenv, LSBATTR_EFFECT | LSBATTR_ENV_READ);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.require"), 1, pl_require, tenv,
+                                    LSBATTR_EFFECT | LSBATTR_ENV_READ);
   if (lsstrcmp(name, lsstr_cstr("requireOpt")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.requireOpt"), 1, pl_require_opt, tenv, LSBATTR_EFFECT | LSBATTR_ENV_READ);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.requireOpt"), 1, pl_require_opt, tenv,
+                                    LSBATTR_EFFECT | LSBATTR_ENV_READ);
   if (lsstrcmp(name, lsstr_cstr("include")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.include"), 1, pl_include, tenv, LSBATTR_ENV_READ);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.include"), 1, pl_include, tenv,
+                                    LSBATTR_ENV_READ);
   /* pluginHello removed */
   if (lsstrcmp(name, lsstr_cstr("importOpt")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.importOpt"), 1, pl_importOpt, tenv, LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.importOpt"), 1, pl_importOpt, tenv,
+                                    LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
   /* nsSelf removed */
   if (lsstrcmp(name, lsstr_cstr("withImport")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.withImport"), 2, pl_withImport, tenv, LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.withImport"), 2, pl_withImport, tenv,
+                                    LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
   if (lsstrcmp(name, lsstr_cstr("chain")) == 0)
     return lsthunk_new_builtin(lsstr_cstr("prelude.chain"), 2, pl_chain, NULL);
   if (lsstrcmp(name, lsstr_cstr("bind")) == 0)
@@ -384,23 +450,26 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
   if (lsstrcmp(name, lsstr_cstr("force")) == 0)
     return lsthunk_new_builtin_attr(lsstr_cstr("prelude.force"), 1, pl_force, NULL, LSBATTR_PURE);
   if (lsstrcmp(name, lsstr_cstr("traceForce")) == 0)
-    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.traceForce"), 2, pl_trace_force, NULL, LSBATTR_EFFECT);
+    return lsthunk_new_builtin_attr(lsstr_cstr("prelude.traceForce"), 2, pl_trace_force, NULL,
+                                    LSBATTR_EFFECT);
   /* raise removed: use ^(expr) dedicated AST */
   if (lsstrcmp(name, lsstr_cstr("lt")) == 0) {
-    lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
+    lsthunk_t* carg     = lsthunk_new_str(lsstr_cstr("core"));
     lsthunk_t* cargv[1] = { carg };
-    lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
-    if (!core_ns) return ls_make_err("prelude.lt: no core builtins");
-    lsthunk_t* key = lsthunk_new_symbol(lsstr_cstr(".lt"));
+    lsthunk_t* core_ns  = lsbuiltin_prelude_builtin(1, cargv, tenv);
+    if (!core_ns)
+      return ls_make_err("prelude.lt: no core builtins");
+    lsthunk_t* key      = lsthunk_new_symbol(lsstr_cstr(".lt"));
     lsthunk_t* argv1[1] = { key };
     return lsthunk_eval(core_ns, 1, argv1);
   }
   if (lsstrcmp(name, lsstr_cstr("eq")) == 0) {
-    lsthunk_t* carg = lsthunk_new_str(lsstr_cstr("core"));
+    lsthunk_t* carg     = lsthunk_new_str(lsstr_cstr("core"));
     lsthunk_t* cargv[1] = { carg };
-    lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, tenv);
-    if (!core_ns) return ls_make_err("prelude.eq: no core builtins");
-    lsthunk_t* key = lsthunk_new_symbol(lsstr_cstr(".eq"));
+    lsthunk_t* core_ns  = lsbuiltin_prelude_builtin(1, cargv, tenv);
+    if (!core_ns)
+      return ls_make_err("prelude.eq: no core builtins");
+    lsthunk_t* key      = lsthunk_new_symbol(lsstr_cstr(".eq"));
     lsthunk_t* argv1[1] = { key };
     return lsthunk_eval(core_ns, 1, argv1);
   }

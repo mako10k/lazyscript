@@ -82,7 +82,7 @@ static void      lspat_walk_mark_right(const lspat_t* p, lstenv_t* tenv) {
     lspat_walk_mark_right(lspat_get_or_left(p), tenv);
     lspat_walk_mark_right(lspat_get_or_right(p), tenv);
     break;
-  case LSPTYPE_CARET:
+       case LSPTYPE_CARET:
     lspat_walk_mark_right(lspat_get_caret_inner(p), tenv);
     break;
   }
@@ -103,7 +103,7 @@ static lstpat_t* lstpat_from_lspalge(const lspalge_t* palge, lstenv_t* tenv,
                                      lstref_target_origin_t* origin) {
   (void)tenv;
   (void)origin;
-  lssize_t  argc = lspalge_get_argc(palge);
+  lssize_t argc = lspalge_get_argc(palge);
   if (argc == 0) {
     return lstpat_new_alge_internal(lspalge_get_constr(palge), 0, NULL);
   } else {
@@ -139,9 +139,10 @@ lstpat_t* lstpat_new_pat(const lspat_t* pat, lstenv_t* tenv, lstref_target_origi
     return lstpat_from_lspas(lspat_get_as(pat), tenv, origin);
   case LSPTYPE_CARET: {
     lstpat_t* in = lstpat_new_pat(lspat_get_caret_inner(pat), tenv, origin);
-    if (!in) return NULL;
-    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
-    ret->ltp_type = LSPTYPE_CARET;
+    if (!in)
+      return NULL;
+    lstpat_t* ret    = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type    = LSPTYPE_CARET;
     ret->caret.inner = in;
     return ret;
   }
@@ -383,8 +384,8 @@ static lstpat_t* lstpat_clone_internal(const lstpat_t* pat) {
     return ret;
   }
   case LSPTYPE_CARET: {
-    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
-    ret->ltp_type = LSPTYPE_CARET;
+    lstpat_t* ret    = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type    = LSPTYPE_CARET;
     ret->caret.inner = lstpat_clone_internal(pat->caret.inner);
     return ret;
   }
@@ -445,7 +446,7 @@ void      lstpat_print(FILE* fp, lsprec_t prec, int indent, const lstpat_t* pat)
       lsprintf(fp, indent, ")");
     break;
   case LSPTYPE_CARET:
-    lsprintf(fp, indent, "^(" );
+    lsprintf(fp, indent, "^(");
     lstpat_print(fp, LSPREC_LOWEST, indent, pat->caret.inner);
     lsprintf(fp, indent, ")");
     break;
@@ -577,9 +578,10 @@ static lstpat_t* lstpat_new_pat_reuse_only(const lspat_t* pat, lstenv_t* tenv,
   }
   case LSPTYPE_CARET: {
     lstpat_t* in = lstpat_new_pat_reuse_only(lspat_get_caret_inner(pat), tenv, origin);
-    if (!in) return NULL;
-    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
-    ret->ltp_type = LSPTYPE_CARET;
+    if (!in)
+      return NULL;
+    lstpat_t* ret    = lsmalloc(sizeof(lstpat_t));
+    ret->ltp_type    = LSPTYPE_CARET;
     ret->caret.inner = in;
     return ret;
   }

@@ -15,9 +15,9 @@ extern "C" {
 #define LSTI_VERSION_MINOR 0u
 
 // File-level flags
-#define LSTI_F_STORE_TYPES  (1u << 0)
-#define LSTI_F_STORE_LOCS   (1u << 1)
-#define LSTI_F_STORE_TRACE  (1u << 2)
+#define LSTI_F_STORE_TYPES (1u << 0)
+#define LSTI_F_STORE_LOCS (1u << 1)
+#define LSTI_F_STORE_TRACE (1u << 2)
 
 // Suggested alignment (2^align_log2 bytes)
 typedef enum lsti_align {
@@ -56,9 +56,10 @@ typedef struct lsti_write_opts {
 
 // API
 int lsti_write(FILE* fp, lsthunk_t* const* roots, lssize_t rootc, const lsti_write_opts_t* opt);
-int lsti_map(const char* path, lsti_image_t* out_img);      // mmap or fread
-int lsti_validate(const lsti_image_t* img);                 // magic/version/align/sections
-int lsti_materialize(const lsti_image_t* img, lsthunk_t*** out_roots, lssize_t* out_rootc, lstenv_t* prelude_env);
+int lsti_map(const char* path, lsti_image_t* out_img); // mmap or fread
+int lsti_validate(const lsti_image_t* img);            // magic/version/align/sections
+int lsti_materialize(const lsti_image_t* img, lsthunk_t*** out_roots, lssize_t* out_rootc,
+                     lstenv_t* prelude_env);
 int lsti_unmap(lsti_image_t* img);
 
 #ifdef __cplusplus

@@ -134,7 +134,7 @@ static const lscir_value_t* mk_val_lam(const char* param, const lscir_expr_t* bo
 }
 
 static const lscir_value_t* mk_val_nslit(int n, const char* const* names,
-                                        const lscir_value_t* const* vals) {
+                                         const lscir_value_t* const* vals) {
   lscir_value_t* x = lsmalloc(sizeof(*x));
   x->kind          = LCIR_VAL_NSLIT;
   x->nslit.count   = n;
@@ -264,17 +264,18 @@ static const lscir_value_t* lower_value(const lsexpr_t* e) {
     return NULL;
   }
   case LSETYPE_NSLIT: {
-    const lsenslit_t* ns = lsexpr_get_nslit(e);
-    lssize_t          n  = lsenslit_get_count(ns);
-    const char**      names = NULL;
-    const lscir_value_t** vals = NULL;
+    const lsenslit_t*     ns    = lsexpr_get_nslit(e);
+    lssize_t              n     = lsenslit_get_count(ns);
+    const char**          names = NULL;
+    const lscir_value_t** vals  = NULL;
     if (n > 0) {
       names = lsmalloc(sizeof(char*) * (size_t)n);
       vals  = lsmalloc(sizeof(lscir_value_t*) * (size_t)n);
       for (lssize_t i = 0; i < n; i++) {
         const char* nb = lsstr_get_buf(lsenslit_get_name(ns, i));
-        if (nb && nb[0] == '.') nb++;
-        names[i] = nb;
+        if (nb && nb[0] == '.')
+          nb++;
+        names[i]                = nb;
         const lscir_value_t* vi = lower_value(lsenslit_get_expr(ns, i));
         if (!vi)
           return NULL;
@@ -340,12 +341,14 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
     if (lsexpr_get_type(func_e) == LSETYPE_APPL) {
       const lseappl_t* ap2 = lsexpr_get_appl(func_e);
       const lsexpr_t*  f2  = lseappl_get_func(ap2);
-  // TODO: Avoid silent prelude flattening.
-  // This block recognizes (~prelude .env .sym) and emits (var sym). This is a temporary lowering
-  // for bootstrapping and must be replaced by explicit IR imports emission and reader-bound registry.
-  int is_prelude_head = 0;
+      // TODO: Avoid silent prelude flattening.
+      // This block recognizes (~prelude .env .sym) and emits (var sym). This is a temporary
+      // lowering for bootstrapping and must be replaced by explicit IR imports emission and
+      // reader-bound registry.
+      int is_prelude_head = 0;
       // Case A: (app (var prelude) a0)
-      if (lsexpr_get_type(f2) == LSETYPE_REF && strcmp(extract_ref_name(lsexpr_get_ref(f2)), "prelude") == 0) {
+      if (lsexpr_get_type(f2) == LSETYPE_REF &&
+          strcmp(extract_ref_name(lsexpr_get_ref(f2)), "prelude") == 0) {
         is_prelude_head = 1;
       }
       // Case B: (app (app (var prelude) (.env)) sym) i.e., ((prelude .env) .sym)
@@ -353,10 +356,14 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
         const lseappl_t* ap_head = lsexpr_get_appl(f2);
         if ((int)lseappl_get_argc(ap_head) == 1) {
           const lsexpr_t* f3 = lseappl_get_func(ap_head);
-          if (lsexpr_get_type(f3) == LSETYPE_REF && strcmp(extract_ref_name(lsexpr_get_ref(f3)), "prelude") == 0) {
+          if (lsexpr_get_type(f3) == LSETYPE_REF &&
+              strcmp(extract_ref_name(lsexpr_get_ref(f3)), "prelude") == 0) {
             const lsexpr_t* a0h = lseappl_get_args(ap_head)[0];
-            if ((lsexpr_get_type(a0h) == LSETYPE_SYMBOL && strcmp(lsstr_get_buf(lsexpr_get_symbol(a0h)), ".env") == 0) ||
-                (lsexpr_get_type(a0h) == LSETYPE_ALGE && lsealge_get_argc(lsexpr_get_alge(a0h)) == 0 && strcmp(lsstr_get_buf(lsealge_get_constr(lsexpr_get_alge(a0h))), ".env") == 0)) {
+            if ((lsexpr_get_type(a0h) == LSETYPE_SYMBOL &&
+                 strcmp(lsstr_get_buf(lsexpr_get_symbol(a0h)), ".env") == 0) ||
+                (lsexpr_get_type(a0h) == LSETYPE_ALGE &&
+                 lsealge_get_argc(lsexpr_get_alge(a0h)) == 0 &&
+                 strcmp(lsstr_get_buf(lsealge_get_constr(lsexpr_get_alge(a0h))), ".env") == 0)) {
               is_prelude_head = 2; // two-step env
             }
           }
@@ -370,12 +377,12 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
             // ((prelude .env) .sym) form: a0 is the .sym
             if (lsexpr_get_type(a0) == LSETYPE_SYMBOL) {
               const char* s = lsstr_get_buf(lsexpr_get_symbol(a0));
-              sym = (s && s[0] == '.') ? (s + 1) : s;
+              sym           = (s && s[0] == '.') ? (s + 1) : s;
             } else if (lsexpr_get_type(a0) == LSETYPE_ALGE) {
               const lsealge_t* al3 = lsexpr_get_alge(a0);
               if (lsealge_get_argc(al3) == 0) {
                 const char* s = lsstr_get_buf(lsealge_get_constr(al3));
-                sym = (s && s[0] == '.') ? (s + 1) : s;
+                sym           = (s && s[0] == '.') ? (s + 1) : s;
               }
             }
           } else if (lsexpr_get_type(a0) == LSETYPE_REF) {
@@ -442,10 +449,10 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
               if (vi) {
                 vals[i] = vi;
               } else {
-                const char*      tmpv = cir_gensym("a$");
-                vals[i]                 = mk_val_var(tmpv);
-                const char**     nn   = lsmalloc(sizeof(const char*) * (letc + 1));
-                const lsexpr_t** ee   = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
+                const char* tmpv    = cir_gensym("a$");
+                vals[i]             = mk_val_var(tmpv);
+                const char**     nn = lsmalloc(sizeof(const char*) * (letc + 1));
+                const lsexpr_t** ee = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
                 for (int k = 0; k < letc; k++) {
                   nn[k] = lnames[k];
                   ee[k] = lexprs[k];
@@ -477,19 +484,19 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
       if (vi) {
         vals[i] = vi;
       } else {
-        const char*      tmpv = cir_gensym("a$");
-        vals[i]                 = mk_val_var(tmpv);
-        const char**     nn   = lsmalloc(sizeof(const char*) * (letc + 1));
-        const lsexpr_t** ee   = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
+        const char* tmpv    = cir_gensym("a$");
+        vals[i]             = mk_val_var(tmpv);
+        const char**     nn = lsmalloc(sizeof(const char*) * (letc + 1));
+        const lsexpr_t** ee = lsmalloc(sizeof(const lsexpr_t*) * (letc + 1));
         for (int k = 0; k < letc; k++) {
           nn[k] = let_names[k];
           ee[k] = let_exprs[k];
         }
-        nn[letc]     = tmpv;
-        ee[letc]     = eargs[i];
+        nn[letc] = tmpv;
+        ee[letc] = eargs[i];
         letc++;
-        let_names    = nn;
-        let_exprs    = ee;
+        let_names = nn;
+        let_exprs = ee;
       }
     }
     const lscir_value_t* fv    = lower_value(func_e);
@@ -520,10 +527,10 @@ static const lscir_expr_t* lower_expr(const lsexpr_t* e) {
       rn = cir_gensym("c$");
       vr = mk_val_var(rn);
     }
-  const char* opnm = (lsechoice_get_kind(ch) == LSECHOICE_LAMBDA) ? "choice.lambda" :
-                     (lsechoice_get_kind(ch) == LSECHOICE_EXPR) ? "choice.expr" :
-                                                                  "choice.catch";
-  const lscir_value_t*  f        = mk_val_var(opnm);
+    const char*           opnm     = (lsechoice_get_kind(ch) == LSECHOICE_LAMBDA) ? "choice.lambda"
+                                     : (lsechoice_get_kind(ch) == LSECHOICE_EXPR) ? "choice.expr"
+                                                                                  : "choice.catch";
+    const lscir_value_t*  f        = mk_val_var(opnm);
     const lscir_value_t** args_arr = lsmalloc(sizeof(const lscir_value_t*) * 2);
     args_arr[0]                    = vl;
     args_arr[1]                    = vr;

@@ -3,8 +3,7 @@
 typedef struct lscir_prog lscir_prog_t;
 // Text IR header/version (for stream format emitted by lazyscriptc)
 #define LCIR_TEXT_VERSION 0
-#define LCIR_TEXT_HEADER  "LCIR v0"
-
+#define LCIR_TEXT_HEADER "LCIR v0"
 
 #include <stdio.h>
 #include "misc/prog.h"
@@ -50,9 +49,9 @@ struct lscir_pat {
   union {
     const char* var; // LCIR_PAT_VAR
     struct {         // LCIR_PAT_CONSTR
-      const char*           name;
+      const char*               name;
       const lscir_pat_t* const* subpats;
-      int                   subc;
+      int                       subc;
     } constr;
     long long   ival; // LCIR_PAT_INT
     const char* sval; // LCIR_PAT_STR
@@ -60,7 +59,7 @@ struct lscir_pat {
 };
 
 struct lscir_case {
-  const lscir_pat_t* pat;
+  const lscir_pat_t*  pat;
   const lscir_expr_t* body;
 };
 

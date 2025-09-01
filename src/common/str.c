@@ -75,7 +75,7 @@ static void lsstr_ht_resize(lsstr_ht_t* str_ht, lssize_t new_capacity) {
     return;
   lsstr_ht_t new_str_hash = { NULL, 0, new_capacity };
   // Allocate entries in GC-scanned memory so pointers inside are considered roots.
-  new_str_hash.lsth_ents  = lsmalloc(sizeof(const lsstr_t*) * new_capacity);
+  new_str_hash.lsth_ents = lsmalloc(sizeof(const lsstr_t*) * new_capacity);
   for (lssize_t i = 0; i < new_capacity; i++)
     new_str_hash.lsth_ents[i] = NULL;
   for (lssize_t i = 0; i < str_ht->lsth_cap; i++) {

@@ -25,7 +25,8 @@ void lsbind_print(FILE* fp, lsprec_t prec, int indent, const lsbind_t* bind) {
   // Emit comments that belong to this bind line before printing 'lhs ='
   if (lsfmt_is_active()) {
     int line = lsexpr_get_loc(bind->lbe_rhs).first_line;
-    if (line > 0) lsfmt_flush_comments_up_to(fp, line - 1, indent);
+    if (line > 0)
+      lsfmt_flush_comments_up_to(fp, line - 1, indent);
     // If the next pending comment is on the same line as RHS, print it BEFORE the bind
     const lscomment_t* nc = lsfmt_peek_next_comment();
     if (nc && nc->lc_loc.first_line == line && nc->lc_text) {

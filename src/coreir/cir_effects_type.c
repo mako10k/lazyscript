@@ -159,7 +159,8 @@ static int expr_has_effects(const lscir_expr_t* e, int in_token_scope) {
            expr_has_effects(e->ife.else_e, in_token_scope);
   case LCIR_EXP_MATCH: {
     int any = 0;
-    for (int i = 0; i < e->match1.casec; i++) any |= expr_has_effects(e->match1.cases[i].body, in_token_scope);
+    for (int i = 0; i < e->match1.casec; i++)
+      any |= expr_has_effects(e->match1.cases[i].body, in_token_scope);
     return any;
   }
   case LCIR_EXP_EFFAPP:
@@ -204,7 +205,10 @@ static int expr_check_arity(const lscir_expr_t* e) {
   case LCIR_EXP_IF:
     return expr_check_arity(e->ife.then_e) + expr_check_arity(e->ife.else_e);
   case LCIR_EXP_MATCH: {
-    int errs = 0; for (int i = 0; i < e->match1.casec; i++) errs += expr_check_arity(e->match1.cases[i].body); return errs;
+    int errs = 0;
+    for (int i = 0; i < e->match1.casec; i++)
+      errs += expr_check_arity(e->match1.cases[i].body);
+    return errs;
   }
   case LCIR_EXP_EFFAPP:
     return 0;

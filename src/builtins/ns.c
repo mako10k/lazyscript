@@ -21,9 +21,10 @@ typedef struct lsns {
 // Debug logging toggle for nslit; enabled when LS_NS_LOG_NSLIT is set and non-empty
 static int nslog_enabled(void) {
   static int cached = -1;
-  if (cached >= 0) return cached;
+  if (cached >= 0)
+    return cached;
   const char* v = getenv("LS_NS_LOG_NSLIT");
-  cached = (v && v[0] && v[0] != '0') ? 1 : 0;
+  cached        = (v && v[0] && v[0] != '0') ? 1 : 0;
   return cached;
 }
 
@@ -31,29 +32,51 @@ static int nslog_enabled(void) {
 // 0: warn (default), 1: return error thunk, 2: hard error (NULL)
 static int ns_depr_mode(void) {
   static int cached = -1;
-  if (cached >= 0) return cached;
+  if (cached >= 0)
+    return cached;
   const char* v = getenv("LS_NS_DEPRECATION");
   if (!v || !v[0]) {
     // Default: quiet (no warnings) unless explicitly requested
     cached = 3; // quiet
     return cached;
   }
-  if (v[0] == '0') { cached = 0; return cached; }
-  if (v[0] == '1') { cached = 1; return cached; }
-  if (v[0] == '2') { cached = 2; return cached; }
-  if (strcmp(v, "warn") == 0) { cached = 0; return cached; }
-  if (strcmp(v, "error") == 0 || strcmp(v, "err") == 0 || strcmp(v, "errout") == 0) { cached = 1; return cached; }
-  if (strcmp(v, "hard") == 0 || strcmp(v, "fatal") == 0) { cached = 2; return cached; }
-  if (strcmp(v, "quiet") == 0 || strcmp(v, "off") == 0) { cached = 3; return cached; }
-  cached = 0; return cached;
+  if (v[0] == '0') {
+    cached = 0;
+    return cached;
+  }
+  if (v[0] == '1') {
+    cached = 1;
+    return cached;
+  }
+  if (v[0] == '2') {
+    cached = 2;
+    return cached;
+  }
+  if (strcmp(v, "warn") == 0) {
+    cached = 0;
+    return cached;
+  }
+  if (strcmp(v, "error") == 0 || strcmp(v, "err") == 0 || strcmp(v, "errout") == 0) {
+    cached = 1;
+    return cached;
+  }
+  if (strcmp(v, "hard") == 0 || strcmp(v, "fatal") == 0) {
+    cached = 2;
+    return cached;
+  }
+  if (strcmp(v, "quiet") == 0 || strcmp(v, "off") == 0) {
+    cached = 3;
+    return cached;
+  }
+  cached = 0;
+  return cached;
 }
 
 static int ns_depr_handle_warn(const char* api, const char* detail) {
   int mode = ns_depr_mode();
   if (mode == 0) {
-    lsprintf(stderr, 0, "W: %s: named namespaces are deprecated%s%s\n",
-             api, (detail && detail[0]) ? ": " : "",
-             (detail && detail[0]) ? detail : "");
+    lsprintf(stderr, 0, "W: %s: named namespaces are deprecated%s%s\n", api,
+             (detail && detail[0]) ? ": " : "", (detail && detail[0]) ? detail : "");
   }
   return mode;
 }
@@ -72,14 +95,17 @@ static int ns_depr_handle_warn(const char* api, const char* detail) {
 static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, void* data);
 static lsthunk_t* lsbuiltin_ns_set(lssize_t argc, lsthunk_t* const* args, void* data);
 // Debug helper forward decls (defined later)
-typedef struct { int first; } _ns_dbg_ctx_t;
+typedef struct {
+  int first;
+} _ns_dbg_ctx_t;
 static void _ns_dbg_cb(const lsstr_t* key, lshash_data_t value, void* data);
 // Represent an ns value as a 1-ary builtin that dispatches on symbol: (~NS sym)
 static lshash_t* g_namespaces = NULL; // name -> ns* (named namespaces only)
-lsthunk_t* lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data) {
-  // data directly holds the namespace instance
+lsthunk_t*       lsbuiltin_ns_value(lssize_t argc, lsthunk_t* const* args, void* data) {
+        // data directly holds the namespace instance
   lsns_t* ns = (lsns_t*)data;
-  if (!ns) return NULL;
+  if (!ns)
+    return NULL;
   return lsbuiltin_ns_dispatch(argc, args, ns);
 }
 
@@ -89,7 +115,9 @@ static lsns_t* g_nslit_self = NULL;
 
 // (~prelude nsSelf) => returns the namespace value currently being built by nslit
 lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)args; (void)data;
+  (void)argc;
+  (void)args;
+  (void)data;
   if (!g_nslit_self || !g_nslit_self->map) {
     return ls_make_err("nsSelf: not in namespace literal");
   }
@@ -101,19 +129,19 @@ lsthunk_t* lsbuiltin_prelude_ns_self(lssize_t argc, lsthunk_t* const* args, void
 // temporarily set g_nslit_self so that (~prelude nsSelf) works even outside
 // of the literal construction, and so that intra-namespace references resolve.
 typedef struct ns_member_data {
-  lsns_t*     ns;   // owning namespace
-  lsthunk_t*  val;  // original value thunk (unevaluated)
+  lsns_t*    ns;  // owning namespace
+  lsthunk_t* val; // original value thunk (unevaluated)
 } ns_member_data_t;
-
 
 static lsthunk_t* lsbuiltin_ns_member_wrap(lssize_t argc, lsthunk_t* const* args, void* data) {
   ns_member_data_t* md = (ns_member_data_t*)data;
-  if (!md || !md->ns || !md->val) return ls_make_err("namespace: member invalid");
+  if (!md || !md->ns || !md->val)
+    return ls_make_err("namespace: member invalid");
   lsns_t* prev_self = g_nslit_self;
   g_nslit_self      = md->ns;
   // When applied, delegate application to original thunk; otherwise eval to WHNF
   lsthunk_t* ret = (argc == 0) ? lsthunk_eval0(md->val) : lsthunk_eval(md->val, argc, args);
-  g_nslit_self = prev_self;
+  g_nslit_self   = prev_self;
   return ret;
 }
 // Key canonicalization
@@ -121,15 +149,17 @@ static lsthunk_t* lsbuiltin_ns_member_wrap(lssize_t argc, lsthunk_t* const* args
 // to avoid collisions. Returns NULL on invalid type and reports a descriptive
 // error via stderr.
 static const lsstr_t* ns_encode_key_from_thunk(lsthunk_t* keyv) {
-  if (!keyv) return NULL;
+  if (!keyv)
+    return NULL;
   // Case 1: explicit symbol (e.g., .name)
   if (lsthunk_get_type(keyv) == LSTTYPE_SYMBOL) {
-    const lsstr_t* s = lsthunk_get_symbol(keyv);
-    lssize_t n = lsstr_get_len(s);
-    const char* p = lsstr_get_buf(s);
-    char* buf = lsmalloc((size_t)n + 1);
-    buf[0] = 'S';
-    for (lssize_t i = 0; i < n; ++i) buf[1 + i] = p[i];
+    const lsstr_t* s   = lsthunk_get_symbol(keyv);
+    lssize_t       n   = lsstr_get_len(s);
+    const char*    p   = lsstr_get_buf(s);
+    char*          buf = lsmalloc((size_t)n + 1);
+    buf[0]             = 'S';
+    for (lssize_t i = 0; i < n; ++i)
+      buf[1 + i] = p[i];
     const lsstr_t* k = lsstr_new(buf, n + 1);
     lsfree(buf);
     return k;
@@ -137,17 +167,20 @@ static const lsstr_t* ns_encode_key_from_thunk(lsthunk_t* keyv) {
   // Case 2: bare constructor (e.g., Some) — accept as symbol by prefixing '.'
   if (lsthunk_get_type(keyv) == LSTTYPE_ALGE && lsthunk_get_argc(keyv) == 0) {
     const lsstr_t* c = lsthunk_get_constr(keyv);
-    lssize_t n = lsstr_get_len(c);
-    const char* p = lsstr_get_buf(c);
-  // Encode as 'S' + (p already has leading '.' ? name : '.' + name)
-  int has_dot = (n > 0 && p[0] == '.');
-  size_t total = (size_t)n + 1 + (has_dot ? 0 : 1);
-  char* buf = lsmalloc(total);
-  buf[0] = 'S';
-  size_t off = 1;
-  if (!has_dot) { buf[off++] = '.'; }
-  for (lssize_t i = 0; i < n; ++i) buf[off + (size_t)i] = p[i];
-  const lsstr_t* k = lsstr_new(buf, (lssize_t)total);
+    lssize_t       n = lsstr_get_len(c);
+    const char*    p = lsstr_get_buf(c);
+    // Encode as 'S' + (p already has leading '.' ? name : '.' + name)
+    int    has_dot = (n > 0 && p[0] == '.');
+    size_t total   = (size_t)n + 1 + (has_dot ? 0 : 1);
+    char*  buf     = lsmalloc(total);
+    buf[0]         = 'S';
+    size_t off     = 1;
+    if (!has_dot) {
+      buf[off++] = '.';
+    }
+    for (lssize_t i = 0; i < n; ++i)
+      buf[off + (size_t)i] = p[i];
+    const lsstr_t* k = lsstr_new(buf, (lssize_t)total);
     lsfree(buf);
     return k;
   }
@@ -158,8 +191,8 @@ static const lsstr_t* ns_encode_key_from_thunk(lsthunk_t* keyv) {
 // ----------------------------------------
 // nsMembers implementation helpers
 typedef struct ns_key_item {
-  const char*  bytes; // pointer to key bytes after tag
-  lssize_t     len;   // length after tag
+  const char* bytes; // pointer to key bytes after tag
+  lssize_t    len;   // length after tag
 } ns_key_item_t;
 
 typedef struct ns_collect_ctx {
@@ -171,30 +204,35 @@ typedef struct ns_collect_ctx {
 static void ns_collect_cb(const lsstr_t* key, lshash_data_t value, void* data) {
   (void)value;
   ns_collect_ctx_t* ctx = (ns_collect_ctx_t*)data;
-  if (!key) return;
+  if (!key)
+    return;
   const char* bytes = lsstr_get_buf(key);
   lssize_t    len   = lsstr_get_len(key);
-  if (!bytes || len == 0) return;
+  if (!bytes || len == 0)
+    return;
   if (ctx->count == ctx->cap) {
     size_t ncap = ctx->cap ? ctx->cap * 2 : 16;
     ctx->items  = (ns_key_item_t*)lsrealloc(ctx->items, ncap * sizeof(ns_key_item_t));
     ctx->cap    = ncap;
   }
-  if (bytes[0] != 'S') return; // only symbol keys are expected
+  if (bytes[0] != 'S')
+    return; // only symbol keys are expected
   ns_key_item_t it;
-  it.bytes = bytes + 1;
-  it.len   = len - 1;
+  it.bytes                 = bytes + 1;
+  it.len                   = len - 1;
   ctx->items[ctx->count++] = it;
 }
 
 static int ns_item_cmp(const void* a, const void* b) {
-  const ns_key_item_t* x = (const ns_key_item_t*)a;
-  const ns_key_item_t* y = (const ns_key_item_t*)b;
-  int min = (int)(x->len < y->len ? x->len : y->len);
-  int c   = memcmp(x->bytes, y->bytes, (size_t)min);
-  if (c != 0) return c;
+  const ns_key_item_t* x   = (const ns_key_item_t*)a;
+  const ns_key_item_t* y   = (const ns_key_item_t*)b;
+  int                  min = (int)(x->len < y->len ? x->len : y->len);
+  int                  c   = memcmp(x->bytes, y->bytes, (size_t)min);
+  if (c != 0)
+    return c;
   // shorter first
-  if (x->len != y->len) return (int)(x->len - y->len);
+  if (x->len != y->len)
+    return (int)(x->len - y->len);
   return 0;
 }
 
@@ -209,35 +247,48 @@ static const lsexpr_t* ns_item_to_expr(const ns_key_item_t* it) {
 static lsthunk_t* ns_build_list(size_t n, const ns_key_item_t* items) {
   const lsexpr_t* tail = lsexpr_new_alge(lsealge_new(lsstr_cstr("[]"), 0, NULL));
   for (long i = (long)n - 1; i >= 0; --i) {
-    const lsexpr_t* head = ns_item_to_expr(&items[i]);
+    const lsexpr_t* head     = ns_item_to_expr(&items[i]);
     const lsexpr_t* args2[2] = { head, tail };
-    tail = lsexpr_new_alge(lsealge_new(lsstr_cstr(":"), 2, args2));
+    tail                     = lsexpr_new_alge(lsealge_new(lsstr_cstr(":"), 2, args2));
   }
   return lsthunk_new_expr(tail, NULL);
 }
 
-
 // (~nsMembers ns) => list<symbol>
 lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)data;
+  (void)argc;
+  (void)data;
   // Accept namespace value or named symbol
   lsthunk_t* nsv = ls_eval_arg(args[0], "nsMembers: ns");
-  if (lsthunk_is_err(nsv)) return nsv;
-  if (!nsv) return ls_make_err("nsMembers: ns eval");
+  if (lsthunk_is_err(nsv))
+    return nsv;
+  if (!nsv)
+    return ls_make_err("nsMembers: ns eval");
   lsns_t* ns = NULL;
   if (lsthunk_is_builtin(nsv)) {
     lstbuiltin_func_t fn = lsthunk_get_builtin_func(nsv);
-    if (fn == lsbuiltin_ns_value) ns = (lsns_t*)lsthunk_get_builtin_data(nsv);
+    if (fn == lsbuiltin_ns_value)
+      ns = (lsns_t*)lsthunk_get_builtin_data(nsv);
   } else if (lsthunk_get_type(nsv) == LSTTYPE_ALGE && lsthunk_get_argc(nsv) == 0) {
-    int mode = ns_depr_handle_warn("nsMembers", "passing named namespace (~NS); pass namespace value instead");
-    if (mode == 1) return ls_make_err("nsMembers: named namespaces are deprecated");
-    if (mode == 2) { lsprintf(stderr, 0, "E: nsMembers: named namespaces are disabled\n"); return NULL; }
+    int mode = ns_depr_handle_warn("nsMembers",
+                                   "passing named namespace (~NS); pass namespace value instead");
+    if (mode == 1)
+      return ls_make_err("nsMembers: named namespaces are deprecated");
+    if (mode == 2) {
+      lsprintf(stderr, 0, "E: nsMembers: named namespaces are disabled\n");
+      return NULL;
+    }
     const lsstr_t* nsname = lsthunk_get_constr(nsv);
-    if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
+    if (g_namespaces) {
+      lshash_data_t nsp;
+      if (lshash_get(g_namespaces, nsname, &nsp))
+        ns = (lsns_t*)nsp;
+    }
   }
-  if (!ns || !ns->map) return ls_make_err("nsMembers: not a namespace");
+  if (!ns || !ns->map)
+    return ls_make_err("nsMembers: not a namespace");
 
-  ns_collect_ctx_t ctx = {0};
+  ns_collect_ctx_t ctx = { 0 };
   lshash_foreach(ns->map, ns_collect_cb, &ctx);
   if (ctx.count == 0) {
     const lsealge_t* nil = lsealge_new(lsstr_cstr("[]"), 0, NULL);
@@ -257,30 +308,45 @@ typedef struct {
 
 static void ns_iter_cb_adapter(const lsstr_t* key, lshash_data_t value, void* data) {
   ns_iter_user_cb_t* u = (ns_iter_user_cb_t*)data;
-  if (!u || !u->cb || !key) return;
+  if (!u || !u->cb || !key)
+    return;
   const char* bytes = lsstr_get_buf(key);
   lssize_t    len   = lsstr_get_len(key);
-  if (!bytes || len == 0) return;
-  if (bytes[0] != 'S') return; // only symbol keys
+  if (!bytes || len == 0)
+    return;
+  if (bytes[0] != 'S')
+    return; // only symbol keys
   const lsstr_t* sym = lsstr_new(bytes + 1, len - 1);
   u->cb(sym, (lsthunk_t*)value, u->data);
 }
 
 int lsns_foreach_member(lsthunk_t* ns_thunk, lsns_iter_cb cb, void* data) {
-  if (!ns_thunk || !cb) return 0;
+  if (!ns_thunk || !cb)
+    return 0;
   // Accept either namespace value or named symbol (0-arity constructor)
   lsns_t* ns = NULL;
   if (lsthunk_is_builtin(ns_thunk)) {
     lstbuiltin_func_t fn = lsthunk_get_builtin_func(ns_thunk);
-    if (fn == lsbuiltin_ns_value) ns = (lsns_t*)lsthunk_get_builtin_data(ns_thunk);
+    if (fn == lsbuiltin_ns_value)
+      ns = (lsns_t*)lsthunk_get_builtin_data(ns_thunk);
   } else if (lsthunk_get_type(ns_thunk) == LSTTYPE_ALGE && lsthunk_get_argc(ns_thunk) == 0) {
-    int mode = ns_depr_handle_warn("ns", "passing named namespace (~NS); pass namespace value instead");
-    if (mode == 1) return 0;
-    if (mode == 2) { lsprintf(stderr, 0, "E: ns: named namespaces are disabled\n"); return 0; }
+    int mode =
+        ns_depr_handle_warn("ns", "passing named namespace (~NS); pass namespace value instead");
+    if (mode == 1)
+      return 0;
+    if (mode == 2) {
+      lsprintf(stderr, 0, "E: ns: named namespaces are disabled\n");
+      return 0;
+    }
     const lsstr_t* nsname = lsthunk_get_constr(ns_thunk);
-    if (g_namespaces) { lshash_data_t nsp; if (lshash_get(g_namespaces, nsname, &nsp)) ns = (lsns_t*)nsp; }
+    if (g_namespaces) {
+      lshash_data_t nsp;
+      if (lshash_get(g_namespaces, nsname, &nsp))
+        ns = (lsns_t*)nsp;
+    }
   }
-  if (!ns || !ns->map) return 0;
+  if (!ns || !ns->map)
+    return 0;
   ns_iter_user_cb_t u = { cb, data };
   lshash_foreach(ns->map, ns_iter_cb_adapter, &u);
   return 1;
@@ -289,10 +355,13 @@ int lsns_foreach_member(lsthunk_t* ns_thunk, lsns_iter_cb cb, void* data) {
 static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
   lsns_t* ns = (lsns_t*)data;
-  if (!ns || !ns->map) return ls_make_err("namespace: invalid");
+  if (!ns || !ns->map)
+    return ls_make_err("namespace: invalid");
   lsthunk_t* keyv = ls_eval_arg(args[0], "namespace: key");
-  if (lsthunk_is_err(keyv)) return keyv;
-  if (!keyv) return ls_make_err("namespace: key eval");
+  if (lsthunk_is_err(keyv))
+    return keyv;
+  if (!keyv)
+    return ls_make_err("namespace: key eval");
   // Suggestion for common mistake: passing string "__set"/".__set"
   if (lsthunk_get_type(keyv) == LSTTYPE_STR) {
     const lsstr_t* s = lsthunk_get_str(keyv);
@@ -308,14 +377,15 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
     }
   }
   const lsstr_t* key = ns_encode_key_from_thunk(keyv);
-  if (!key) return ls_make_err("namespace: symbol expected");
+  if (!key)
+    return ls_make_err("namespace: symbol expected");
   // optional debug
   if (NS_DLOG_ENABLED) {
     lsprintf(stderr, 0, "DBG ns_lookup ns=%p ", (void*)ns);
     lsstr_print_bare(stderr, LSPREC_LOWEST, 0, key);
     lsprintf(stderr, 0, "\n");
   }
-  lshash_data_t  valp;
+  lshash_data_t valp;
   if (!lshash_get(ns->map, key, &valp)) {
     if (NS_DLOG_ENABLED) {
       lsprintf(stderr, 0, "DBG ns_lookup undefined key=");
@@ -333,19 +403,43 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
     return ls_make_err("namespace: undefined");
   }
   if (NS_DLOG_ENABLED) {
-    lsthunk_t* tv = (lsthunk_t*)valp;
+    lsthunk_t*  tv = (lsthunk_t*)valp;
     const char* tt = "?";
     if (tv) {
       switch (lsthunk_get_type(tv)) {
-  case LSTTYPE_SYMBOL: tt = "symbol"; break;
-      case LSTTYPE_LAMBDA: tt = "lambda"; break;
-      case LSTTYPE_INT: tt = "int"; break;
-      case LSTTYPE_STR: tt = "str"; break;
-      case LSTTYPE_ALGE: tt = "alge"; break;
-      case LSTTYPE_APPL: tt = "appl"; break;
-      case LSTTYPE_REF: tt = "ref"; break;
-      case LSTTYPE_BUILTIN: tt = "builtin"; break;
-      case LSTTYPE_CHOICE: tt = "choice"; break;
+      case LSTTYPE_SYMBOL:
+        tt = "symbol";
+        break;
+      case LSTTYPE_LAMBDA:
+        tt = "lambda";
+        break;
+      case LSTTYPE_INT:
+        tt = "int";
+        break;
+      case LSTTYPE_STR:
+        tt = "str";
+        break;
+      case LSTTYPE_ALGE:
+        tt = "alge";
+        break;
+      case LSTTYPE_APPL:
+        tt = "appl";
+        break;
+      case LSTTYPE_REF:
+        tt = "ref";
+        break;
+      case LSTTYPE_BUILTIN:
+        tt = "builtin";
+        break;
+      case LSTTYPE_CHOICE:
+        tt = "choice";
+        break;
+      case LSTTYPE_BOTTOM:
+        tt = "bottom";
+        break;
+      default:
+        tt = "?";
+        break;
       }
     }
     lsprintf(stderr, 0, "DBG ns_lookup ret type=%s\n", tt);
@@ -355,7 +449,10 @@ static lsthunk_t* lsbuiltin_ns_dispatch(lssize_t argc, lsthunk_t* const* args, v
 
 // __set helper implementation
 static lsthunk_t* lsbuiltin_ns_set(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; lsns_t* ns = (lsns_t*)data; if (!ns || !ns->map) return ls_make_err("namespace: invalid");
+  (void)argc;
+  lsns_t* ns = (lsns_t*)data;
+  if (!ns || !ns->map)
+    return ls_make_err("namespace: invalid");
   if (!ns->is_mutable) {
     return ls_make_err("namespace: immutable");
   }
@@ -364,45 +461,60 @@ static lsthunk_t* lsbuiltin_ns_set(lssize_t argc, lsthunk_t* const* args, void* 
     return NULL;
   }
   lsthunk_t* keyv = ls_eval_arg(args[0], "namespace: __set key");
-  if (lsthunk_is_err(keyv)) return keyv;
-  if (!keyv) return ls_make_err("namespace: __set key eval");
+  if (lsthunk_is_err(keyv))
+    return keyv;
+  if (!keyv)
+    return ls_make_err("namespace: __set key eval");
   const lsstr_t* s = ns_encode_key_from_thunk(keyv);
-  if (!s) return ls_make_err("namespace: symbol expected");
+  if (!s)
+    return ls_make_err("namespace: symbol expected");
   lsthunk_t* val = ls_eval_arg(args[1], "namespace: __set value");
-  if (lsthunk_is_err(val)) return val;
-  if (!val) return ls_make_err("namespace: __set value eval");
-  lshash_data_t oldv; (void)lshash_put(ns->map, s, (const void*)val, &oldv);
+  if (lsthunk_is_err(val))
+    return val;
+  if (!val)
+    return ls_make_err("namespace: __set value eval");
+  lshash_data_t oldv;
+  (void)lshash_put(ns->map, s, (const void*)val, &oldv);
   return ls_make_unit();
 }
 
 // global registry name -> ns*
-static unsigned long g_ns_counter = 0;
+static unsigned long  g_ns_counter = 0;
 static const lsstr_t* ns_make_key(const lsstr_t* base) {
-  if (base) return base;
+  if (base)
+    return base;
   char buf[32];
   snprintf(buf, sizeof(buf), "__ns$%lu", ++g_ns_counter);
   return lsstr_cstr(buf);
 }
 
 lsthunk_t* lsbuiltin_nsnew(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)args; (void)data;
+  (void)argc;
+  (void)args;
+  (void)data;
   return ls_make_err("nsnew: mutable/named namespaces are removed; use { ... } literal");
 }
 
 lsthunk_t* lsbuiltin_nsdef(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)args; (void)data;
+  (void)argc;
+  (void)args;
+  (void)data;
   return ls_make_err("nsdef: mutable/named namespaces are removed; use { ... } literal");
 }
 
 // Create an anonymous namespace value: returns NS value usable as (~NS sym)
 lsthunk_t* lsbuiltin_nsnew0(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)args; (void)data;
+  (void)argc;
+  (void)args;
+  (void)data;
   return ls_make_err("nsnew0: mutable namespaces are removed; use { ... } literal");
 }
 
 // Define into a namespace value directly: (nsdefv NS sym value)
 lsthunk_t* lsbuiltin_nsdefv(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc; (void)args; (void)data;
+  (void)argc;
+  (void)args;
+  (void)data;
   return ls_make_err("nsdefv: mutable namespaces are removed; use { ... } literal");
 }
 
@@ -415,35 +527,43 @@ lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data) {
   if (nslog_enabled()) {
     lsprintf(stderr, 0, "DBG nslit begin argc=%ld\n", (long)argc);
   }
-  lsns_t* ns = lsmalloc(sizeof(lsns_t));
-  ns->map = lshash_new(16);
+  lsns_t* ns     = lsmalloc(sizeof(lsns_t));
+  ns->map        = lshash_new(16);
   ns->is_mutable = 0; // immutable literal namespace
   // Enable (~prelude nsSelf) inside values while building
-  lsns_t* prev_self = g_nslit_self; g_nslit_self = ns;
+  lsns_t* prev_self = g_nslit_self;
+  g_nslit_self      = ns;
   // First pass: resolve all keys and pre-register wrapped thunks for forward/self refs.
   // We do NOT evaluate values here; we keep the original thunk and wrap it so that
   // later evaluation happens with nsSelf bound.
   for (lssize_t i = 0; i < argc; i += 2) {
     if (nslog_enabled()) {
-      lsprintf(stderr, 0, "DBG nslit key[%ld] eval (pass1)\n", (long)i/2);
+      lsprintf(stderr, 0, "DBG nslit key[%ld] eval (pass1)\n", (long)i / 2);
     }
     lsthunk_t* symv = ls_eval_arg(args[i], "nslit: key");
-    if (lsthunk_is_err(symv)) { g_nslit_self = prev_self; return symv; }
+    if (lsthunk_is_err(symv)) {
+      g_nslit_self = prev_self;
+      return symv;
+    }
     const lsstr_t* symname = ns_encode_key_from_thunk(symv);
-    if (!symname) { g_nslit_self = prev_self; return ls_make_err("nslit: symbol expected"); }
+    if (!symname) {
+      g_nslit_self = prev_self;
+      return ls_make_err("nslit: symbol expected");
+    }
     // Wrap original value thunk (unevaluated)
-    lsthunk_t*  val_orig = args[i + 1];
-    ns_member_data_t* md = lsmalloc(sizeof(ns_member_data_t));
-    md->ns  = ns;
-    md->val = val_orig;
-    lsthunk_t* wrapped = lsthunk_new_builtin(lsstr_cstr("namespace.member"), 0,
-                                             lsbuiltin_ns_member_wrap, md);
+    lsthunk_t*        val_orig = args[i + 1];
+    ns_member_data_t* md       = lsmalloc(sizeof(ns_member_data_t));
+    md->ns                     = ns;
+    md->val                    = val_orig;
+    lsthunk_t* wrapped =
+        lsthunk_new_builtin(lsstr_cstr("namespace.member"), 0, lsbuiltin_ns_member_wrap, md);
     if (nslog_enabled()) {
       lsprintf(stderr, 0, "DBG nslit put wrapped member for key=");
       lsstr_print_bare(stderr, LSPREC_LOWEST, 0, symname);
       lsprintf(stderr, 0, " (val type=%d)\n", (int)lsthunk_get_type(val_orig));
     }
-    lshash_data_t oldv; (void)lshash_put(ns->map, symname, (const void*)wrapped, &oldv);
+    lshash_data_t oldv;
+    (void)lshash_put(ns->map, symname, (const void*)wrapped, &oldv);
   }
   // No second pass needed; values will be evaluated lazily via wrappers.
   g_nslit_self = prev_self;
@@ -456,12 +576,16 @@ lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* data) {
 static void _ns_dbg_cb(const lsstr_t* key, lshash_data_t value, void* data) {
   (void)value;
   _ns_dbg_ctx_t* c = (_ns_dbg_ctx_t*)data;
-  if (!key || !c) return;
+  if (!key || !c)
+    return;
   const char* bytes = lsstr_get_buf(key);
   lssize_t    len   = lsstr_get_len(key);
-  if (!bytes || len == 0) return;
-  if (bytes[0] != 'S') return; // only symbol keys
-  if (!c->first) lsprintf(stderr, 0, ", ");
+  if (!bytes || len == 0)
+    return;
+  if (bytes[0] != 'S')
+    return; // only symbol keys
+  if (!c->first)
+    lsprintf(stderr, 0, ", ");
   c->first = 0;
   lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsstr_new(bytes + 1, len - 1));
 }

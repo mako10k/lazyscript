@@ -10,36 +10,37 @@ typedef struct lsscan lsscan_t;
 
 // Lightweight comment record
 typedef struct lscomment {
-	lsloc_t        lc_loc;
-	const lsstr_t* lc_text; // raw comment text as it appeared (e.g., "#..." or "{- ... -}")
+  lsloc_t        lc_loc;
+  const lsstr_t* lc_text; // raw comment text as it appeared (e.g., "#..." or "{- ... -}")
 } lscomment_t;
 
 // Create program with expression and optional comments list (array of lscomment_t*)
-const lsprog_t* lsprog_new(const lsexpr_t* expr, const lsarray_t* comments);
-void            lsprog_print(FILE* fp, int prec, int indent, const lsprog_t* prog);
-const lsexpr_t* lsprog_get_expr(const lsprog_t* prog);
+const lsprog_t*  lsprog_new(const lsexpr_t* expr, const lsarray_t* comments);
+void             lsprog_print(FILE* fp, int prec, int indent, const lsprog_t* prog);
+const lsexpr_t*  lsprog_get_expr(const lsprog_t* prog);
 const lsarray_t* lsprog_get_comments(const lsprog_t* prog);
 
-void            yyerror(lsloc_t* loc, lsscan_t* scanner, const char* s);
+void             yyerror(lsloc_t* loc, lsscan_t* scanner, const char* s);
 
-lsscan_t*       lsscan_new(const char* filename);
-const lsprog_t* lsscan_get_prog(const lsscan_t* scanner);
-void            lsscan_set_prog(lsscan_t* scanner, const lsprog_t* prog);
-const char*     lsscan_get_filename(const lsscan_t* scanner);
+lsscan_t*        lsscan_new(const char* filename);
+const lsprog_t*  lsscan_get_prog(const lsscan_t* scanner);
+void             lsscan_set_prog(lsscan_t* scanner, const lsprog_t* prog);
+const char*      lsscan_get_filename(const lsscan_t* scanner);
 // Sugar namespace for ~~sym desugaring (default: "prelude")
 void        lsscan_set_sugar_ns(lsscan_t* scanner, const char* ns);
 const char* lsscan_get_sugar_ns(const lsscan_t* scanner);
 
 // Comments collection API (used by lexer)
-void            lsscan_add_comment(lsscan_t* scanner, lsloc_t loc, const lsstr_t* text);
+void lsscan_add_comment(lsscan_t* scanner, lsloc_t loc, const lsstr_t* text);
 // Transfer ownership of accumulated comments to caller, resetting internal storage
 const lsarray_t* lsscan_take_comments(lsscan_t* scanner);
 
 // --- Scanner whitespace/tight-adjacency helpers ---
 // Mark that whitespace was seen since the last token.
 void lsscan_note_ws(lsscan_t* scanner);
-// Consume and return current tight-adjacency flag (1 when no whitespace since previous token and at least one token was produced).
-int  lsscan_consume_tight(lsscan_t* scanner);
+// Consume and return current tight-adjacency flag (1 when no whitespace since previous token and at
+// least one token was produced).
+int lsscan_consume_tight(lsscan_t* scanner);
 
 // Comment weaving API (used by formatter):
 // Enable interleaving of source comments during printing. When active,

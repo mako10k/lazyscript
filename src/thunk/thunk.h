@@ -139,34 +139,36 @@ lsthunk_t* lsthunk_new_builtin_attr(const lsstr_t* name, lssize_t arity, lstbuil
                                     void* data, lsbuiltin_attr_t attr);
 
 // Builtin helpers (introspection)
-int              lsthunk_is_builtin(const lsthunk_t* thunk);
+int               lsthunk_is_builtin(const lsthunk_t* thunk);
 lstbuiltin_func_t lsthunk_get_builtin_func(const lsthunk_t* thunk);
-void*            lsthunk_get_builtin_data(const lsthunk_t* thunk);
-const lsstr_t*   lsthunk_get_builtin_name(const lsthunk_t* thunk);
+void*             lsthunk_get_builtin_data(const lsthunk_t* thunk);
+const lsstr_t*    lsthunk_get_builtin_name(const lsthunk_t* thunk);
 
 // Bottom (⊥) constructors and accessors
 // Create a bottom value with message and optional related thunks (argc may be 0)
-lsthunk_t* lsthunk_new_bottom(const char* message, lsloc_t loc, lssize_t argc, lsthunk_t* const* args);
+lsthunk_t* lsthunk_new_bottom(const char* message, lsloc_t loc, lssize_t argc,
+                              lsthunk_t* const* args);
 // Convenience: bottom with current pending/unknown location
 lsthunk_t* lsthunk_bottom_here(const char* message);
 // Predicates and getters
-int         lsthunk_is_bottom(const lsthunk_t* thunk);
-const char* lsthunk_bottom_get_message(const lsthunk_t* thunk);
-lsloc_t     lsthunk_bottom_get_loc(const lsthunk_t* thunk);
-lssize_t    lsthunk_bottom_get_argc(const lsthunk_t* thunk);
+int               lsthunk_is_bottom(const lsthunk_t* thunk);
+const char*       lsthunk_bottom_get_message(const lsthunk_t* thunk);
+lsloc_t           lsthunk_bottom_get_loc(const lsthunk_t* thunk);
+lssize_t          lsthunk_bottom_get_argc(const lsthunk_t* thunk);
 lsthunk_t* const* lsthunk_bottom_get_args(const lsthunk_t* thunk);
-// Merge/accumulate two bottoms: concatenates messages with "; " and appends args; chooses earlier location
+// Merge/accumulate two bottoms: concatenates messages with "; " and appends args; chooses earlier
+// location
 lsthunk_t* lsthunk_bottom_merge(lsthunk_t* a, lsthunk_t* b);
 
 // Internal-friendly constructors for two-phase wiring (used by loaders/materializers)
 // Allocate an ALGE thunk with space for argc args; arguments are left unset for later wiring
 lsthunk_t* lsthunk_alloc_alge(const lsstr_t* constr, lssize_t argc);
 // Set the i-th argument on an ALGE thunk allocated via lsthunk_alloc_alge
-void        lsthunk_set_alge_arg(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg);
+void lsthunk_set_alge_arg(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg);
 // Allocate a BOTTOM thunk with message and reserved related slots; args left NULL for later wiring
-lsthunk_t*  lsthunk_alloc_bottom(const char* message, lsloc_t loc, lssize_t argc);
+lsthunk_t* lsthunk_alloc_bottom(const char* message, lsloc_t loc, lssize_t argc);
 // Set the i-th related thunk on a BOTTOM allocated via lsthunk_alloc_bottom
-void        lsthunk_set_bottom_related(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg);
+void lsthunk_set_bottom_related(lsthunk_t* thunk, lssize_t idx, lsthunk_t* arg);
 
 /**
  * Create a new thunk for an expression
@@ -189,7 +191,6 @@ lsttype_t lsthunk_get_type(const lsthunk_t* thunk);
  * @return The algebraic constructor
  */
 const lsstr_t* lsthunk_get_constr(const lsthunk_t* thunk);
-
 
 /**
  * Get the arguments of a thunk
@@ -217,7 +218,7 @@ const lsint_t* lsthunk_get_int(const lsthunk_t* thunk);
  * @param thunk The thunk
  * @return The string value
  */
-const lsstr_t*    lsthunk_get_str(const lsthunk_t* thunk);
+const lsstr_t* lsthunk_get_str(const lsthunk_t* thunk);
 
 /**
  * Get the symbol value of a thunk
@@ -234,9 +235,9 @@ lsthunk_t* const* lsthunk_get_args(const lsthunk_t* thunk);
 
 // removed: lsthunk_get_right (unused)
 
-lstpat_t*         lsthunk_get_param(const lsthunk_t* thunk);
+lstpat_t*  lsthunk_get_param(const lsthunk_t* thunk);
 
-lsthunk_t*        lsthunk_get_body(const lsthunk_t* thunk);
+lsthunk_t* lsthunk_get_body(const lsthunk_t* thunk);
 
 // removed: lsthunk_get_ref_target (unused)
 
@@ -309,7 +310,7 @@ void                    lsthunk_print(FILE* fp, lsprec_t prec, int indent, lsthu
 
 void                    lsthunk_dprint(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk);
 // Deep print: recursively evaluate substructures while printing (used by to_string)
-void                    lsthunk_deep_print(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk);
+void lsthunk_deep_print(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk);
 
 // For now, cloning a thunk returns the same pointer (immutable semantics).
 // If thunk mutability is introduced, replace with a deep copy.

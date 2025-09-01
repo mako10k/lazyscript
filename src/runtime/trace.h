@@ -18,7 +18,7 @@ typedef struct lstrace_span {
 } lstrace_span_t;
 
 typedef struct lstrace_table {
-  lstrace_span_t* spans;   // length = count
+  lstrace_span_t* spans; // length = count
   int             count;
 } lstrace_table_t;
 
@@ -38,7 +38,7 @@ void lstrace_print_frame(FILE* fp, lstrace_span_t span);
 
 // --- Lightweight runtime context (experimental) ---
 // Returns current trace id from evaluation context or -1 if unknown
-int  lstrace_current(void);
+int lstrace_current(void);
 // Push/pop current trace id (nesting-safe)
 void lstrace_push(int id);
 void lstrace_pop(void);
@@ -48,14 +48,14 @@ void lstrace_print_stack(FILE* fp, int max_depth);
 
 // --- Optional sidecar generation (experimental) ---
 // Begin dumping a JSONL sourcemap to the given path. Returns 0 on success.
-int  lstrace_begin_dump(const char* path);
+int lstrace_begin_dump(const char* path);
 // Emit one location record in creation order. Safe to call when dump is disabled (no-op).
 void lstrace_emit_loc(lsloc_t loc);
 // Finish dumping and close the file.
 void lstrace_end_dump(void);
 
 // Pending source location for next thunk creation (set by lsthunk_new_expr)
-void   lstrace_set_pending_loc(lsloc_t loc);
+void lstrace_set_pending_loc(lsloc_t loc);
 // Take pending loc if any; otherwise return <unknown>
 lsloc_t lstrace_take_pending_or_unknown(void);
 

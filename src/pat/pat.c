@@ -65,7 +65,10 @@ const lsstr_t*   lspat_get_str(const lspat_t* pat) { return pat->lp_str; }
 const lsref_t*   lspat_get_ref(const lspat_t* pat) { return pat->lp_ref; }
 
 void             lspat_print(FILE* fp, lsprec_t prec, int indent, const lspat_t* pat) {
-  if (!pat) { lsprintf(fp, indent, "<null-pat>"); return; }
+              if (!pat) {
+                lsprintf(fp, indent, "<null-pat>");
+                return;
+  }
               switch (pat->lp_type) {
               case LSPTYPE_ALGE:
     lspalge_print(fp, prec, indent, pat->lp_alge);
@@ -95,7 +98,7 @@ void             lspat_print(FILE* fp, lsprec_t prec, int indent, const lspat_t*
       lsprintf(fp, indent, ")");
     break;
               case LSPTYPE_CARET:
-    lsprintf(fp, indent, "^(" );
+    lsprintf(fp, indent, "^(");
     lspat_print(fp, LSPREC_LOWEST, indent, pat->lp_caret.inner);
     lsprintf(fp, indent, ")");
     break;
@@ -128,8 +131,8 @@ const lspat_t* lspat_get_or_left(const lspat_t* pat) { return pat->lp_or.left; }
 const lspat_t* lspat_get_or_right(const lspat_t* pat) { return pat->lp_or.right; }
 
 const lspat_t* lspat_new_caret(const lspat_t* inner) {
-  lspat_t* pat   = lsmalloc(sizeof(lspat_t));
-  pat->lp_type   = LSPTYPE_CARET;
+  lspat_t* pat        = lsmalloc(sizeof(lspat_t));
+  pat->lp_type        = LSPTYPE_CARET;
   pat->lp_caret.inner = inner;
   return pat;
 }

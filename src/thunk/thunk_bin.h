@@ -14,23 +14,23 @@ extern "C" {
 #define LSTB_VERSION_MINOR 1u
 
 // File-level flags
-#define LSTB_F_STORE_WHNF   (1u << 0)
-#define LSTB_F_STORE_TRACE  (1u << 1)
-#define LSTB_F_STORE_LOCS   (1u << 2)
-#define LSTB_F_STORE_TYPES  (1u << 3)
+#define LSTB_F_STORE_WHNF (1u << 0)
+#define LSTB_F_STORE_TRACE (1u << 1)
+#define LSTB_F_STORE_LOCS (1u << 2)
+#define LSTB_F_STORE_TYPES (1u << 3)
 
 // Thunk kinds (table entry kinds)
 typedef enum lstb_kind {
-  LSTB_KIND_ALGE   = 0,
-  LSTB_KIND_APPL   = 1,
-  LSTB_KIND_CHOICE = 2,
-  LSTB_KIND_LAMBDA = 3,
-  LSTB_KIND_REF    = 4,
-  LSTB_KIND_INT    = 5,
-  LSTB_KIND_STR    = 6,
-  LSTB_KIND_SYMBOL = 7,
-  LSTB_KIND_BUILTIN= 8,
-  LSTB_KIND_BOTTOM = 9
+  LSTB_KIND_ALGE    = 0,
+  LSTB_KIND_APPL    = 1,
+  LSTB_KIND_CHOICE  = 2,
+  LSTB_KIND_LAMBDA  = 3,
+  LSTB_KIND_REF     = 4,
+  LSTB_KIND_INT     = 5,
+  LSTB_KIND_STR     = 6,
+  LSTB_KIND_SYMBOL  = 7,
+  LSTB_KIND_BUILTIN = 8,
+  LSTB_KIND_BOTTOM  = 9
 } lstb_kind_t;
 
 // Choice operator sub-kind
@@ -47,9 +47,9 @@ typedef enum lstb_choice_kind {
 
 // TYPE_POOL entry kinds (reservation)
 typedef enum lstb_type_kind {
-  LSTB_TK_STRING_NAME = 0,  // STRING_POOL id
-  LSTB_TK_SYMBOL_NAME = 1,  // SYMBOL_POOL id
-  LSTB_TK_OPAQUE_BLOB = 2   // opaque binary blob (reserved)
+  LSTB_TK_STRING_NAME = 0, // STRING_POOL id
+  LSTB_TK_SYMBOL_NAME = 1, // SYMBOL_POOL id
+  LSTB_TK_OPAQUE_BLOB = 2  // opaque binary blob (reserved)
 } lstb_type_kind_t;
 
 // Forward decls (opaque types from runtime)

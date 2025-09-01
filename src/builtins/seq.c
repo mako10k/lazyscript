@@ -14,7 +14,8 @@ lsthunk_t* lsbuiltin_seq(lssize_t argc, lsthunk_t* const* args, void* data) {
   ls_effects_begin();
   lsthunk_t* fst_evaled = ls_eval_arg(fst, "seq: first");
   ls_effects_end();
-  if (lsthunk_is_err(fst_evaled)) return fst_evaled;
+  if (lsthunk_is_err(fst_evaled))
+    return fst_evaled;
   if (fst_evaled == NULL)
     return ls_make_err("seq: first eval");
   switch ((lsseq_type_t)(intptr_t)data) {
