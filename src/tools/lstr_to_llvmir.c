@@ -132,11 +132,6 @@ int main(int argc, char** argv){
       case LSTTYPE_ALGE: {
         const lsstr_t* c = lsthunk_get_constr(r0);
         lssize_t ac = lsthunk_get_argc(r0);
-        // Bool-like constructors
-        if (c && ac == 0) {
-          if (lsstrcmp(c, lsstr_cstr(".True")) == 0) { emit_ir_main_ret_i32(stdout, 1); break; }
-          if (lsstrcmp(c, lsstr_cstr(".False")) == 0) { emit_ir_main_ret_i32(stdout, 0); break; }
-        }
         // Result-like Ok payloads
         if (c && lsstrcmp(c, lsstr_cstr(".Ok")) == 0 && ac == 1) {
           lsthunk_t* const* args = lsthunk_get_args(r0);
@@ -158,6 +153,15 @@ int main(int argc, char** argv){
           }
         }
         // Fallback
+        emit_ir_main_ret_i32(stdout, 0);
+        break;
+      }
+      case LSTTYPE_SYMBOL: {
+        const lsstr_t* sym = lsthunk_get_symbol(r0);
+        if (sym) {
+          if (lsstrcmp(sym, lsstr_cstr(".True")) == 0) { emit_ir_main_ret_i32(stdout, 1); break; }
+          if (lsstrcmp(sym, lsstr_cstr(".False")) == 0) { emit_ir_main_ret_i32(stdout, 0); break; }
+        }
         emit_ir_main_ret_i32(stdout, 0);
         break;
       }
