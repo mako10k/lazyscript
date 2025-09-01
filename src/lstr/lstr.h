@@ -43,3 +43,6 @@ typedef enum {
 const lstr_prog_t* lstr_read_text(FILE* in, FILE* err);
 void               lstr_print(FILE* out, int indent, const lstr_prog_t* p);
 int                lstr_validate(const lstr_prog_t* p);
+
+// Convenience: build LSTR from an LSTI file path (minimal v1)
+const lstr_prog_t* lstr_from_lsti_path(const char* path);
