@@ -163,36 +163,38 @@ for name in "${eval_cases[@]}"; do
   fi
 done
 
-# Discover Core IR dump tests: any test/**/*.ls that has a matching .coreir.out
-cir_cases=()
-for rel in "${case_files[@]}"; do
-  base_noext="${rel%.ls}"
-  if [[ -f "$DIR/$base_noext.coreir.out" ]]; then
-    cir_cases+=("$base_noext")
-  fi
-done
+# Discover Core IR dump tests only if the CLI supports --dump-coreir
+if "$BIN" --help 2>&1 | grep -q -- "--dump-coreir"; then
+  cir_cases=()
+  for rel in "${case_files[@]}"; do
+    base_noext="${rel%.ls}"
+    if [[ -f "$DIR/$base_noext.coreir.out" ]]; then
+      cir_cases+=("$base_noext")
+    fi
+  done
 
-for name in "${cir_cases[@]}"; do
-  [[ -z "$name" ]] && continue
-  src="$DIR/$name.ls"
-  exp="$DIR/$name.coreir.out"
-  base="$DIR/$name"
-  # Run program with Core IR dump and capture all output
-  add_args=()
-  if [[ -n "${LAZYSCRIPT_ARGS:-}" ]]; then
-    # shellcheck disable=SC2206
-    add_args=($LAZYSCRIPT_ARGS)
-  fi
-  out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" --dump-coreir "$src")"
-  if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-    echo "ok - coreir $name"
-    ((pass++))
-  else
-    echo "not ok - coreir $name"
-    echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
-    ((fail++))
-  fi
-done
+  for name in "${cir_cases[@]}"; do
+    [[ -z "$name" ]] && continue
+    src="$DIR/$name.ls"
+    exp="$DIR/$name.coreir.out"
+    base="$DIR/$name"
+    # Run program with Core IR dump and capture all output
+    add_args=()
+    if [[ -n "${LAZYSCRIPT_ARGS:-}" ]]; then
+      # shellcheck disable=SC2206
+      add_args=($LAZYSCRIPT_ARGS)
+    fi
+    out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" --dump-coreir "$src")"
+    if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
+      echo "ok - coreir $name"
+      ((pass++))
+    else
+      echo "not ok - coreir $name"
+      echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
+      ((fail++))
+    fi
+  done
+fi
 
 # Optional: formatter smoke test if the binary exists and an expectation file is present
 if [[ -x "$FMT_BIN" ]]; then
@@ -277,24 +279,27 @@ if "$BIN" --help 2>&1 | grep -q -- "--typecheck"; then
 fi
 
 # Optional: Core IR pipe tests (lazyscriptc | lscoreir) for marked cases
-COMP="$ROOT/src/lazyscriptc"
-RUNIR="$ROOT/src/lscoreir"
-if [[ -x "$COMP" && -x "$RUNIR" ]]; then
-  mapfile -t pipe_marks < <(find "$DIR" -type f -name '*.pipe.ok' -printf '%P\n' | sort)
-  for mark in "${pipe_marks[@]}"; do
-    base="${mark%.pipe.ok}"
-    src="$DIR/$base.ls"; exp="$DIR/$base.out"
-    [[ -f "$src" && -f "$exp" ]] || continue
-    out="$(run_with_timeout_capture bash -lc "$COMP '$src' | '$RUNIR'")"
-    if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-      echo "ok - pipe $base"
-      ((pass++))
-    else
-      echo "not ok - pipe $base"
-      echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
-      ((fail++))
-    fi
-  done
+# Run only if the CLI advertises COREIR support (back-compat) and both tools exist
+if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
+  COMP="$ROOT/src/lazyscriptc"
+  RUNIR="$ROOT/src/lscoreir"
+  if [[ -x "$COMP" && -x "$RUNIR" ]]; then
+    mapfile -t pipe_marks < <(find "$DIR" -type f -name '*.pipe.ok' -printf '%P\n' | sort)
+    for mark in "${pipe_marks[@]}"; do
+      base="${mark%.pipe.ok}"
+      src="$DIR/$base.ls"; exp="$DIR/$base.out"
+      [[ -f "$src" && -f "$exp" ]] || continue
+      out="$(run_with_timeout_capture bash -lc "$COMP '$src' | '$RUNIR'")"
+      if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
+        echo "ok - pipe $base"
+        ((pass++))
+      else
+        echo "not ok - pipe $base"
+        echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
+        ((fail++))
+      fi
+    done
+  fi
 fi
 
 if [[ $fail -eq 0 ]]; then

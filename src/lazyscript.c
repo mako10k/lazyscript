@@ -13,7 +13,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <dlfcn.h>
-#include "coreir/coreir.h"
+/* coreir removed */
 #include "common/hash.h"
 #include "common/malloc.h"
 #include "common/ref.h"
@@ -339,214 +339,120 @@ int        main(int argc, char** argv) {
            GC_init();
   }
   const char*   prelude_so       = NULL;
-  int           dump_coreir      = 0;
-  int           eval_coreir      = 0;
-  int           typecheck_coreir = 0;
-  int           kind_warn        = 1;    // default warn
-  int           kind_error       = 0;    // default no error
+   int           kind_warn        = 1;    // (kept for future, no coreir)
+   int           kind_error       = 0;    // (kept for future, no coreir)
   const char*   trace_map_path   = NULL; // optional sourcemap for runtime tracing
   struct option longopts[]       = {
-                 { "eval", required_argument, NULL, 'e' },
-                 { "prelude-so", required_argument, NULL, 'p' },
-                 { "sugar-namespace", required_argument, NULL, 'n' },
-                 { "strict-effects", no_argument, NULL, 's' },
-                 { "run-main", no_argument, NULL, 1003 },
-                 { "entry", required_argument, NULL, 1004 },
-                 { "dump-coreir", no_argument, NULL, 'i' },
-                 { "eval-coreir", no_argument, NULL, 'c' },
-                 { "typecheck", no_argument, NULL, 't' },
-                 { "no-kind-warn", no_argument, NULL, 1000 },
-                 { "kind-error", no_argument, NULL, 1001 },
-                 { "init", required_argument, NULL, 1002 },
-                 { "trace-map", required_argument, NULL, 2000 },
-                 { "trace-stack-depth", required_argument, NULL, 2001 },
-                 { "trace-dump", required_argument, NULL, 2002 },
-                 { "debug", no_argument, NULL, 'd' },
-                 { "help", no_argument, NULL, 'h' },
-                 { "version", no_argument, NULL, 'v' },
-                 { NULL, 0, NULL, 0 },
+    { "eval", required_argument, NULL, 'e' },
+    { "prelude-so", required_argument, NULL, 'p' },
+    { "sugar-namespace", required_argument, NULL, 'n' },
+    { "strict-effects", no_argument, NULL, 's' },
+    { "run-main", no_argument, NULL, 1003 },
+    { "entry", required_argument, NULL, 1004 },
+    { "init", required_argument, NULL, 1002 },
+    { "trace-map", required_argument, NULL, 2000 },
+    { "trace-stack-depth", required_argument, NULL, 2001 },
+    { "trace-dump", required_argument, NULL, 2002 },
+    { "debug", no_argument, NULL, 'd' },
+    { "help", no_argument, NULL, 'h' },
+    { "version", no_argument, NULL, 'v' },
+    { NULL, 0, NULL, 0 },
   };
   int opt;
-  while ((opt = getopt_long(argc, argv, "e:p:n:sictdhv", longopts, NULL)) != -1) {
-           switch (opt) {
-           case 'e': {
-             static int eval_count = 0;
-             char       name[32];
-             snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
-             const lsprog_t* prog = lsparse_string(name, optarg);
-             if (prog != NULL) {
-               if (dump_coreir) {
-                 const lscir_prog_t* cir = lscir_lower_prog(prog);
-                 lscir_print(stdout, 0, cir);
-                 if (ls_effects_get_strict()) {
-                   int errs = lscir_validate_effects(stderr, cir);
-                   if (errs > 0) {
-                     fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-                     exit(1);
-            }
-          }
-                 break;
+  while ((opt = getopt_long(argc, argv, "e:p:n:sdhv", longopts, NULL)) != -1) {
+    switch (opt) {
+    case 'e': {
+      // Evaluate one-line program
+      const lsprog_t* prog = lsparse_string("<cmd>", optarg);
+      if (prog != NULL) {
+        if (g_debug)
+          lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+        lstenv_t* tenv = lstenv_new(NULL);
+        if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
+          lsprintf(stderr, 0,
+                   "E: prelude: plugin not found or failed to load; set --prelude-so or install liblazyscript_prelude.so\n");
+          exit(1);
         }
-               if (g_debug) {
-                 lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
-        }
-               if (typecheck_coreir) {
-                 lscir_typecheck_set_kind_warn(kind_warn);
-                 lscir_typecheck_set_kind_error(kind_error);
-                 const lscir_prog_t* cir = lscir_lower_prog(prog);
-                 if (ls_effects_get_strict()) {
-                   int errs = lscir_validate_effects(stderr, cir);
-                   if (errs > 0) {
-                     fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-                     exit(1);
-            }
-          }
-                 return lscir_typecheck(stdout, cir);
-        }
-               if (eval_coreir) {
-                 const lscir_prog_t* cir = lscir_lower_prog(prog);
-                 if (ls_effects_get_strict()) {
-                   int errs = lscir_validate_effects(stderr, cir);
-                   if (errs > 0) {
-                     fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-                     exit(1);
-            }
-          }
-                 lscir_eval(stdout, cir);
-                 break;
-        }
-               if (ls_effects_get_strict()) {
-                 const lscir_prog_t* cir  = lscir_lower_prog(prog);
-                 int                 errs = lscir_validate_effects(stderr, cir);
-                 if (errs > 0) {
-                   fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-                   exit(1);
-          }
-        }
-               lstenv_t* tenv = lstenv_new(NULL);
-               if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
-                 lsprintf(stderr, 0,
-                          "E: prelude: plugin not found or failed to load; set --prelude-so or install "
-                                 "liblazyscript_prelude.so\n");
-                 exit(1);
-        }
-               // Plugin registers prelude dispatchers; no host-side MUX
-               int saved_run_main = g_run_main;
-               g_run_main         = 0; // -e は従来通り：最終値を出力
-               // Optional: begin trace dump for this evaluation
-               if (g_trace_dump_path && g_trace_dump_path[0])
+        int saved_run_main = g_run_main;
+        g_run_main         = 0; // -e は最終値を出力
+        if (g_trace_dump_path && g_trace_dump_path[0])
           lstrace_begin_dump(g_trace_dump_path);
         if (g_debug)
           lsprintf(stderr, 0, "DBG: eval(-e) begin\n");
         lsthunk_t* ret = lsprog_eval(prog, tenv);
-               if (g_debug)
+        if (g_debug)
           lsprintf(stderr, 0, "DBG: eval(-e) end ret=%p\n", (void*)ret);
         if (ret != NULL) {
-                 if (g_debug) {
-                   const char* rt = "?";
-                   if (lsthunk_is_err(ret))
+          if (g_debug) {
+            const char* rt = "?";
+            if (lsthunk_is_err(ret))
               rt = "<bottom>";
             else
               switch (lsthunk_get_type(ret)) {
-              case LSTTYPE_ALGE:
-                rt = "alge";
-                break;
-              case LSTTYPE_APPL:
-                rt = "appl";
-                break;
-              case LSTTYPE_LAMBDA:
-                rt = "lambda";
-                break;
-              case LSTTYPE_REF:
-                rt = "ref";
-                break;
-              case LSTTYPE_INT:
-                rt = "int";
-                break;
-              case LSTTYPE_STR:
-                rt = "str";
-                break;
-              case LSTTYPE_SYMBOL:
-                rt = "symbol";
-                break;
-              case LSTTYPE_BUILTIN:
-                rt = "builtin";
-                break;
-              case LSTTYPE_CHOICE:
-                rt = "choice";
-                break;
-              case LSTTYPE_BOTTOM:
-                rt = "bottom";
-                break;
+              case LSTTYPE_ALGE: rt = "alge"; break;
+              case LSTTYPE_APPL: rt = "appl"; break;
+              case LSTTYPE_LAMBDA: rt = "lambda"; break;
+              case LSTTYPE_REF: rt = "ref"; break;
+              case LSTTYPE_INT: rt = "int"; break;
+              case LSTTYPE_STR: rt = "str"; break;
+              case LSTTYPE_SYMBOL: rt = "symbol"; break;
+              case LSTTYPE_BUILTIN: rt = "builtin"; break;
+              case LSTTYPE_CHOICE: rt = "choice"; break;
+              case LSTTYPE_BOTTOM: rt = "bottom"; break;
               }
             lsprintf(stderr, 0, "DBG: eval(-e) ret-type=%s\n", rt);
           }
-                 if (lsthunk_is_err(ret)) {
-                   lsprintf(stderr, 0, "E: ");
-                   lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
-                   if (g_lstrace_table && g_trace_stack_depth > 0)
+          if (lsthunk_is_err(ret)) {
+            lsprintf(stderr, 0, "E: ");
+            lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
+            if (g_lstrace_table && g_trace_stack_depth > 0)
               lstrace_print_stack(stderr, g_trace_stack_depth);
             lsprintf(stderr, 0, "\n");
           } else {
-                   if (g_debug)
+            if (g_debug)
               lsprintf(stderr, 0, "DBG: print ret begin\n");
             lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
-                   lsprintf(stdout, 0, "\n");
-                   if (g_debug)
+            lsprintf(stdout, 0, "\n");
+            if (g_debug)
               lsprintf(stderr, 0, "DBG: print ret end\n");
           }
         }
-               g_run_main = saved_run_main;
-               if (g_trace_dump_path && g_trace_dump_path[0])
+        g_run_main = saved_run_main;
+        if (g_trace_dump_path && g_trace_dump_path[0])
           lstrace_end_dump();
       }
-             break;
+      break;
     }
-           case 'p':
+    case 'p':
       prelude_so = optarg;
       break;
-           case 'n':
+    case 'n':
       g_sugar_ns = optarg;
       break;
-           case 's':
+    case 's':
       ls_effects_set_strict(1);
       break;
-           case 1003: // --run-main
+    case 1003: // --run-main
       g_run_main = 1;
       break;
-           case 1004: // --entry <name>
+    case 1004: // --entry <name>
       g_entry_name = optarg;
       break;
-           case 'i':
-      dump_coreir = 1;
-      break;
-           case 'c':
-      eval_coreir = 1;
-      break;
-           case 't':
-      typecheck_coreir = 1;
-      break;
-           case 1000: // --no-kind-warn
-      kind_warn = 0;
-      break;
-           case 1001: // --kind-error
-      kind_error = 1;
-      break;
-           case 1002: // --init <file>
+    case 1002: // --init <file>
       g_init_file = optarg;
       break;
-           case 2000: // --trace-map <file>
+    case 2000: // --trace-map <file>
       trace_map_path = optarg;
       break;
-           case 2001: // --trace-stack-depth <n>
+    case 2001: // --trace-stack-depth <n>
       g_trace_stack_depth = atoi(optarg);
       if (g_trace_stack_depth < 0)
         g_trace_stack_depth = 0;
       break;
-           case 2002: // --trace-dump <file>
+    case 2002: // --trace-dump <file>
       g_trace_dump_path = optarg;
       break;
-           case 'd':
+    case 'd':
       g_debug = 1;
 #if DEBUG
       {
@@ -563,31 +469,21 @@ int        main(int argc, char** argv) {
       printf("  -p, --prelude-so <path>  load prelude plugin .so (override)\n");
       printf("  -n, --sugar-namespace <ns>  set namespace for ~~sym sugar (default: prelude)\n");
       printf("  -s, --strict-effects  enforce effect discipline (seq/chain required)\n");
-      printf("      --run-main          run entry function instead of printing top-level value "
-             "(off)\n");
+      printf("      --run-main          run entry function instead of printing top-level value (off)\n");
       printf("      --entry <name>      set entry function name (default: main)\n");
-      printf("  -i, --dump-coreir  print Core IR after parsing (debug)\n");
-      printf("  -c, --eval-coreir  run via Core IR evaluator (smoke)\n");
-      printf("  -t, --typecheck    run minimal Core IR typechecker and print OK/error\n");
-      printf("      --no-kind-warn  suppress kind (Pure/IO) warnings during --typecheck\n");
-      printf("      --kind-error    treat kind (Pure/IO) issues as errors during --typecheck\n");
-      printf("      --init <file>   load and evaluate an init LazyScript before user code (thunk "
-             "path)\n");
+      printf("      --init <file>   load and evaluate an init LazyScript before user code (thunk path)\n");
       printf("      --trace-map <file>   load sourcemap JSONL for runtime trace printing (exp)\n");
       printf("      --trace-stack-depth <n>  print up to N frames on error (default: 1)\n");
       printf("      --trace-dump <file>  write JSONL sourcemap while evaluating (exp)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
       printf("\nDefault prelude: plugin-only (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover).\n");
-      printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not "
-             "set)\n");
-      printf("  LAZYSCRIPT_PRELUDE_PATH search paths (:) to find liblazyscript_prelude.so when SO "
-             "not set\n");
+      printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not set)\n");
+      printf("  LAZYSCRIPT_PRELUDE_PATH search paths (:) to find liblazyscript_prelude.so when SO not set\n");
       printf("  LAZYSCRIPT_SUGAR_NS     namespace used for ~~sym sugar (if -n not set)\n");
       printf("  LAZYSCRIPT_INIT         path to init LazyScript (used if --init not set)\n");
       printf("  LAZYSCRIPT_TRACE_MAP    path to sourcemap JSONL (used if --trace-map not set)\n");
-      printf(
-          "  LAZYSCRIPT_TRACE_STACK_DEPTH  depth to print (used if --trace-stack-depth not set)\n");
+      printf("  LAZYSCRIPT_TRACE_STACK_DEPTH  depth to print (used if --trace-stack-depth not set)\n");
       printf("  LAZYSCRIPT_TRACE_DUMP   path to write JSONL (used if --trace-dump not set)\n");
       exit(0);
     case 'v':
@@ -629,57 +525,10 @@ int        main(int argc, char** argv) {
       filename = "/dev/stdin";
     const lsprog_t* prog = lsparse_file(filename);
     if (prog != NULL) {
-      if (dump_coreir) {
-        const lscir_prog_t* cir = lscir_lower_prog(prog);
-        lscir_print(stdout, 0, cir);
-        if (ls_effects_get_strict()) {
-          int errs = lscir_validate_effects(stderr, cir);
-          if (errs > 0) {
-            fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-            exit(1);
-          }
-        }
-        continue;
-      }
       if (g_debug) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
       }
-      if (typecheck_coreir) {
-        lscir_typecheck_set_kind_warn(kind_warn);
-        lscir_typecheck_set_kind_error(kind_error);
-        const lscir_prog_t* cir = lscir_lower_prog(prog);
-        if (ls_effects_get_strict()) {
-          int errs = lscir_validate_effects(stderr, cir);
-          if (errs > 0) {
-            fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-            exit(1);
-          }
-        }
-        int rc = lscir_typecheck(stdout, cir);
-        if (rc != 0)
-          return rc;
-        continue;
-      }
-      if (eval_coreir) {
-        const lscir_prog_t* cir = lscir_lower_prog(prog);
-        if (ls_effects_get_strict()) {
-          int errs = lscir_validate_effects(stderr, cir);
-          if (errs > 0) {
-            fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-            exit(1);
-          }
-        }
-        lscir_eval(stdout, cir);
-        continue;
-      }
-      if (ls_effects_get_strict()) {
-        const lscir_prog_t* cir  = lscir_lower_prog(prog);
-        int                 errs = lscir_validate_effects(stderr, cir);
-        if (errs > 0) {
-          fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-          exit(1);
-        }
-      }
+  // strict-effects discipline is enforced at runtime; no prevalidation
       lstenv_t* tenv = lstenv_new(NULL);
       if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
         lsprintf(stderr, 0,

@@ -1,7 +1,7 @@
 AUTOMAKE_OPTIONS = subdir-objects
-SUBDIRS = common expr misc parser pat thunk coreir lstr llvmir plugins
+SUBDIRS = common expr misc parser pat thunk lstr plugins
 
-bin_PROGRAMS = lazyscript lazyscript_format lsllvmir_dump lazyscriptc lscoreir lslsti_check lslstr_dump lslstr_roundtrip
+bin_PROGRAMS = lazyscript lazyscript_format lslsti_check lslstr_dump lslstr_roundtrip
 
 lazy_script_common_libs = \
     parser/liblsparser.la \
@@ -9,8 +9,7 @@ lazy_script_common_libs = \
     thunk/liblsthunk.la \
     pat/liblspat.la \
     expr/liblsexpr.la \
-    coreir/liblscoreir.la \
-    llvmir/liblsllvmir.la \
+    \
     common/liblscommon.la \
     $(GC_LIBS)
 
@@ -44,30 +43,9 @@ lazyscript_format_SOURCES = \
     lazyscript.h \
     lstypes.h
 
-lsllvmir_dump_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-lsllvmir_dump_LDADD = $(lazy_script_common_libs)
-lsllvmir_dump_SOURCES = \
-    lsllvmir_dump.c \
-    lazyscript.h \
-    lstypes.h
+# (removed) lsllvmir_dump was relying on Core IR; disabled with coreir removal
 
-# Compiler (frontend → Core IR)
-lazyscriptc_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-lazyscriptc_LDADD = $(lazy_script_common_libs)
-lazyscriptc_SOURCES = \
-    tools/lazyscriptc_main.c \
-    runtime/effects.c \
-    lazyscript.h \
-    lstypes.h
-
-# Runtime (Core IR evaluator)
-lscoreir_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
-lscoreir_LDADD = $(lazy_script_common_libs)
-lscoreir_SOURCES = \
-    tools/lscoreir_main.c \
-    runtime/effects.c \
-    lazyscript.h \
-    lstypes.h
+# (removed) lazyscriptc (Core IR frontend) disabled with coreir removal
 
 lslsti_check_CFLAGS = $(AM_CFLAGS) $(GC_CFLAGS)
 # Arrange libraries so providers come after users for static linking
@@ -76,8 +54,6 @@ lslsti_check_LDADD = \
     thunk/liblsthunk.la \
     pat/liblspat.la \
     expr/liblsexpr.la \
-    coreir/liblscoreir.la \
-    llvmir/liblsllvmir.la \
     misc/liblsmisc.la \
     common/liblscommon.la \
     $(GC_LIBS)
@@ -95,8 +71,6 @@ lslstr_dump_LDADD = \
     thunk/liblsthunk.la \
     pat/liblspat.la \
     expr/liblsexpr.la \
-    coreir/liblscoreir.la \
-    llvmir/liblsllvmir.la \
     misc/liblsmisc.la \
     common/liblscommon.la \
     $(GC_LIBS)
@@ -114,8 +88,6 @@ lslstr_roundtrip_LDADD = \
     thunk/liblsthunk.la \
     pat/liblspat.la \
     expr/liblsexpr.la \
-    coreir/liblscoreir.la \
-    llvmir/liblsllvmir.la \
     misc/liblsmisc.la \
     common/liblscommon.la \
     $(GC_LIBS)
