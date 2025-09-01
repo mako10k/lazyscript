@@ -1,2 +1,4 @@
 # Skip placeholder/experimental tests under coreir until wiring is ready
-# (kept empty intentionally)
+
+# Empty placeholder; provide only .coreir.out for now
+t11_coreir_match_no_case
