@@ -16,4 +16,5 @@ jobs:
           sudo apt-get install -y clang-format
       - name: Check format
         run: |
-          make check-format CLANG_FORMAT_BIN=clang-format
+          chmod +x scripts/check-format.sh
+          scripts/check-format.sh
