@@ -186,13 +186,13 @@ void       lsthunk_set_lambda_body(lsthunk_t* thunk, lsthunk_t* body);
 
 // Lightweight getters used by serializers
 // When thunk is APPL, return function child (may be NULL for partially wired)
-lsthunk_t*       lsthunk_get_appl_func(const lsthunk_t* thunk);
+lsthunk_t* lsthunk_get_appl_func(const lsthunk_t* thunk);
 // Choice helpers
-int              lsthunk_get_choice_kind(const lsthunk_t* thunk);
-lsthunk_t*       lsthunk_get_choice_left(const lsthunk_t* thunk);
-lsthunk_t*       lsthunk_get_choice_right(const lsthunk_t* thunk);
+int        lsthunk_get_choice_kind(const lsthunk_t* thunk);
+lsthunk_t* lsthunk_get_choice_left(const lsthunk_t* thunk);
+lsthunk_t* lsthunk_get_choice_right(const lsthunk_t* thunk);
 // Ref name accessor (external/builtin by name serialization)
-const lsstr_t*   lsthunk_get_ref_name(const lsthunk_t* thunk);
+const lsstr_t* lsthunk_get_ref_name(const lsthunk_t* thunk);
 
 /**
  * Create a new thunk for an expression

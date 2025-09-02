@@ -326,7 +326,7 @@ const lsstr_t* lstpat_get_str(const lstpat_t* pat) {
   return pat->strval;
 }
 
-int  lstpat_is_wild(const lstpat_t* pat) { return pat->ltp_type == LSPTYPE_WILDCARD; }
+int            lstpat_is_wild(const lstpat_t* pat) { return pat->ltp_type == LSPTYPE_WILDCARD; }
 
 const lsstr_t* lstpat_get_refname(const lstpat_t* pat) {
   assert(pat->ltp_type == LSPTYPE_REF);

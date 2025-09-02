@@ -116,7 +116,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     lstpat_t** data;
     lssize_t   size, cap;
   } vec_pat_t;
-  vec_pat_t ppool = { 0 };
+  vec_pat_t  ppool = { 0 };
 
 #define VEC_PUSH(vec, val, type)                                                                   \
   do {                                                                                             \
@@ -139,8 +139,8 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
   // add to string pool if not exists; return index
 #define ADD_SPOOL(BYTES, LEN, OUT_IDX)                                                             \
   do {                                                                                             \
-    const char* __b = (const char*)(BYTES);                                                        \
-    lssize_t    __l = (LEN);                                                                       \
+    const char* __b   = (const char*)(BYTES);                                                      \
+    lssize_t    __l   = (LEN);                                                                     \
     int         __idx = -1;                                                                        \
     if (__b && __l >= 0) {                                                                         \
       for (lssize_t __i = 0; __i < spool.size; ++__i) {                                            \
@@ -165,7 +165,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
   // add to symbol pool if not exists; return index
 #define ADD_YPOOL(LSSTR, OUT_IDX)                                                                  \
   do {                                                                                             \
-    const lsstr_t* __s = (LSSTR);                                                                  \
+    const lsstr_t* __s   = (LSSTR);                                                                \
     int            __idx = -1;                                                                     \
     if (__s) {                                                                                     \
       const char* __b = lsstr_get_buf(__s);                                                        \
@@ -223,77 +223,138 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     case LSTTYPE_STR: {
       const lsstr_t* s = lsthunk_get_str(t);
       if (s) {
-        int __idx; ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), __idx); (void)__idx;
+        int __idx;
+        ADD_SPOOL(lsstr_get_buf(s), lsstr_get_len(s), __idx);
+        (void)__idx;
       }
       break;
     }
     case LSTTYPE_SYMBOL: {
       const lsstr_t* sym = lsthunk_get_symbol(t);
-      if (sym) { int __idx; ADD_YPOOL(sym, __idx); (void)__idx; }
+      if (sym) {
+        int __idx;
+        ADD_YPOOL(sym, __idx);
+        (void)__idx;
+      }
       break;
     }
     case LSTTYPE_ALGE: {
       const lsstr_t* c = lsthunk_get_constr(t);
-      if (c) { int __idx; ADD_YPOOL(c, __idx); (void)__idx; }
-      lssize_t ac = lsthunk_get_argc(t);
+      if (c) {
+        int __idx;
+        ADD_YPOOL(c, __idx);
+        (void)__idx;
+      }
+      lssize_t          ac = lsthunk_get_argc(t);
       lsthunk_t* const* as = lsthunk_get_args(t);
       for (lssize_t i = 0; i < ac; ++i) {
-        lsthunk_t* ch = as[i]; int id; GET_ID(ch, id); if (id < 0) VEC_PUSH(nodes, ch, lsthunk_t*);
+        lsthunk_t* ch = as[i];
+        int        id;
+        GET_ID(ch, id);
+        if (id < 0)
+          VEC_PUSH(nodes, ch, lsthunk_t*);
       }
       break;
     }
     case LSTTYPE_APPL: {
       lsthunk_t* func = lsthunk_get_appl_func(t);
-      if (func) { int id; GET_ID(func, id); if (id < 0) VEC_PUSH(nodes, func, lsthunk_t*); }
-      lssize_t ac = lsthunk_get_argc(t);
+      if (func) {
+        int id;
+        GET_ID(func, id);
+        if (id < 0)
+          VEC_PUSH(nodes, func, lsthunk_t*);
+      }
+      lssize_t          ac = lsthunk_get_argc(t);
       lsthunk_t* const* as = lsthunk_get_args(t);
       for (lssize_t i = 0; i < ac; ++i) {
-        lsthunk_t* ch = as[i]; int id; GET_ID(ch, id); if (id < 0) VEC_PUSH(nodes, ch, lsthunk_t*);
+        lsthunk_t* ch = as[i];
+        int        id;
+        GET_ID(ch, id);
+        if (id < 0)
+          VEC_PUSH(nodes, ch, lsthunk_t*);
       }
       break;
     }
     case LSTTYPE_LAMBDA: {
       // collect param pattern into pattern pool (dedup by pointer)
-      lstpat_t* p = lsthunk_get_param(t);
-      int pidx = -1;
-      for (lssize_t i = 0; i < ppool.size; ++i) { if (ppool.data[i] == p) { pidx = (int)i; break; } }
+      lstpat_t* p    = lsthunk_get_param(t);
+      int       pidx = -1;
+      for (lssize_t i = 0; i < ppool.size; ++i) {
+        if (ppool.data[i] == p) {
+          pidx = (int)i;
+          break;
+        }
+      }
       if (pidx < 0) {
         if (ppool.size == ppool.cap) {
           lssize_t ncap = ppool.cap ? ppool.cap * 2 : 8;
-          void* np = realloc(ppool.data, (size_t)ncap * sizeof(lstpat_t*));
-          if (!np) return -ENOMEM;
-          ppool.data = (lstpat_t**)np; ppool.cap = ncap;
+          void*    np   = realloc(ppool.data, (size_t)ncap * sizeof(lstpat_t*));
+          if (!np)
+            return -ENOMEM;
+          ppool.data = (lstpat_t**)np;
+          ppool.cap  = ncap;
         }
         ppool.data[ppool.size++] = p;
       }
       lsthunk_t* b = lsthunk_get_body(t);
-      if (b) { int id; GET_ID(b, id); if (id < 0) VEC_PUSH(nodes, b, lsthunk_t*); }
+      if (b) {
+        int id;
+        GET_ID(b, id);
+        if (id < 0)
+          VEC_PUSH(nodes, b, lsthunk_t*);
+      }
       break;
     }
     case LSTTYPE_CHOICE: {
       lsthunk_t* l = lsthunk_get_choice_left(t);
       lsthunk_t* r = lsthunk_get_choice_right(t);
-      if (l) { int id; GET_ID(l, id); if (id < 0) VEC_PUSH(nodes, l, lsthunk_t*); }
-      if (r) { int id; GET_ID(r, id); if (id < 0) VEC_PUSH(nodes, r, lsthunk_t*); }
+      if (l) {
+        int id;
+        GET_ID(l, id);
+        if (id < 0)
+          VEC_PUSH(nodes, l, lsthunk_t*);
+      }
+      if (r) {
+        int id;
+        GET_ID(r, id);
+        if (id < 0)
+          VEC_PUSH(nodes, r, lsthunk_t*);
+      }
       break;
     }
     case LSTTYPE_REF: {
       const lsstr_t* name = lsthunk_get_ref_name(t);
-      if (name) { int __idx; ADD_YPOOL(name, __idx); (void)__idx; }
+      if (name) {
+        int __idx;
+        ADD_YPOOL(name, __idx);
+        (void)__idx;
+      }
       break;
     }
     case LSTTYPE_BUILTIN: {
       const lsstr_t* bname = lsthunk_get_builtin_name(t);
-      if (bname) { int __idx; ADD_YPOOL(bname, __idx); (void)__idx; }
+      if (bname) {
+        int __idx;
+        ADD_YPOOL(bname, __idx);
+        (void)__idx;
+      }
       break;
     }
     case LSTTYPE_BOTTOM: {
       const char* msg = lsthunk_bottom_get_message(t);
-      if (msg) { int __idx; ADD_SPOOL(msg, (lssize_t)strlen(msg), __idx); (void)__idx; }
-      lssize_t ac = lsthunk_bottom_get_argc(t);
+      if (msg) {
+        int __idx;
+        ADD_SPOOL(msg, (lssize_t)strlen(msg), __idx);
+        (void)__idx;
+      }
+      lssize_t          ac = lsthunk_bottom_get_argc(t);
       lsthunk_t* const* as = lsthunk_bottom_get_args(t);
       for (lssize_t i = 0; i < ac; ++i) {
-        lsthunk_t* ch = as[i]; int id; GET_ID(ch, id); if (id < 0) VEC_PUSH(nodes, ch, lsthunk_t*);
+        lsthunk_t* ch = as[i];
+        int        id;
+        GET_ID(ch, id);
+        if (id < 0)
+          VEC_PUSH(nodes, ch, lsthunk_t*);
       }
       break;
     }
@@ -351,7 +412,8 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       cur += (uint32_t)spool.data[i].len;
     }
     // Write index header + index body: [u32 count][(u32 off,u32 len) * count]
-    uint32_t index_bytes = (uint32_t)sizeof(uint32_t) + (uint32_t)spool.size * (uint32_t)(sizeof(uint32_t) * 2);
+    uint32_t index_bytes =
+        (uint32_t)sizeof(uint32_t) + (uint32_t)spool.size * (uint32_t)(sizeof(uint32_t) * 2);
     if (fwrite(&index_bytes, 1, sizeof(index_bytes), fp) != sizeof(index_bytes))
       return -EIO;
     uint32_t scount = (uint32_t)spool.size;
@@ -365,7 +427,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     }
     // Write payload bytes in the same order
     for (lssize_t i = 0; i < spool.size; ++i) {
-      const char* b = spool.data[i].bytes;
+      const char* b  = spool.data[i].bytes;
       lssize_t    bl = spool.data[i].len;
       if (bl > 0) {
         if (fwrite(b, 1, (size_t)bl, fp) != (size_t)bl)
@@ -395,7 +457,8 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       cur += (uint32_t)ypool.data[i].len;
     }
     // Write index header + index body: [u32 count][(u32 off,u32 len) * count]
-    uint32_t index_bytes = (uint32_t)sizeof(uint32_t) + (uint32_t)ypool.size * (uint32_t)(sizeof(uint32_t) * 2);
+    uint32_t index_bytes =
+        (uint32_t)sizeof(uint32_t) + (uint32_t)ypool.size * (uint32_t)(sizeof(uint32_t) * 2);
     if (fwrite(&index_bytes, 1, sizeof(index_bytes), fp) != sizeof(index_bytes))
       return -EIO;
     uint32_t ycount = (uint32_t)ypool.size;
@@ -409,7 +472,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     }
     // Write payload bytes
     for (lssize_t i = 0; i < ypool.size; ++i) {
-      const char* b = ypool.data[i].bytes;
+      const char* b  = ypool.data[i].bytes;
       lssize_t    bl = ypool.data[i].len;
       if (bl > 0) {
         if (fwrite(b, 1, (size_t)bl, fp) != (size_t)bl)
@@ -433,7 +496,8 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     if (ptab_off < 0)
       return -EIO;
     uint32_t pcnt = (uint32_t)ppool.size;
-    uint32_t ptab_index_bytes = (uint32_t)sizeof(uint32_t) + (uint32_t)pcnt * (uint32_t)sizeof(uint64_t);
+    uint32_t ptab_index_bytes =
+        (uint32_t)sizeof(uint32_t) + (uint32_t)pcnt * (uint32_t)sizeof(uint64_t);
     if (fwrite(&ptab_index_bytes, 1, sizeof(ptab_index_bytes), fp) != sizeof(ptab_index_bytes))
       return -EIO;
     if (fwrite(&pcnt, 1, sizeof(pcnt), fp) != sizeof(pcnt))
@@ -455,7 +519,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
         free(poffs);
         return -EIO;
       }
-      poffs[i] = (uint64_t)(ent_off - ptab_off);
+      poffs[i]          = (uint64_t)(ent_off - ptab_off);
       const lstpat_t* p = ppool.data[i];
       // pat entry: u8 kind + payload (SYMBOL/STRING refs by len/offset; thunk ids not allowed)
       uint8_t kind = (uint8_t)lstpat_get_type(p);
@@ -542,8 +606,8 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       }
       case LSPTYPE_OR: {
         // payload: left_id, right_id
-        lstpat_t* l = lstpat_get_or_left(p);
-        lstpat_t* r = lstpat_get_or_right(p);
+        lstpat_t* l  = lstpat_get_or_left(p);
+        lstpat_t* r  = lstpat_get_or_right(p);
         int       il = -1, ir = -1;
         for (lssize_t k = 0; k < ppool.size; ++k) {
           if (ppool.data[k] == l)
@@ -598,7 +662,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
       free(poffs);
       return -EIO;
     }
-  free(poffs);
+    free(poffs);
     ptab_entry.kind     = (uint32_t)LSTI_SECT_PATTERN_TAB;
     ptab_entry.file_off = (uint64_t)ptab_off;
     ptab_entry.size     = (uint64_t)(ptab_end - ptab_off);
@@ -694,13 +758,13 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
     case LSTTYPE_CHOICE: {
       hdr2.kind = (uint8_t)LSTB_KIND_CHOICE;
       // aorl = choice_kind, payload: left_id, right_id
-      hdr2.aorl = (uint32_t)lsthunk_get_choice_kind(t);
+      hdr2.aorl  = (uint32_t)lsthunk_get_choice_kind(t);
       hdr2.extra = 0;
       break;
     }
     case LSTTYPE_REF: {
-      hdr2.kind         = (uint8_t)LSTB_KIND_REF;
-      const lsstr_t* s  = lsthunk_get_ref_name(t);
+      hdr2.kind        = (uint8_t)LSTB_KIND_REF;
+      const lsstr_t* s = lsthunk_get_ref_name(t);
       if (s) {
         int idx;
         ADD_YPOOL(s, idx);
@@ -817,7 +881,7 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
           }
         }
       }
-  } else if (paykind == PAY_BOTTOM) {
+    } else if (paykind == PAY_BOTTOM) {
       // write message len, then related ids
       if (fwrite(&pay_len_or_reserved, 1, sizeof(uint32_t), fp) != sizeof(uint32_t)) {
         free(rel_offs);
@@ -859,11 +923,13 @@ int lsti_write(FILE* fp, struct lsthunk* const* roots, lssize_t rootc,
           }
         }
       } else if (lsthunk_get_type(t) == LSTTYPE_CHOICE) {
-        lsthunk_t* l = lsthunk_get_choice_left(t);
-        lsthunk_t* r = lsthunk_get_choice_right(t);
+        lsthunk_t* l   = lsthunk_get_choice_left(t);
+        lsthunk_t* r   = lsthunk_get_choice_right(t);
         int        lid = -1, rid = -1;
-        if (l) GET_ID(l, lid);
-        if (r) GET_ID(r, rid);
+        if (l)
+          GET_ID(l, lid);
+        if (r)
+          GET_ID(r, rid);
         if (lid < 0 || rid < 0) {
           free(rel_offs);
           return -EIO;
@@ -1121,27 +1187,35 @@ int lsti_validate(const lsti_image_t* img) {
       return -EINVAL;
   }
   // Read reserved index headers for blobs/tables
-  uint32_t string_index_bytes = 0, symbol_index_bytes = 0, pattern_index_bytes = 0;
-  const uint8_t* string_payload_base = NULL;
-  const uint8_t* symbol_payload_base = NULL;
-  const uint8_t* pattern_payload_base = NULL;
-  uint32_t       pattern_count = 0;
+  uint32_t       string_index_bytes = 0, symbol_index_bytes = 0, pattern_index_bytes = 0;
+  const uint8_t* string_payload_base        = NULL;
+  const uint8_t* symbol_payload_base        = NULL;
+  const uint8_t* pattern_payload_base       = NULL;
+  uint32_t       pattern_count              = 0;
   uint64_t       pattern_index_header_bytes = 0; // sizeof(u32) + index body size when present
   if (string_blob) {
-    if (string_blob->size < sizeof(uint32_t)) return -EINVAL;
+    if (string_blob->size < sizeof(uint32_t))
+      return -EINVAL;
     memcpy(&string_index_bytes, img->base + (lssize_t)string_blob->file_off, sizeof(uint32_t));
-    if (string_blob->size < (uint64_t)sizeof(uint32_t) + string_index_bytes) return -EINVAL;
-    string_payload_base = img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t) + string_index_bytes;
+    if (string_blob->size < (uint64_t)sizeof(uint32_t) + string_index_bytes)
+      return -EINVAL;
+    string_payload_base =
+        img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t) + string_index_bytes;
     // If index present: [u32 count][(u32 off,u32 len) * count]
     if (string_index_bytes) {
-      if (string_index_bytes < sizeof(uint32_t)) return -EINVAL;
-      const uint8_t* ip = img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t);
-      uint32_t scnt = 0; memcpy(&scnt, ip, sizeof(uint32_t));
-      uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)scnt * (uint64_t)(sizeof(uint32_t) * 2);
-      if ((uint64_t)string_index_bytes < need) return -EINVAL;
-      uint64_t payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
-      const uint8_t* p = ip + sizeof(uint32_t);
-      uint64_t prev_end = 0;
+      if (string_index_bytes < sizeof(uint32_t))
+        return -EINVAL;
+      const uint8_t* ip   = img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t);
+      uint32_t       scnt = 0;
+      memcpy(&scnt, ip, sizeof(uint32_t));
+      uint64_t need =
+          (uint64_t)sizeof(uint32_t) + (uint64_t)scnt * (uint64_t)(sizeof(uint32_t) * 2);
+      if ((uint64_t)string_index_bytes < need)
+        return -EINVAL;
+      uint64_t payload_sz =
+          string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
+      const uint8_t* p        = ip + sizeof(uint32_t);
+      uint64_t       prev_end = 0;
       for (uint32_t i = 0; i < scnt; ++i) {
         uint32_t o = 0, l = 0;
         memcpy(&o, p, sizeof(uint32_t));
@@ -1157,19 +1231,27 @@ int lsti_validate(const lsti_image_t* img) {
     }
   }
   if (symbol_blob) {
-    if (symbol_blob->size < sizeof(uint32_t)) return -EINVAL;
+    if (symbol_blob->size < sizeof(uint32_t))
+      return -EINVAL;
     memcpy(&symbol_index_bytes, img->base + (lssize_t)symbol_blob->file_off, sizeof(uint32_t));
-    if (symbol_blob->size < (uint64_t)sizeof(uint32_t) + symbol_index_bytes) return -EINVAL;
-    symbol_payload_base = img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t) + symbol_index_bytes;
+    if (symbol_blob->size < (uint64_t)sizeof(uint32_t) + symbol_index_bytes)
+      return -EINVAL;
+    symbol_payload_base =
+        img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t) + symbol_index_bytes;
     if (symbol_index_bytes) {
-      if (symbol_index_bytes < sizeof(uint32_t)) return -EINVAL;
-      const uint8_t* ip = img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t);
-      uint32_t ycnt = 0; memcpy(&ycnt, ip, sizeof(uint32_t));
-      uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)ycnt * (uint64_t)(sizeof(uint32_t) * 2);
-      if ((uint64_t)symbol_index_bytes < need) return -EINVAL;
-      uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
-      const uint8_t* p = ip + sizeof(uint32_t);
-      uint64_t prev_end = 0;
+      if (symbol_index_bytes < sizeof(uint32_t))
+        return -EINVAL;
+      const uint8_t* ip   = img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t);
+      uint32_t       ycnt = 0;
+      memcpy(&ycnt, ip, sizeof(uint32_t));
+      uint64_t need =
+          (uint64_t)sizeof(uint32_t) + (uint64_t)ycnt * (uint64_t)(sizeof(uint32_t) * 2);
+      if ((uint64_t)symbol_index_bytes < need)
+        return -EINVAL;
+      uint64_t payload_sz =
+          symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
+      const uint8_t* p        = ip + sizeof(uint32_t);
+      uint64_t       prev_end = 0;
       for (uint32_t i = 0; i < ycnt; ++i) {
         uint32_t o = 0, l = 0;
         memcpy(&o, p, sizeof(uint32_t));
@@ -1185,20 +1267,27 @@ int lsti_validate(const lsti_image_t* img) {
     }
   }
   if (pattern_tab) {
-    if (pattern_tab->size < sizeof(uint32_t)) return -EINVAL; // need at least index header size
+    if (pattern_tab->size < sizeof(uint32_t))
+      return -EINVAL; // need at least index header size
     memcpy(&pattern_index_bytes, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
-  if (pattern_index_bytes) {
+    if (pattern_index_bytes) {
       // index: [u32 count][u64 offs[count]]
-      if (pattern_tab->size < (uint64_t)sizeof(uint32_t) + (uint64_t)pattern_index_bytes) return -EINVAL;
-      if (pattern_index_bytes < sizeof(uint32_t)) return -EINVAL;
+      if (pattern_tab->size < (uint64_t)sizeof(uint32_t) + (uint64_t)pattern_index_bytes)
+        return -EINVAL;
+      if (pattern_index_bytes < sizeof(uint32_t))
+        return -EINVAL;
       const uint8_t* ip = img->base + (lssize_t)pattern_tab->file_off + sizeof(uint32_t);
-      if ((uint64_t)(ip - img->base) + sizeof(uint32_t) > img->size) return -EINVAL;
-      uint32_t pcnt = 0; memcpy(&pcnt, ip, sizeof(uint32_t));
+      if ((uint64_t)(ip - img->base) + sizeof(uint32_t) > img->size)
+        return -EINVAL;
+      uint32_t pcnt = 0;
+      memcpy(&pcnt, ip, sizeof(uint32_t));
       uint64_t need = (uint64_t)sizeof(uint32_t) + (uint64_t)pcnt * (uint64_t)sizeof(uint64_t);
-      if ((uint64_t)pattern_index_bytes < need) return -EINVAL;
+      if ((uint64_t)pattern_index_bytes < need)
+        return -EINVAL;
       // basic bounds on offsets
       const uint64_t* offs = (const uint64_t*)(ip + sizeof(uint32_t));
-      uint64_t header_bytes = (uint64_t)sizeof(uint32_t) + (uint64_t)pattern_index_bytes; // index header + body
+      uint64_t        header_bytes =
+          (uint64_t)sizeof(uint32_t) + (uint64_t)pattern_index_bytes; // index header + body
       for (uint32_t i = 0; i < pcnt; ++i) {
         uint64_t eo = offs[i];
         if (eo < header_bytes || eo >= pattern_tab->size)
@@ -1209,7 +1298,8 @@ int lsti_validate(const lsti_image_t* img) {
       pattern_count              = pcnt;
     } else {
       // legacy: payload starts right after [u32 0] + [u32 count]
-      if (pattern_tab->size < (uint64_t)sizeof(uint32_t) + sizeof(uint32_t)) return -EINVAL;
+      if (pattern_tab->size < (uint64_t)sizeof(uint32_t) + sizeof(uint32_t))
+        return -EINVAL;
       // legacy layout: [u32 0][u32 count][u64 offs[count]] then entries
       const uint8_t* ip = img->base + (lssize_t)pattern_tab->file_off + sizeof(uint32_t);
       memcpy(&pattern_count, ip, sizeof(uint32_t));
@@ -1217,66 +1307,95 @@ int lsti_validate(const lsti_image_t* img) {
                                    (uint64_t)pattern_count * (uint64_t)sizeof(uint64_t);
       if (pattern_tab->size < pattern_index_header_bytes)
         return -EINVAL;
-      pattern_payload_base = img->base + (lssize_t)pattern_tab->file_off + pattern_index_header_bytes;
+      pattern_payload_base =
+          img->base + (lssize_t)pattern_tab->file_off + pattern_index_header_bytes;
     }
   }
   // If PATTERN_TAB present, validate each entry's minimal structure and referenced bounds
   if (pattern_tab && pattern_count > 0) {
-    const uint8_t* pt_section = img->base + (lssize_t)pattern_tab->file_off;
-    const uint64_t*po = NULL;
+    const uint8_t*  pt_section = img->base + (lssize_t)pattern_tab->file_off;
+    const uint64_t* po         = NULL;
     if (pattern_index_bytes) {
       const uint8_t* ip = pt_section + sizeof(uint32_t);
-      po = (const uint64_t*)(ip + sizeof(uint32_t));
+      po                = (const uint64_t*)(ip + sizeof(uint32_t));
     } else {
       const uint8_t* ip = pt_section + sizeof(uint32_t);
-      po = (const uint64_t*)(ip + sizeof(uint32_t));
+      po                = (const uint64_t*)(ip + sizeof(uint32_t));
     }
-    uint64_t s_payload_sz = string_blob ? (string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes) : 0;
-    uint64_t y_payload_sz = symbol_blob ? (symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes) : 0;
+    uint64_t s_payload_sz =
+        string_blob
+            ? (string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes)
+            : 0;
+    uint64_t y_payload_sz =
+        symbol_blob
+            ? (symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes)
+            : 0;
     for (uint32_t i = 0; i < pattern_count; ++i) {
       uint64_t eo = po[i];
       if (eo < pattern_index_header_bytes || eo >= pattern_tab->size)
         return -EINVAL;
-      const uint8_t* ent = pt_section + eo;
-      uint64_t remain = pattern_tab->size - eo;
-      if (remain < 1) return -EINVAL;
-      uint8_t pk = ent[0];
-      const uint8_t* q = ent + 1;
+      const uint8_t* ent    = pt_section + eo;
+      uint64_t       remain = pattern_tab->size - eo;
+      if (remain < 1)
+        return -EINVAL;
+      uint8_t        pk = ent[0];
+      const uint8_t* q  = ent + 1;
       switch (pk) {
       case LSPTYPE_ALGE: {
-        if (remain < 1 + 12) return -EINVAL;
-        uint32_t clen=0, coff=0, argc=0;
-        memcpy(&clen, q, 4); memcpy(&coff, q+4, 4); memcpy(&argc, q+8, 4);
-        if (remain < 1 + 12 + (uint64_t)argc * 4u) return -EINVAL;
-        if (!symbol_blob) return -EINVAL;
-        if ((uint64_t)coff > y_payload_sz || (uint64_t)clen > y_payload_sz || (uint64_t)coff + (uint64_t)clen > y_payload_sz)
+        if (remain < 1 + 12)
+          return -EINVAL;
+        uint32_t clen = 0, coff = 0, argc = 0;
+        memcpy(&clen, q, 4);
+        memcpy(&coff, q + 4, 4);
+        memcpy(&argc, q + 8, 4);
+        if (remain < 1 + 12 + (uint64_t)argc * 4u)
+          return -EINVAL;
+        if (!symbol_blob)
+          return -EINVAL;
+        if ((uint64_t)coff > y_payload_sz || (uint64_t)clen > y_payload_sz ||
+            (uint64_t)coff + (uint64_t)clen > y_payload_sz)
           return -EINVAL;
         // child ids will be validated in thunk phase; here we can't check range against pcnt
         break;
       }
       case LSPTYPE_AS: {
-        if (remain < 1 + 8) return -EINVAL;
-        uint32_t rid=0,iid=0; memcpy(&rid, q, 4); memcpy(&iid, q+4, 4);
-        if (rid >= pattern_count || iid >= pattern_count) return -EINVAL;
+        if (remain < 1 + 8)
+          return -EINVAL;
+        uint32_t rid = 0, iid = 0;
+        memcpy(&rid, q, 4);
+        memcpy(&iid, q + 4, 4);
+        if (rid >= pattern_count || iid >= pattern_count)
+          return -EINVAL;
         break;
       }
       case LSPTYPE_INT: {
-        if (remain < 1 + 8) return -EINVAL; // 64-bit int
+        if (remain < 1 + 8)
+          return -EINVAL; // 64-bit int
         break;
       }
       case LSPTYPE_STR: {
-        if (remain < 1 + 8) return -EINVAL;
-        if (!string_blob) return -EINVAL;
-        uint32_t slen=0, soff=0; memcpy(&slen, q, 4); memcpy(&soff, q+4, 4);
-        if ((uint64_t)soff > s_payload_sz || (uint64_t)slen > s_payload_sz || (uint64_t)soff + (uint64_t)slen > s_payload_sz)
+        if (remain < 1 + 8)
+          return -EINVAL;
+        if (!string_blob)
+          return -EINVAL;
+        uint32_t slen = 0, soff = 0;
+        memcpy(&slen, q, 4);
+        memcpy(&soff, q + 4, 4);
+        if ((uint64_t)soff > s_payload_sz || (uint64_t)slen > s_payload_sz ||
+            (uint64_t)soff + (uint64_t)slen > s_payload_sz)
           return -EINVAL;
         break;
       }
       case LSPTYPE_REF: {
-        if (remain < 1 + 8) return -EINVAL;
-        if (!symbol_blob) return -EINVAL;
-        uint32_t ylen=0, yoff=0; memcpy(&ylen, q, 4); memcpy(&yoff, q+4, 4);
-        if ((uint64_t)yoff > y_payload_sz || (uint64_t)ylen > y_payload_sz || (uint64_t)yoff + (uint64_t)ylen > y_payload_sz)
+        if (remain < 1 + 8)
+          return -EINVAL;
+        if (!symbol_blob)
+          return -EINVAL;
+        uint32_t ylen = 0, yoff = 0;
+        memcpy(&ylen, q, 4);
+        memcpy(&yoff, q + 4, 4);
+        if ((uint64_t)yoff > y_payload_sz || (uint64_t)ylen > y_payload_sz ||
+            (uint64_t)yoff + (uint64_t)ylen > y_payload_sz)
           return -EINVAL;
         break;
       }
@@ -1285,15 +1404,22 @@ int lsti_validate(const lsti_image_t* img) {
         break;
       }
       case LSPTYPE_OR: {
-        if (remain < 1 + 8) return -EINVAL;
-        uint32_t l=0,r=0; memcpy(&l, q, 4); memcpy(&r, q+4, 4);
-        if (l >= pattern_count || r >= pattern_count) return -EINVAL;
+        if (remain < 1 + 8)
+          return -EINVAL;
+        uint32_t l = 0, r = 0;
+        memcpy(&l, q, 4);
+        memcpy(&r, q + 4, 4);
+        if (l >= pattern_count || r >= pattern_count)
+          return -EINVAL;
         break;
       }
       case LSPTYPE_CARET: {
-        if (remain < 1 + 4) return -EINVAL;
-        uint32_t i0=0; memcpy(&i0, q, 4);
-        if (i0 >= pattern_count) return -EINVAL;
+        if (remain < 1 + 4)
+          return -EINVAL;
+        uint32_t i0 = 0;
+        memcpy(&i0, q, 4);
+        if (i0 >= pattern_count)
+          return -EINVAL;
         break;
       }
       default:
@@ -1310,21 +1436,28 @@ int lsti_validate(const lsti_image_t* img) {
       memcpy(&aorl, ent + 4, sizeof(uint32_t));
       memcpy(&extra, ent + 8, sizeof(uint32_t));
       // basic header size must fit
-      if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t))
+      if (thunk_tab->size - offs[i] < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) +
+                                          sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t))
         return -EINVAL;
       switch (kind) {
       case LSTB_KIND_STR: {
-        if (!string_blob) return -EINVAL;
-        uint64_t payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
+        if (!string_blob)
+          return -EINVAL;
+        uint64_t payload_sz =
+            string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > payload_sz || len > payload_sz || off + len > payload_sz) return -EINVAL;
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
+          return -EINVAL;
         break;
       }
       case LSTB_KIND_SYMBOL: {
-        if (!symbol_blob) return -EINVAL;
-        uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
+        if (!symbol_blob)
+          return -EINVAL;
+        uint64_t payload_sz =
+            symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > payload_sz || len > payload_sz || off + len > payload_sz) return -EINVAL;
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
+          return -EINVAL;
         break;
       }
       case LSTB_KIND_INT: {
@@ -1332,74 +1465,111 @@ int lsti_validate(const lsti_image_t* img) {
         break;
       }
       case LSTB_KIND_REF: {
-        if (!symbol_blob) return -EINVAL;
-        uint64_t payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
+        if (!symbol_blob)
+          return -EINVAL;
+        uint64_t payload_sz =
+            symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)aorl;
-        if (off > payload_sz || len > payload_sz || off + len > payload_sz) return -EINVAL;
+        if (off > payload_sz || len > payload_sz || off + len > payload_sz)
+          return -EINVAL;
         break;
       }
       case LSTB_KIND_LAMBDA: {
-        if (!pattern_tab) return -EINVAL;
+        if (!pattern_tab)
+          return -EINVAL;
         uint32_t pid = 0, bid = 0;
         memcpy(&pid, ent + 4, sizeof(uint32_t));
         memcpy(&bid, ent + 8, sizeof(uint32_t));
-        if (pid >= pattern_count || bid >= ncnt) return -EINVAL;
+        if (pid >= pattern_count || bid >= ncnt)
+          return -EINVAL;
         break;
       }
       case LSTB_KIND_ALGE: {
-        if (!symbol_blob) return -EINVAL;
+        if (!symbol_blob)
+          return -EINVAL;
         uint64_t have = thunk_tab->size - offs[i];
-        uint64_t need = (uint64_t)sizeof(uint32_t) /*constr_len*/ + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
-        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + need)
+        uint64_t need =
+            (uint64_t)sizeof(uint32_t) /*constr_len*/ + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) +
+                       sizeof(uint32_t) + sizeof(uint32_t) + need)
           return -EINVAL;
         // check constructor bytes within symbol payload
-        uint32_t constr_len = 0; memcpy(&constr_len, ent + 12, sizeof(uint32_t));
-        uint64_t y_payload_sz = symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
+        uint32_t constr_len = 0;
+        memcpy(&constr_len, ent + 12, sizeof(uint32_t));
+        uint64_t y_payload_sz =
+            symbol_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)symbol_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)constr_len;
-        if (off > y_payload_sz || len > y_payload_sz || off + len > y_payload_sz) return -EINVAL;
+        if (off > y_payload_sz || len > y_payload_sz || off + len > y_payload_sz)
+          return -EINVAL;
         // child ids in-range
         const uint8_t* p = ent + 12 + 4;
         for (uint32_t j = 0; j < aorl; ++j) {
-          uint32_t idj = 0; memcpy(&idj, p, sizeof(uint32_t)); p += 4;
-          if (idj >= ncnt) return -EINVAL;
+          uint32_t idj = 0;
+          memcpy(&idj, p, sizeof(uint32_t));
+          p += 4;
+          if (idj >= ncnt)
+            return -EINVAL;
         }
         break;
       }
       case LSTB_KIND_BOTTOM: {
-        if (!string_blob) return -EINVAL;
-        uint64_t have = thunk_tab->size - offs[i];
-        uint64_t need = (uint64_t)sizeof(uint32_t) /*msg_len*/ + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
-        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + need)
+        if (!string_blob)
           return -EINVAL;
-        uint32_t msg_len = 0; memcpy(&msg_len, ent + 12, sizeof(uint32_t));
-        uint64_t s_payload_sz = string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
+        uint64_t have = thunk_tab->size - offs[i];
+        uint64_t need =
+            (uint64_t)sizeof(uint32_t) /*msg_len*/ + (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) +
+                       sizeof(uint32_t) + sizeof(uint32_t) + need)
+          return -EINVAL;
+        uint32_t msg_len = 0;
+        memcpy(&msg_len, ent + 12, sizeof(uint32_t));
+        uint64_t s_payload_sz =
+            string_blob->size - (uint64_t)sizeof(uint32_t) - (uint64_t)string_index_bytes;
         uint64_t off = (uint64_t)extra, len = (uint64_t)msg_len;
-        if (off > s_payload_sz || len > s_payload_sz || off + len > s_payload_sz) return -EINVAL;
+        if (off > s_payload_sz || len > s_payload_sz || off + len > s_payload_sz)
+          return -EINVAL;
         const uint8_t* p = ent + 12 + 4;
         for (uint32_t j = 0; j < aorl; ++j) {
-          uint32_t idj = 0; memcpy(&idj, p, sizeof(uint32_t)); p += 4;
-          if (idj >= ncnt) return -EINVAL;
+          uint32_t idj = 0;
+          memcpy(&idj, p, sizeof(uint32_t));
+          p += 4;
+          if (idj >= ncnt)
+            return -EINVAL;
         }
         break;
       }
       case LSTB_KIND_APPL: {
         uint64_t need = (uint64_t)aorl * (uint64_t)sizeof(uint32_t);
         uint64_t have = thunk_tab->size - offs[i];
-        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + need)
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) +
+                       sizeof(uint32_t) + sizeof(uint32_t) + need)
           return -EINVAL;
-        if (extra >= ncnt) return -EINVAL; // func_id
+        if (extra >= ncnt)
+          return -EINVAL; // func_id
         const uint8_t* p = ent + 12;
-        for (uint32_t j = 0; j < aorl; ++j) { uint32_t idj = 0; memcpy(&idj, p, sizeof(uint32_t)); p += 4; if (idj >= ncnt) return -EINVAL; }
+        for (uint32_t j = 0; j < aorl; ++j) {
+          uint32_t idj = 0;
+          memcpy(&idj, p, sizeof(uint32_t));
+          p += 4;
+          if (idj >= ncnt)
+            return -EINVAL;
+        }
         break;
       }
       case LSTB_KIND_CHOICE: {
-        if (aorl < 1 || aorl > 3) return -EINVAL;
+        if (aorl < 1 || aorl > 3)
+          return -EINVAL;
         uint64_t need = 2u * (uint64_t)sizeof(uint32_t);
         uint64_t have = thunk_tab->size - offs[i];
-        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + need)
+        if (have < (uint64_t)sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) +
+                       sizeof(uint32_t) + sizeof(uint32_t) + need)
           return -EINVAL;
-        const uint8_t* p = ent + 12; uint32_t lid = 0, rid = 0; memcpy(&lid, p, sizeof(uint32_t)); memcpy(&rid, p + 4, sizeof(uint32_t));
-        if (lid >= ncnt || rid >= ncnt) return -EINVAL;
+        const uint8_t* p   = ent + 12;
+        uint32_t       lid = 0, rid = 0;
+        memcpy(&lid, p, sizeof(uint32_t));
+        memcpy(&rid, p + 4, sizeof(uint32_t));
+        if (lid >= ncnt || rid >= ncnt)
+          return -EINVAL;
         break;
       }
       default:
@@ -1450,10 +1620,10 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   if (!nodes)
     return -ENOMEM;
   typedef struct {
-    uint8_t   kind;   // 0=none,1=ALGE,2=BOTTOM,3=APPL,4=CHOICE
-    lssize_t  argc;   // ALGE/BOTTOM/APP: number of IDs in ids[]; CHOICE: 2
-    uint32_t* ids;    // children ids (APP=args; CHOICE=[left,right])
-    uint32_t  extra;  // APP=function id
+    uint8_t   kind;  // 0=none,1=ALGE,2=BOTTOM,3=APPL,4=CHOICE
+    lssize_t  argc;  // ALGE/BOTTOM/APP: number of IDs in ids[]; CHOICE: 2
+    uint32_t* ids;   // children ids (APP=args; CHOICE=[left,right])
+    uint32_t  extra; // APP=function id
   } pend_t;
   pend_t* pend = (pend_t*)calloc(ncnt, sizeof(pend_t));
   if (!pend) {
@@ -1464,20 +1634,23 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   const char* sbase = NULL;
   const char* ybase = NULL;
   if (string_blob) {
-    uint32_t ib = 0; memcpy(&ib, img->base + (lssize_t)string_blob->file_off, sizeof(uint32_t));
+    uint32_t ib = 0;
+    memcpy(&ib, img->base + (lssize_t)string_blob->file_off, sizeof(uint32_t));
     sbase = (const char*)(img->base + (lssize_t)string_blob->file_off + sizeof(uint32_t) + ib);
   }
   if (symbol_blob) {
-    uint32_t ib = 0; memcpy(&ib, img->base + (lssize_t)symbol_blob->file_off, sizeof(uint32_t));
+    uint32_t ib = 0;
+    memcpy(&ib, img->base + (lssize_t)symbol_blob->file_off, sizeof(uint32_t));
     ybase = (const char*)(img->base + (lssize_t)symbol_blob->file_off + sizeof(uint32_t) + ib);
   }
   // parse pattern table if present
-  uint32_t       pcnt = 0;
-  const uint8_t* pt   = NULL;
-  const uint64_t*po   = NULL;
-  const uint8_t* pt_section = NULL; // section base (for entry offsets)
+  uint32_t        pcnt       = 0;
+  const uint8_t*  pt         = NULL;
+  const uint64_t* po         = NULL;
+  const uint8_t*  pt_section = NULL; // section base (for entry offsets)
   if (pattern_tab) {
-    uint32_t ib = 0; memcpy(&ib, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
+    uint32_t ib = 0;
+    memcpy(&ib, img->base + (lssize_t)pattern_tab->file_off, sizeof(uint32_t));
     pt_section = img->base + (lssize_t)pattern_tab->file_off;
     if (ib) {
       // index area contains [u32 count][u64 offs[count]]; payload after header+ib
@@ -1495,7 +1668,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
   for (uint32_t i = 0; i < ncnt; ++i) {
     const uint8_t* ent  = tt + offs[i];
     uint8_t        kind = ent[0];
-  switch (kind) {
+    switch (kind) {
     case LSTB_KIND_INT: {
       uint32_t val = 0;
       memcpy(&val, ent + 8, sizeof(uint32_t));
@@ -1510,8 +1683,8 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       uint32_t len = 0, off = 0;
       memcpy(&len, ent + 4, sizeof(uint32_t));
       memcpy(&off, ent + 8, sizeof(uint32_t));
-      const lsstr_t* s    = lsstr_new(sbase + off, (lssize_t)len);
-      nodes[i]            = lsthunk_new_str(s);
+      const lsstr_t* s = lsstr_new(sbase + off, (lssize_t)len);
+      nodes[i]         = lsthunk_new_str(s);
       break;
     }
     case LSTB_KIND_SYMBOL: {
@@ -1522,8 +1695,8 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       uint32_t len = 0, off = 0;
       memcpy(&len, ent + 4, sizeof(uint32_t));
       memcpy(&off, ent + 8, sizeof(uint32_t));
-      const lsstr_t* s    = lsstr_new(ybase + off, (lssize_t)len);
-      nodes[i]            = lsthunk_new_symbol(s);
+      const lsstr_t* s = lsstr_new(ybase + off, (lssize_t)len);
+      nodes[i]         = lsthunk_new_symbol(s);
       break;
     }
     case LSTB_KIND_ALGE: {
@@ -1613,9 +1786,9 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
         free(nodes);
         return -ENOMEM;
       }
-      nodes[i]     = t;
-      pend[i].kind = 3;
-      pend[i].argc = (lssize_t)argc;
+      nodes[i]      = t;
+      pend[i].kind  = 3;
+      pend[i].argc  = (lssize_t)argc;
       pend[i].extra = fid;
       if (argc > 0) {
         pend[i].ids = (uint32_t*)malloc(sizeof(uint32_t) * (size_t)argc);
@@ -1639,7 +1812,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       // aorl=choice_kind; payload: left,right ids
       uint32_t ck = 0;
       memcpy(&ck, ent + 4, sizeof(uint32_t));
-      const uint8_t* p = ent + 12;
+      const uint8_t* p   = ent + 12;
       uint32_t       lid = 0, rid = 0;
       memcpy(&lid, p, sizeof(uint32_t));
       memcpy(&rid, p + 4, sizeof(uint32_t));
@@ -1649,10 +1822,10 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
         free(nodes);
         return -ENOMEM;
       }
-      nodes[i]      = t;
-      pend[i].kind  = 4;
-      pend[i].argc  = 2;
-      pend[i].ids   = (uint32_t*)malloc(sizeof(uint32_t) * 2);
+      nodes[i]     = t;
+      pend[i].kind = 4;
+      pend[i].argc = 2;
+      pend[i].ids  = (uint32_t*)malloc(sizeof(uint32_t) * 2);
       if (!pend[i].ids) {
         free(pend);
         free(nodes);
@@ -1672,9 +1845,9 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       uint32_t len = 0, off = 0;
       memcpy(&len, ent + 4, sizeof(uint32_t));
       memcpy(&off, ent + 8, sizeof(uint32_t));
-  const lsstr_t* s    = lsstr_new(ybase + off, (lssize_t)len);
-      const lsref_t* r    = lsref_new(s, lstrace_take_pending_or_unknown());
-      nodes[i]            = lsthunk_new_ref(r, prelude_env);
+      const lsstr_t* s = lsstr_new(ybase + off, (lssize_t)len);
+      const lsref_t* r = lsref_new(s, lstrace_take_pending_or_unknown());
+      nodes[i]         = lsthunk_new_ref(r, prelude_env);
       break;
     }
     case LSTB_KIND_BUILTIN: {
@@ -1688,9 +1861,9 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
       uint32_t len = 0, off = 0;
       memcpy(&len, ent + 4, sizeof(uint32_t));
       memcpy(&off, ent + 8, sizeof(uint32_t));
-  const lsstr_t* s    = lsstr_new(ybase + off, (lssize_t)len);
-      const lsref_t* r    = lsref_new(s, lstrace_take_pending_or_unknown());
-      nodes[i]            = lsthunk_new_ref(r, prelude_env);
+      const lsstr_t* s = lsstr_new(ybase + off, (lssize_t)len);
+      const lsref_t* r = lsref_new(s, lstrace_take_pending_or_unknown());
+      nodes[i]         = lsthunk_new_ref(r, prelude_env);
       break;
     }
     case LSTB_KIND_LAMBDA: {
@@ -1709,11 +1882,11 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
         return -EINVAL;
       }
       // decode pattern entry at pt+po[pid]
-  const uint8_t* pp = pt_section + po[pid];
+      const uint8_t* pp = pt_section + po[pid];
       uint8_t        pk = pp[0];
       // recursive lambda to decode pattern by index
       // We'll cache decoded patterns by index for potential sharing
-      static lstpat_t** pdec = NULL;
+      static lstpat_t** pdec     = NULL;
       static uint32_t   pdec_cap = 0;
       if (pdec_cap < pcnt) {
         pdec = (lstpat_t**)realloc(pdec, sizeof(lstpat_t*) * pcnt);
@@ -1728,7 +1901,7 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
           return NULL;
         if (pdec && pdec[idx])
           return pdec[idx];
-  const uint8_t* ppe = pt_section + po[idx];
+        const uint8_t* ppe  = pt_section + po[idx];
         uint8_t        kind = ppe[0];
         ppe++;
         switch (kind) {
@@ -1739,8 +1912,8 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
           memcpy(&argc, ppe + 8, 4);
           ppe += 12;
           const lsstr_t* constr = lsstr_new(ybase + coff, (lssize_t)clen);
-          lstpat_t*      args = NULL;
-          lstpat_t**     argp = NULL;
+          lstpat_t*      args   = NULL;
+          lstpat_t**     argp   = NULL;
           if (argc > 0) {
             argp = (lstpat_t**)malloc(sizeof(lstpat_t*) * argc);
             for (uint32_t j = 0; j < argc; ++j) {
@@ -1790,8 +1963,8 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
           uint32_t ylen = 0, yoff = 0;
           memcpy(&ylen, ppe, 4);
           memcpy(&yoff, ppe + 4, 4);
-          const lsstr_t* s  = lsstr_new(ybase + yoff, (lssize_t)ylen);
-          const lsref_t* rr = lsref_new(s, lstrace_take_pending_or_unknown());
+          const lsstr_t* s   = lsstr_new(ybase + yoff, (lssize_t)ylen);
+          const lsref_t* rr  = lsref_new(s, lstrace_take_pending_or_unknown());
           lstpat_t*      ret = lstpat_new_ref(rr);
           if (pdec)
             pdec[idx] = ret;
@@ -1825,19 +1998,19 @@ int lsti_materialize(const lsti_image_t* img, struct lsthunk*** out_roots, lssiz
         }
       }
       // assign function pointer to call recursive impl
-      decode = &decode_impl;
+      decode          = &decode_impl;
       lstpat_t* param = decode(pid);
       if (!param) {
         free(pend);
         free(nodes);
         return -EINVAL;
       }
-  // Allocate lambda thunk via internal-friendly API
-  lsthunk_t* lam = lsthunk_alloc_lambda(param);
-      nodes[i]                 = lam;
-      pend[i].kind             = 5; // lambda pending body
-      pend[i].argc             = 1;
-      pend[i].ids              = (uint32_t*)malloc(sizeof(uint32_t));
+      // Allocate lambda thunk via internal-friendly API
+      lsthunk_t* lam = lsthunk_alloc_lambda(param);
+      nodes[i]       = lam;
+      pend[i].kind   = 5; // lambda pending body
+      pend[i].argc   = 1;
+      pend[i].ids    = (uint32_t*)malloc(sizeof(uint32_t));
       if (!pend[i].ids) {
         free(pend);
         free(nodes);

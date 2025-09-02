@@ -50,4 +50,5 @@ int                lstr_validate(const lstr_prog_t* p);
 const lstr_prog_t* lstr_from_lsti_path(const char* path);
 
 // Convert LSTR program to runtime thunks (roots)
-int lstr_materialize_to_thunks(const lstr_prog_t* p, lsthunk_t*** out_roots, lssize_t* out_rootc, lstenv_t* env);
+int lstr_materialize_to_thunks(const lstr_prog_t* p, lsthunk_t*** out_roots, lssize_t* out_rootc,
+                               lstenv_t* env);
