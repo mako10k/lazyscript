@@ -389,8 +389,6 @@ expr4:
   | eappl { $$ = lsexpr_with_loc(lsexpr_new_appl($1), @$); }
   | ealge { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
   | lamchain { $$ = $1; }
-  /* Grouped lambda-choice: allow ( \x -> a | \y -> b ) as a single expression */
-  | '(' lamchain ')' { $$ = $2; }
     ;
 
 ealge:
@@ -421,6 +419,8 @@ efact:
     }
   | elist { $$ = lsexpr_with_loc(lsexpr_new_alge($1), @$); }
   | closure { $$ = lsexpr_with_loc(lsexpr_new_closure($1), @$); }
+  /* Grouped lambda-choice as an atomic factor so it can be applied: ( \x -> a | \y -> b ) */
+  | '(' lamchain ')' { $$ = $2; }
   | LSTCARET '(' expr ')' {
         // ^(Expr): dedicated AST node; runtime constructs Bottom from the value of Expr
         $$ = lsexpr_with_loc(lsexpr_new_raise($3), @$);

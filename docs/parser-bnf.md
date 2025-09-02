@@ -60,7 +60,6 @@
                   | <eappl>
                   | <ealge>
                   | <lamchain>
-                  | '(' <lamchain> ')'
 /* efact: 基本要素 */
 <efact> ::= LSTINT
          | LSTSTR
@@ -71,6 +70,7 @@
          | <elist>
          | <closure>
          | <elambda>
+         | '(' <lamchain> ')'
          | '!' '{' <dostmts> '}'
          | '{' <nslit_entries> '}'
 
@@ -171,7 +171,7 @@
          - パターン側: `^(<pat>)` は Bottom 値にのみマッチする特殊パターン。
          - 式側: `^(<expr>)` は Bottom を構築する（専用 AST ノードを生成して評価時に構築）。
          - 仕様詳細は `docs/spec/bottom-and-caret.md` を参照。
-- 2025-09: ラムダ選択鎖の括弧によるグルーピングを許可（`( \x -> a | \y -> b )` を1つの式として扱う）。
+- 2025-09: ラムダ選択鎖の括弧によるグルーピングを原子式として扱い、適用可能にした（`( \\x -> a | \\y -> b ) v` など）。
 
 ## 参照
 - 元ソース: `src/parser/parser.y`
