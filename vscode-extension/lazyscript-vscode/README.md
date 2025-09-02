@@ -2,8 +2,8 @@
 
 Features:
 - Syntax highlighting for `.ls`
-- Diagnostics using `lazyscript` (parse errors inline)
-- Formatting using `lazyscript_format`
+- Diagnostics using `lsi` (parse errors inline)
+- Formatting using `lsi-fmt`
 
 ## Quick start
 1) Open this folder in VS Code: `vscode-extension/lazyscript-vscode`
@@ -17,13 +17,13 @@ code --extensionDevelopmentPath /absolute/path/to/vscode-extension/lazyscript-vs
 ```
 
 ## Settings
-- `lazyscript.lazyscriptPath` (default: `lazyscript`)
-- `lazyscript.formatterPath` (default: `lazyscript_format`)
+- `lazyscript.lazyscriptPath` (default: `lsi`)
+- `lazyscript.formatterPath` (default: `lsi-fmt`)
 - `lazyscript.diagnostics.debounceMs` (default: 300)
 
 ## How it works
-- Diagnostics: runs the configured `lazyscript` binary on a temp file snapshot of the document and parses messages like `file:line.col-...: syntax error ...` into diagnostics.
-- Formatting: runs `lazyscript_format` on a temp file containing the document and replaces the content with its stdout.
+- Diagnostics: runs the configured `lsi` binary on a temp file snapshot of the document and parses messages like `file:line.col-...: syntax error ...` into diagnostics.
+- Formatting: runs `lsi-fmt` on a temp file containing the document and replaces the content with its stdout.
 
 ## Notes
 - Ensure your `PATH` has the binaries or set absolute paths via settings.

@@ -2,7 +2,7 @@
   "name": "lazyscript-vscode",
   "displayName": "LazyScript",
   "description": "Syntax highlighting, diagnostics, and formatting for LazyScript (.ls)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "local-dev",
   "engines": {
     "vscode": "^1.85.0"
@@ -31,13 +31,13 @@
       "properties": {
         "lazyscript.lazyscriptPath": {
           "type": "string",
-          "default": "lazyscript",
-          "description": "Path to lazyscript executable (for error diagnostics)."
+          "default": "lsi",
+          "description": "Path to lsi executable (for error diagnostics)."
         },
         "lazyscript.formatterPath": {
           "type": "string",
-          "default": "lazyscript_format",
-          "description": "Path to lazyscript_format executable (for formatting)."
+          "default": "lsi-fmt",
+          "description": "Path to lsi-fmt executable (for formatting)."
         },
         "lazyscript.diagnostics.debounceMs": {
           "type": "number",
