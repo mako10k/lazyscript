@@ -1,6 +1,6 @@
 # tests
 
-This directory contains the test suite for lazyscript.
+This directory contains the test suite for lazyscript (binary: lsi).
 
 Structure (current + planned):
 - Flat files tXX_*.ls with matching expectations (current)

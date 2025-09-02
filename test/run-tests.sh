@@ -4,11 +4,11 @@
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$DIR/.." && pwd)"
-BIN="$ROOT/src/lazyscript"
-FMT_BIN="$ROOT/src/lazyscript_format"
+BIN="$ROOT/src/lsi"
+FMT_BIN="$ROOT/src/lsi-fmt"
 
 if [[ ! -x "$BIN" ]]; then
-  echo "E: lazyscript binary not found: $BIN" >&2
+  echo "E: lsi binary not found: $BIN" >&2
   exit 1
 fi
 

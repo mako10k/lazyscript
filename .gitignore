@@ -54,13 +54,19 @@ src/parser/parser.output
 ############################################
 # Built binaries (not tracked)             #
 ############################################
+src/lsi
+src/lsi-fmt
+src/lsi-lsti
+src/lsi-lstr-dump
+src/lsi-lstr-rt
+src/lsi-emit-llvm
+# old names (kept ignored to avoid accidental add)
 src/lazyscript
 src/lazyscript_format
 src/lslsti_check
 src/lslstr_dump
 src/lslstr_roundtrip
 src/lstr_to_llvmir
-# old name (kept ignored to avoid accidental add)
 src/lslstr_to_llvmir
 # legacy/retired tools
 src/lazyscriptc
@@ -101,6 +107,6 @@ logs/
 ############################################
 # Local LSTI/LSTR tooling scratch          #
 ############################################
-_tmp_test*.lsti
-_tmp_rt.lsti
+_tmp_*.lsti
+_tmp_*.rt
 .github/user-instruction/
