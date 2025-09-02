@@ -31,3 +31,13 @@ r92_parse_nonlambda_bar_invalid
 
 # stdlib requires updated List impl formatting — temporarily skip until adjusted
 stdlib/t21_list_lib_req
+
+# Obsolete Core IR tests (coreir retired)
+coreir/t06_coreir_ifthenelse
+coreir/t07_coreir_effect
+coreir/t08_coreir_chain
+coreir/t09_coreir_return
+coreir/t11_coreir_match_no_case
+# Top-level legacy coreir tests
+t10_coreir_nslit
+t84_choice_coreir_dump

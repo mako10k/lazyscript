@@ -14,7 +14,6 @@ Structure (current + planned):
 Conventions:
 - For an interpreter test, create <name>.ls and <name>.out with exact expected stdout+stderr.
 - For eval(-e) tests, add <name>.eval.out.
-- For Core IR dump tests, add <name>.coreir.out.
 - Optional: <name>.env to inject env vars (key=value per line) for that test.
 - Optional: <name>.trace.out turns on eager stack printing to stabilize traces.
 
