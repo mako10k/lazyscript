@@ -5,6 +5,8 @@
 #include "common/str.h"
 #include <ctype.h>
 #include <string.h>
+#include <getopt.h>
+#include "lazyscript.h"
 
 // Minimal LSTR -> LLVM IR (text) emitter
 // - Input: LSTI image path (default: ./_tmp_test.lsti)
@@ -116,15 +118,63 @@ static void emit_ir_main_bind_sym_and_ret0(FILE* out, const char* reg, const cha
 }
 
 int main(int argc, char** argv){
-  const char* path = (argc > 1) ? argv[1] : "./_tmp_test.lsti";
+  const char* input_path = "./_tmp_test.lsti";
+  const char* output_path = NULL; // stdout by default
   long root_index = 0;
-  if (argc > 2) {
-    char *end=NULL; long v = strtol(argv[2], &end, 10);
+
+  // CLI: -i/--input, -o/--output, -r/--root, -h/--help, -v/--version
+  int opt;
+  struct option longopts[] = {
+    { "input", required_argument, NULL, 'i' },
+    { "output", required_argument, NULL, 'o' },
+    { "root", required_argument, NULL, 'r' },
+    { "help", no_argument, NULL, 'h' },
+    { "version", no_argument, NULL, 'v' },
+    { NULL, 0, NULL, 0 },
+  };
+  while ((opt = getopt_long(argc, argv, "i:o:r:hv", longopts, NULL)) != -1) {
+    switch (opt) {
+      case 'i': input_path = optarg; break;
+      case 'o': output_path = optarg; break;
+      case 'r': {
+        char *end=NULL; long v = strtol(optarg, &end, 10);
+        if (end && *end=='\0' && v >= 0) root_index = v;
+        else { fprintf(stderr, "invalid --root value: %s\n", optarg); return 1; }
+        break;
+      }
+      case 'h':
+        printf("Usage: %s [-i FILE] [-r INDEX] [-o FILE]\n", argv[0]);
+        printf("  -i, --input FILE    LSTI input file (default: ./_tmp_test.lsti)\n");
+        printf("  -r, --root INDEX    root index to inspect (default: 0)\n");
+        printf("  -o, --output FILE   write LLVM IR to FILE instead of stdout\n");
+        printf("  -h, --help          show this help and exit\n");
+        printf("  -v, --version       print version and exit\n");
+        return 0;
+      case 'v':
+        printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+        return 0;
+      default:
+        fprintf(stderr, "Try --help for usage.\n");
+        return 1;
+    }
+  }
+  // Backward-compat positional args: [INPUT [ROOT_INDEX]] if provided
+  if (optind < argc) {
+    input_path = argv[optind++];
+  }
+  if (optind < argc) {
+    char *end=NULL; long v = strtol(argv[optind++], &end, 10);
     if (end && *end=='\0' && v >= 0) root_index = v;
   }
-  const lstr_prog_t* p = lstr_from_lsti_path(path);
+
+  FILE* outfp = stdout;
+  if (output_path && strcmp(output_path, "-") != 0) {
+    outfp = fopen(output_path, "w");
+    if (!outfp) { perror(output_path); return 1; }
+  }
+  const lstr_prog_t* p = lstr_from_lsti_path(input_path);
   if(!p){
-    fprintf(stderr, "failed: lstr_from_lsti_path(%s)\n", path);
+    fprintf(stderr, "failed: lstr_from_lsti_path(%s)\n", input_path);
     return 1;
   }
   if(lstr_validate(p)!=0){
@@ -138,20 +188,20 @@ int main(int argc, char** argv){
     fprintf(stderr, "materialize failed\n");
     return 3;
   }
-  emit_ir_prelude(stdout);
+  emit_ir_prelude(outfp);
   if(rootc > 0 && roots && root_index < rootc && roots[root_index]){
     lsthunk_t* r0 = roots[root_index];
     switch(lsthunk_get_type(r0)){
       case LSTTYPE_INT: {
         const lsint_t* iv = lsthunk_get_int(r0);
         int retv = iv ? lsint_get(iv) : 0;
-        emit_ir_main_ret_i32(stdout, retv);
+        emit_ir_main_ret_i32(outfp, retv);
         break;
       }
       case LSTTYPE_ALGE: {
         // 純ADT方針: タグの解釈を行わず、現段階ではコード生成を行わない
         // 将来的にタグ付きユニオン構築/比較の表現を追加する
-        emit_ir_main_ret_i32(stdout, 0);
+        emit_ir_main_ret_i32(outfp, 0);
         break;
       }
       case LSTTYPE_SYMBOL: {
@@ -169,38 +219,39 @@ int main(int argc, char** argv){
           char gname[300]; snprintf(gname, sizeof gname, "sym.%s", labelbuf);
           char reg[300]; snprintf(reg, sizeof reg, "sym.%s", labelbuf);
           // Emit global for symbol text
-          emit_ir_global_named_str(stdout, gname, text, textn);
+          emit_ir_global_named_str(outfp, gname, text, textn);
           // Bind pointer in main and return 0
-          emit_ir_main_bind_sym_and_ret0(stdout, reg, gname, textn);
+          emit_ir_main_bind_sym_and_ret0(outfp, reg, gname, textn);
           break;
         }
-        emit_ir_main_ret_i32(stdout, 0);
+        emit_ir_main_ret_i32(outfp, 0);
         break;
       }
       case LSTTYPE_STR: {
         const lsstr_t* sv = lsthunk_get_str(r0);
         const char* s = sv ? lsstr_get_buf(sv) : "";
         size_t n = sv ? (size_t)lsstr_get_len(sv) : 0;
-        emit_ir_decl_puts(stdout);
-        emit_ir_global_str(stdout, s, n);
-        emit_ir_main_puts(stdout, n);
+        emit_ir_decl_puts(outfp);
+        emit_ir_global_str(outfp, s, n);
+        emit_ir_main_puts(outfp, n);
         break;
       }
       case LSTTYPE_REF: {
         // 現段階ではREFは外部関数にマップせず、薄いラッパとして0を返す
-        emit_ir_main_ret_i32(stdout, 0);
+        emit_ir_main_ret_i32(outfp, 0);
         break;
       }
       case LSTTYPE_APPL: {
         // 現段階ではAPPLも呼出しを生成せず、薄いラッパ（0を返す）
-        emit_ir_main_ret_i32(stdout, 0);
+        emit_ir_main_ret_i32(outfp, 0);
         break;
       }
       default:
-        emit_ir_main_ret_i32(stdout, 0);
+        emit_ir_main_ret_i32(outfp, 0);
     }
   } else {
-    emit_ir_main_ret_i32(stdout, 0);
+    emit_ir_main_ret_i32(outfp, 0);
   }
+  if (outfp && outfp != stdout) fclose(outfp);
   return 0;
 }

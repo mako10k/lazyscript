@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h>
+#include "lazyscript.h"
 #include "lstr/lstr.h"
 #include "thunk/lsti.h"
 #include "thunk/thunk.h"
@@ -27,13 +29,42 @@ static int dump_lstr_to_mem(const char* path, char** out_str, size_t* out_len){
 }
 
 int main(int argc, char** argv){
-  const char* in = (argc>1) ? argv[1] : "./_tmp_test.lsti";
+  const char* in = "./_tmp_test.lsti";
+  const char* out_path = "./_tmp_rt.lsti";
+  int cli_opt;
+  struct option longopts[] = {
+    { "input", required_argument, NULL, 'i' },
+    { "output", required_argument, NULL, 'o' },
+    { "help", no_argument, NULL, 'h' },
+    { "version", no_argument, NULL, 'v' },
+    { NULL, 0, NULL, 0 },
+  };
+  while ((cli_opt = getopt_long(argc, argv, "i:o:hv", longopts, NULL)) != -1) {
+    switch (cli_opt) {
+      case 'i': in = optarg; break;
+      case 'o': out_path = optarg; break;
+      case 'h':
+        printf("Usage: %s [-i FILE] [-o FILE]\n", argv[0]);
+        printf("  -i, --input FILE    input LSTI file (default: ./_tmp_test.lsti)\n");
+        printf("  -o, --output FILE   output LSTI file for roundtrip (default: ./_tmp_rt.lsti)\n");
+        printf("  -h, --help          show this help and exit\n");
+        printf("  -v, --version       print version and exit\n");
+        return 0;
+      case 'v':
+        printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+        return 0;
+      default:
+        fprintf(stderr, "Try --help for usage.\n");
+        return 1;
+    }
+  }
+  if (optind < argc) in = argv[optind++];
   const lstr_prog_t* prog = lstr_from_lsti_path(in);
   if (!prog){ fprintf(stderr, "fail: lstr_from_lsti_path(%s)\n", in); return 2; }
   if (lstr_validate(prog)!=0){ fprintf(stderr, "invalid LSTR\n"); return 3; }
   lsthunk_t** roots=NULL; lssize_t rootc=0; lstenv_t* env = lstenv_new(NULL);
   if (lstr_materialize_to_thunks(prog, &roots, &rootc, env)!=0){ fprintf(stderr, "fail: to_thunks\n"); return 4; }
-  const char* out = "./_tmp_rt.lsti";
+  const char* out = out_path;
   FILE* fp = fopen(out, "wb"); if(!fp){ perror("fopen"); return 5; }
   lsti_write_opts_t opt = { .align_log2 = LSTI_ALIGN_8, .flags = 0 };
   int rc = lsti_write(fp, roots, rootc, &opt); fclose(fp); if(rc!=0){ fprintf(stderr, "lsti_write rc=%d\n", rc); return 6; }
