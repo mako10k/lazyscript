@@ -14,7 +14,7 @@
     ~go ~xs;
     ~go = (
       \[] -> [] |
-      \(~h : ~rest) -> (((\true  -> (~h : (~go ~rest))) | (\false -> (~go ~rest))) ((~p ~h)))
+      \(~h : ~rest) -> ((\true  -> (~h : (~go ~rest)) | \false -> (~go ~rest)) ((~p ~h)))
     )
   );
 
@@ -29,7 +29,7 @@
   .reverse = \~xs -> (
     ~go [] ~xs;
     ~go = (\~acc -> \~zs -> (
-      ((\[] -> ~acc) | (\(~h : ~rest) -> (~go (~h : ~acc) ~rest))) ~zs
+      (\[] -> ~acc | \(~h : ~rest) -> (~go (~h : ~acc) ~rest)) ~zs
     ))
   );
 
