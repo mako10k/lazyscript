@@ -3,11 +3,11 @@
   .cons = \~x -> \~xs -> (~x : ~xs);
 
   .map = \~f -> \~xs -> (
-    ~go ~xs;
-    ~go = (
-      \[] -> [] |
-      \(~h : ~rest) -> ((~f ~h) : (~go ~rest))
-    )
+    (~go ~f ~xs);
+    ~go = (\~f -> \~xs -> (
+      (\[] -> [] |
+       \(~h : ~rest) -> ((~f ~h) : (~go ~f ~rest))) ~xs
+    ))
   );
 
   .filter = \~p -> \~xs -> (
@@ -19,11 +19,11 @@
   );
 
   .append = \~xs -> \~ys -> (
-    ~go ~xs;
-    ~go = (
-      \[] -> ~ys |
-      \(~h : ~rest) -> (~h : (~go ~rest))
-    )
+    (~go ~ys ~xs);
+    ~go = (\~ys -> \~xs -> (
+      (\[] -> ~ys |
+       \(~h : ~rest) -> (~h : (~go ~ys ~rest))) ~xs
+    ))
   );
 
   .reverse = \~xs -> (
@@ -34,17 +34,17 @@
   );
 
   .flatMap = \~f -> \~xs -> (
-    ~go ~xs;
+    (~go ~f ~xs);
     ~append = (\~as -> \~bs -> (
-      ~app ~as;
-      ~app = (
-        \[] -> ~bs |
-        \(~h1 : ~t1) -> (~h1 : (~app ~t1 ~bs))
-      )
+      (~app ~as ~bs);
+      ~app = (\~as -> \~bs -> (
+        (\[] -> ~bs |
+         \(~h1 : ~t1) -> (~h1 : (~app ~t1 ~bs))) ~as
+      ))
     ));
-    ~go = (
-      \[] -> [] |
-      \(~h : ~rest) -> (~append ((~f ~h)) ((~go ~rest)))
-    )
+    ~go = (\~f -> \~xs -> (
+      (\[] -> [] |
+       \(~h : ~rest) -> (~append ((~f ~h)) ((~go ~f ~rest)))) ~xs
+    ))
   )
 };

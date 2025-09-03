@@ -16,6 +16,11 @@ struct lsscan {
   const lsarray_t* ls_comments;         // array of lscomment_t*
   int              ls_seen_token;       // have we emitted any token yet?
   int              ls_tight_since_last; // no whitespace since last token
+  int              ls_had_error;        // set when yyerror is called
+  // include support: stack of filenames (lsstr_t* or raw cstr owned externally)
+  const lsarray_t* ls_file_stack;       // array of const char* (push on include)
+  const lsarray_t* ls_fp_stack;         // array of FILE* parallel to filenames
+  const lsarray_t* ls_inc_sites;        // array of lsloc_t* include sites (one per push)
 };
 
 const lsprog_t* lsprog_new(const lsexpr_t* expr, const lsarray_t* comments) {
@@ -40,10 +45,27 @@ void lsprog_print(FILE* fp, int prec, int indent, const lsprog_t* prog) {
 const lsexpr_t*  lsprog_get_expr(const lsprog_t* prog) { return prog->lp_expr; }
 const lsarray_t* lsprog_get_comments(const lsprog_t* prog) { return prog->lp_comments; }
 
+void             lsscan_print_include_chain(FILE* fp, const lsscan_t* scanner) {
+  if (!scanner || !scanner->ls_inc_sites) return;
+  lssize_t n = lsarray_get_size(scanner->ls_inc_sites);
+  const void* const* pv = lsarray_get(scanner->ls_inc_sites);
+  for (lssize_t i = n; i > 0; --i) {
+    const lsloc_t* site = (const lsloc_t*)pv[i - 1];
+    if (!site) continue;
+    lsprintf(fp, 0, "In file included from ");
+    lsloc_print(fp, *site);
+    lsprintf(fp, 0, "\n");
+  }
+}
+
+void             lsscan_mark_error(lsscan_t* scanner) { if (scanner) scanner->ls_had_error = 1; }
+int              lsscan_has_error(const lsscan_t* scanner) { return scanner ? scanner->ls_had_error : 0; }
+
 void             yyerror(lsloc_t* loc, lsscan_t* scanner, const char* s) {
-              (void)scanner;
-              lsloc_print(stderr, *loc);
-              lsprintf(stderr, 0, "%s\n", s);
+  if (scanner) lsscan_mark_error(scanner);
+  lsscan_print_include_chain(stderr, scanner);
+  if (loc) lsloc_print(stderr, *loc);
+  lsprintf(stderr, 0, "%s\n", s ? s : "error");
 }
 
 lsscan_t* lsscan_new(const char* filename) {
@@ -54,6 +76,10 @@ lsscan_t* lsscan_new(const char* filename) {
   scanner->ls_comments         = NULL;
   scanner->ls_seen_token       = 0;
   scanner->ls_tight_since_last = 0;
+  scanner->ls_had_error        = 0;
+  scanner->ls_file_stack       = NULL;
+  scanner->ls_fp_stack         = NULL;
+  scanner->ls_inc_sites        = NULL;
   return scanner;
 }
 
@@ -62,6 +88,70 @@ const lsprog_t* lsscan_get_prog(const lsscan_t* scanner) { return scanner->ls_pr
 void        lsscan_set_prog(lsscan_t* scanner, const lsprog_t* prog) { scanner->ls_prog = prog; }
 
 const char* lsscan_get_filename(const lsscan_t* scanner) { return scanner->ls_filename; }
+
+void lsscan_push_filename(lsscan_t* scanner, const char* filename) {
+  if (!scanner || !filename) return;
+  // push current name into stack
+  if (!scanner->ls_file_stack) scanner->ls_file_stack = lsarray_new(1, (void*)scanner->ls_filename);
+  else scanner->ls_file_stack = lsarray_push((lsarray_t*)scanner->ls_file_stack, (void*)scanner->ls_filename);
+  scanner->ls_filename = filename;
+}
+
+const char* lsscan_pop_filename(lsscan_t* scanner) {
+  if (!scanner) return NULL;
+  const char* prev = NULL;
+  if (scanner->ls_file_stack) {
+    lssize_t n = lsarray_get_size(scanner->ls_file_stack);
+    if (n > 0) {
+      const void* const* pv = lsarray_get(scanner->ls_file_stack);
+      prev = (const char*)pv[n - 1];
+      // rebuild stack without the last element
+      if (n == 1) scanner->ls_file_stack = NULL;
+      else {
+        // create a new C-array with first n-1 items and wrap into lsarray via lsarray_newv
+        // lsarray API doesn't expose slice; emulate by pushing into a new array
+        const lsarray_t* na = NULL;
+        for (lssize_t i = 0; i < n - 1; ++i) {
+          const void* v = pv[i];
+          na = lsarray_push(na, v);
+        }
+        scanner->ls_file_stack = na;
+      }
+    }
+  }
+  if (prev) scanner->ls_filename = prev;
+  return prev;
+}
+
+int lsscan_in_include_chain(const lsscan_t* scanner, const char* filename) {
+  if (!scanner || !filename) return 0;
+  if (scanner->ls_filename && strcmp(scanner->ls_filename, filename) == 0) return 1;
+  if (!scanner->ls_file_stack) return 0;
+  const void* const* pv = lsarray_get(scanner->ls_file_stack);
+  lssize_t n = lsarray_get_size(scanner->ls_file_stack);
+  for (lssize_t i = 0; i < n; ++i) {
+    const char* f = (const char*)pv[i];
+    if (f && strcmp(f, filename) == 0) return 1;
+  }
+  return 0;
+}
+
+void lsscan_push_file_fp(lsscan_t* scanner, FILE* fp) {
+  if (!scanner) return;
+  scanner->ls_fp_stack = lsarray_push(scanner->ls_fp_stack, fp);
+}
+
+FILE* lsscan_pop_file_fp(lsscan_t* scanner) {
+  if (!scanner || !scanner->ls_fp_stack) return NULL;
+  lssize_t n = lsarray_get_size(scanner->ls_fp_stack);
+  if (n == 0) return NULL;
+  const void* const* pv = lsarray_get(scanner->ls_fp_stack);
+  FILE* fp = (FILE*)pv[n - 1];
+  const lsarray_t* na = NULL;
+  for (lssize_t i = 0; i < n - 1; ++i) na = lsarray_push(na, pv[i]);
+  scanner->ls_fp_stack = na;
+  return fp;
+}
 
 void        lsscan_set_sugar_ns(lsscan_t* scanner, const char* ns) {
          scanner->ls_sugar_ns = (ns && ns[0]) ? ns : "prelude";
@@ -175,3 +265,22 @@ void lsfmt_consume_next_comment(void) {
 
 void lsfmt_set_hold_line(int line) { g_fmt_hold_line = line; }
 void lsfmt_clear_hold_line(void) { g_fmt_hold_line = 0; }
+
+// --- include site stack helpers ---
+void lsscan_push_include_site(lsscan_t* scanner, lsloc_t site) {
+  if (!scanner) return;
+  lsloc_t* p = lsmalloc(sizeof(lsloc_t));
+  *p         = site;
+  scanner->ls_inc_sites = lsarray_push(scanner->ls_inc_sites, p);
+}
+
+void lsscan_pop_include_site(lsscan_t* scanner) {
+  if (!scanner || !scanner->ls_inc_sites) return;
+  lssize_t n = lsarray_get_size(scanner->ls_inc_sites);
+  if (n == 0) return;
+  const void* const* pv = lsarray_get(scanner->ls_inc_sites);
+  lsfree((void*)pv[n - 1]);
+  const lsarray_t* na = NULL;
+  for (lssize_t i = 0; i < n - 1; ++i) na = lsarray_push(na, pv[i]);
+  scanner->ls_inc_sites = na;
+}

@@ -5,7 +5,12 @@
 #include "common/io.h"
 #include "common/malloc.h"
 #include "common/str.h"
-#define YY_USER_ACTION lsloc_update(yylloc, yytext, yyleng);
+#include "misc/prog.h"
+/* Keep token locations accurate across includes */
+#define YY_USER_ACTION do { \
+	if (!(yylloc)->filename) (yylloc)->filename = lsscan_get_filename(yyget_extra(yyscanner)); \
+	lsloc_update(yylloc, yytext, yyleng); \
+} while (0);
 
 /* --- single-quoted identifier parser (supports same escapes as string) --- */
 static int lslex_parse_hex(const char* str, int* pi, int slen) {
@@ -88,9 +93,46 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 %option extra-type="lsscan_t *"
 
 %x COMMENT
+%x INCLUDE
 
 %%
-#[^\n]*          {
+[ \t\n]*\{-[ ]*#include[^\n]*-\} {
+	const char* s = yytext;
+	const char* q1 = strchr(s, '"');
+	const char* q2 = q1 ? strchr(q1 + 1, '"') : NULL;
+	if (!q1 || !q2 || q2 <= q1 + 1) {
+		yyerror(yylloc, yyget_extra(yyscanner), "error: malformed include directive");
+		BEGIN(INITIAL);
+	} else {
+		char* fname = lsmalloc((size_t)(q2 - q1));
+		memcpy(fname, q1 + 1, (size_t)(q2 - q1 - 1));
+		fname[q2 - q1 - 1] = '\0';
+		if (lsscan_in_include_chain(yyget_extra(yyscanner), fname)) {
+			char buf[256];
+			snprintf(buf, sizeof(buf), "error: include cycle detected for '%s'", fname);
+			yyerror(yylloc, yyget_extra(yyscanner), buf);
+			lsfree(fname);
+			BEGIN(INITIAL);
+		} else {
+			FILE* f = fopen(fname, "r");
+			if (!f) {
+				char buf[256];
+				snprintf(buf, sizeof(buf), "error: cannot open include file '%s'", fname);
+				yyerror(yylloc, yyget_extra(yyscanner), buf);
+				lsfree(fname);
+				BEGIN(INITIAL);
+			} else {
+				YY_BUFFER_STATE buf = yy_create_buffer(f, YY_BUF_SIZE, yyscanner);
+				yypush_buffer_state(buf, yyscanner);
+				lsscan_push_filename(yyget_extra(yyscanner), fname);
+				lsscan_push_file_fp(yyget_extra(yyscanner), f);
+				lsscan_push_include_site(yyget_extra(yyscanner), *yylloc);
+				BEGIN(INITIAL);
+			}
+		}
+	}
+}
+"#"[^\n]*          {
 	/* line/EOL comment starting with '#' anywhere on the line */
 	lsscan_add_comment(yyget_extra(yyscanner), *yylloc, lsstr_new(yytext, yyleng));
 }
@@ -147,4 +189,19 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 "^|"       { return LSTCARETBAR; }
 "^"        { return LSTCARET; }
 . { return yytext[0]; }
+<<EOF>> {
+		/* When reaching EOF of an included file, pop buffer and restore previous filename. */
+				FILE* f = lsscan_pop_file_fp(yyget_extra(yyscanner));
+			const char* prev = lsscan_pop_filename(yyget_extra(yyscanner));
+		if (prev) {
+			yypop_buffer_state(yyscanner);
+				if (f) fclose(f);
+					lsscan_pop_include_site(yyget_extra(yyscanner));
+			/* yylloc filename will be updated on next token via YY_USER_ACTION */
+			YY_FLUSH_BUFFER;
+			BEGIN(INITIAL);
+			YY_BREAK;
+		}
+		return 0; /* true EOF */
+}
 %%

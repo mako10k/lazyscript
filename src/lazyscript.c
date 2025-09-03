@@ -45,15 +45,22 @@ const lsprog_t*    lsparse_stream(const char* filename, FILE* in_str) {
      yyscan_t yyscanner;
      yylex_init(&yyscanner);
      lsscan_t* lsscan = lsscan_new(filename);
-     yyset_in(in_str, yyscanner);
-     yyset_extra(lsscan, yyscanner);
+  yyset_in(in_str, yyscanner);
+  yyset_extra(lsscan, yyscanner);
+  // Current filename is already set in lsscan_new; no push for top-level
      // Apply sugar namespace if configured
      if (g_sugar_ns == NULL)
     g_sugar_ns = getenv("LAZYSCRIPT_SUGAR_NS");
   if (g_sugar_ns && g_sugar_ns[0])
     lsscan_set_sugar_ns(lsscan, g_sugar_ns);
   int             ret  = yyparse(yyscanner);
-     const lsprog_t* prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
+     const lsprog_t* prog = NULL;
+     if (ret == 0 && !lsscan_has_error(lsscan)) {
+       prog = lsscan_get_prog(lsscan);
+     } else {
+       // On any scanner/parser error, ensure we do not proceed to evaluation
+       prog = NULL;
+     }
      yylex_destroy(yyscanner);
      return prog;
 }
@@ -364,7 +371,7 @@ int        main(int argc, char** argv) {
            case 'e': {
              // Evaluate one-line program
       const lsprog_t* prog = lsparse_string("<cmd>", optarg);
-      if (prog != NULL) {
+  if (prog != NULL) {
                if (g_debug)
           lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
         lstenv_t* tenv = lstenv_new(NULL);
@@ -376,6 +383,12 @@ int        main(int argc, char** argv) {
         }
                int saved_run_main = g_run_main;
                g_run_main         = 0; // -e は最終値を出力
+               // Honor env for trace dump in -e path as well
+               if (g_trace_dump_path == NULL || g_trace_dump_path[0] == '\0') {
+                 const char* env_dump = getenv("LAZYSCRIPT_TRACE_DUMP");
+                 if (env_dump && env_dump[0])
+                   g_trace_dump_path = env_dump;
+               }
                if (g_trace_dump_path && g_trace_dump_path[0])
           lstrace_begin_dump(g_trace_dump_path);
         if (g_debug)
@@ -441,6 +454,11 @@ int        main(int argc, char** argv) {
                g_run_main = saved_run_main;
                if (g_trace_dump_path && g_trace_dump_path[0])
           lstrace_end_dump();
+      }
+      // When prog is NULL (parse/scan error), skip evaluation silently; yyerror already printed
+      else {
+        // Ensure run-main flag restored in case of early return path
+        // (no change to g_run_main here because we didn't modify it yet if prog==NULL)
       }
              break;
     }
@@ -526,6 +544,12 @@ int        main(int argc, char** argv) {
     if (env_map && env_map[0])
       trace_map_path = env_map;
   }
+  // Allow enabling trace dump via environment if --trace-dump is not specified
+  if (g_trace_dump_path == NULL || g_trace_dump_path[0] == '\0') {
+    const char* env_dump = getenv("LAZYSCRIPT_TRACE_DUMP");
+    if (env_dump && env_dump[0])
+      g_trace_dump_path = env_dump;
+  }
   if (trace_map_path && trace_map_path[0]) {
     if (lstrace_load_jsonl(trace_map_path) != 0) {
       lsprintf(stderr, 0, "W: failed to load trace map: %s\n", trace_map_path);
@@ -549,8 +573,8 @@ int        main(int argc, char** argv) {
     const char* filename = argv[i];
     if (strcmp(filename, "-") == 0)
       filename = "/dev/stdin";
-    const lsprog_t* prog = lsparse_file(filename);
-    if (prog != NULL) {
+  const lsprog_t* prog = lsparse_file(filename);
+  if (prog != NULL) {
       if (g_debug) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
       }
@@ -582,7 +606,8 @@ int        main(int argc, char** argv) {
       }
       if (g_trace_dump_path && g_trace_dump_path[0])
         lstrace_end_dump();
-    }
+  }
+  // else: parse/scan error already reported via yyerror; proceed to next file
   }
   // Cleanup
   lstrace_free();

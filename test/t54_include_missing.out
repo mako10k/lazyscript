@@ -1,0 +1,1 @@
+<ROOT>/test/t54_include_missing.ls:1.1-40: error: cannot open include file 'test/does_not_exist.ls'
