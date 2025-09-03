@@ -34,6 +34,7 @@ static const char* g_entry_name        = "main"; // entry function name
 static int         g_trace_stack_depth = 1;      // default: print top frame only
 static const char* g_trace_dump_path =
     NULL; // optional: where to emit JSONL in thunk creation order
+static int         g_exit_zero_on_error = 0; // default: non-zero exit on error
 // Global registry for namespaces moved to builtins/ns.c
 
 // effects helpers moved to runtime/effects.{h,c}
@@ -349,6 +350,13 @@ int        main(int argc, char** argv) {
   int           kind_warn      = 1;    // (kept for future, no coreir)
   int           kind_error     = 0;    // (kept for future, no coreir)
   const char*   trace_map_path = NULL; // optional sourcemap for runtime tracing
+  int           exit_status    = 0;    // accumulate non-zero on any error
+  // Env default for exit behavior (CLI overrides)
+  {
+    const char* ez = getenv("LAZYSCRIPT_EXIT_ZERO_ON_ERROR");
+    if (ez && ez[0] && ez[0] != '0')
+      g_exit_zero_on_error = 1;
+  }
   struct option longopts[]     = {
                { "eval", required_argument, NULL, 'e' },
                { "prelude-so", required_argument, NULL, 'p' },
@@ -360,6 +368,7 @@ int        main(int argc, char** argv) {
                { "trace-map", required_argument, NULL, 2000 },
                { "trace-stack-depth", required_argument, NULL, 2001 },
                { "trace-dump", required_argument, NULL, 2002 },
+               { "exit-zero-on-error", no_argument, NULL, 3001 },
                { "debug", no_argument, NULL, 'd' },
                { "help", no_argument, NULL, 'h' },
                { "version", no_argument, NULL, 'v' },
@@ -442,6 +451,7 @@ int        main(int argc, char** argv) {
                    if (g_lstrace_table && g_trace_stack_depth > 0)
               lstrace_print_stack(stderr, g_trace_stack_depth);
             lsprintf(stderr, 0, "\n");
+                    exit_status = 1;
           } else {
                    if (g_debug)
               lsprintf(stderr, 0, "DBG: print ret begin\n");
@@ -459,6 +469,7 @@ int        main(int argc, char** argv) {
       else {
         // Ensure run-main flag restored in case of early return path
         // (no change to g_run_main here because we didn't modify it yet if prog==NULL)
+        exit_status = 1; // treat parse/scan error as failure
       }
              break;
     }
@@ -491,6 +502,9 @@ int        main(int argc, char** argv) {
            case 2002: // --trace-dump <file>
       g_trace_dump_path = optarg;
       break;
+      case 3001: // --exit-zero-on-error
+    g_exit_zero_on_error = 1;
+    break;
            case 'd':
       g_debug = 1;
 #if DEBUG
@@ -516,6 +530,7 @@ int        main(int argc, char** argv) {
       printf("      --trace-map <file>   load sourcemap JSONL for runtime trace printing (exp)\n");
       printf("      --trace-stack-depth <n>  print up to N frames on error (default: 1)\n");
       printf("      --trace-dump <file>  write JSONL sourcemap while evaluating (exp)\n");
+  printf("      --exit-zero-on-error  keep legacy exit status 0 even on errors (off)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
       printf("\nDefault prelude: plugin-only (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover).\n");
@@ -529,6 +544,7 @@ int        main(int argc, char** argv) {
       printf(
           "  LAZYSCRIPT_TRACE_STACK_DEPTH  depth to print (used if --trace-stack-depth not set)\n");
       printf("  LAZYSCRIPT_TRACE_DUMP   path to write JSONL (used if --trace-dump not set)\n");
+  printf("  LAZYSCRIPT_EXIT_ZERO_ON_ERROR  when set (non-empty, not '0'), exit 0 even on errors\n");
       exit(0);
     case 'v':
       printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -599,6 +615,7 @@ int        main(int argc, char** argv) {
           if (g_lstrace_table && g_trace_stack_depth > 0)
             lstrace_print_stack(stderr, g_trace_stack_depth);
           lsprintf(stderr, 0, "\n");
+          exit_status = 1;
         } else {
           lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
           lsprintf(stdout, 0, "\n");
@@ -608,8 +625,13 @@ int        main(int argc, char** argv) {
         lstrace_end_dump();
   }
   // else: parse/scan error already reported via yyerror; proceed to next file
+  else {
+    exit_status = 1; // parse/scan error
+  }
   }
   // Cleanup
   lstrace_free();
-  return 0;
+  if (g_exit_zero_on_error)
+    return 0;
+  return exit_status;
 }
