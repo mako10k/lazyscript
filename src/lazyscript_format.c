@@ -24,7 +24,12 @@ static const lsprog_t* lsparse_stream_local(const char* filename, FILE* in_str) 
   if (g_sugar_ns && g_sugar_ns[0])
     lsscan_set_sugar_ns(lsscan, g_sugar_ns);
   int             ret  = yyparse(yyscanner);
-  const lsprog_t* prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
+  const lsprog_t* prog = NULL;
+  if (ret == 0 && !lsscan_has_error(lsscan)) {
+    prog = lsscan_get_prog(lsscan);
+  } else {
+    prog = NULL;
+  }
   yylex_destroy(yyscanner);
   return prog;
 }

@@ -6,8 +6,8 @@
     "configurations": [
         {
             "type": "cppdbg",
-            "program": "${workspaceRoot}/src/lazyscript",
-            "name": "Launch lazyscript",
+            "program": "${workspaceRoot}/src/lsi",
+            "name": "Launch lsi",
             "request": "launch",
             "args": ["test/test.ls"],
             "cwd": "${workspaceRoot}",

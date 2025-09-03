@@ -59,7 +59,9 @@
                 "llvm-vs-code-extensions.vscode-clangd",
                 "llvm-vs-code-extensions.lldb-dap",
                 "ms-vscode.cpptools",
-                "ms-vscode.makefile-tools"
+                "ms-vscode.makefile-tools",
+                "local-dev.lazyscript-vscode",
+                "github.vscode-github-actions"
             ]
         }
     }

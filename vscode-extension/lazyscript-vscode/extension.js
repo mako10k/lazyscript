@@ -69,7 +69,7 @@ function resolveTool(cfgKey, defaultName) {
 }
 
 async function provideFormatting(document, _options, token) {
-  const formatter = resolveTool('formatterPath', 'lazyscript_format');
+  const formatter = resolveTool('formatterPath', 'lsi-fmt');
   // Use temp file to be robust regardless of formatter stdin support
   const tmpFile = createTmpWith(document.getText(), '.ls');
   try {
@@ -77,7 +77,7 @@ async function provideFormatting(document, _options, token) {
     if (token.isCancellationRequested) return [];
     if (code !== 0) {
       const msg = stderr || stdout || `Formatter exited with code ${code}`;
-      vscode.window.showWarningMessage(`lazyscript_format: ${msg.trim()}`);
+      vscode.window.showWarningMessage(`lsi-fmt: ${msg.trim()}`);
       return [];
     }
     const edits = [vscode.TextEdit.replace(new vscode.Range(0, 0, document.lineCount, 0), stdout.replace(/\r\n/g, '\n'))];
@@ -93,7 +93,7 @@ function activate(context) {
 
   const validate = async (doc) => {
     if (!doc || doc.languageId !== 'lazyscript') return;
-  const lazyscript = resolveTool('lazyscriptPath', 'lazyscript');
+  const lazyscript = resolveTool('lazyscriptPath', 'lsi');
     const tmpFile = createTmpWith(doc.getText(), '.ls');
     const opts = { cwd: path.dirname(doc.uri.fsPath) };
     try {

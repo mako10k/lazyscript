@@ -1,2 +1,0 @@
-; CoreIR dump (temporary)
-(let c$1 <null-expr> (app (var choice.expr) (var c$1) (int 1)))

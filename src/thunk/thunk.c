@@ -29,6 +29,119 @@
 #define LS_TRACE 0
 #endif
 
+// --- Eval-time parameter binding frame (overlay) ---------------------------
+typedef struct lseval_bind_ent {
+  const lsstr_t*           name;
+  lsthunk_t*               thunk;
+  struct lseval_bind_ent*  next;
+} lseval_bind_ent_t;
+
+typedef struct lseval_bind_frame {
+  lseval_bind_ent_t*         head;
+  struct lseval_bind_frame*  prev;
+} lseval_bind_frame_t;
+
+static lseval_bind_frame_t* g_eval_bind_top = NULL;
+
+static void lseval_bind_push_empty(void) {
+  lseval_bind_frame_t* f = lsmalloc(sizeof(lseval_bind_frame_t));
+  f->head                = NULL;
+  f->prev                = g_eval_bind_top;
+  g_eval_bind_top        = f;
+}
+
+static void lseval_bind_pop(void) {
+  if (g_eval_bind_top)
+    g_eval_bind_top = g_eval_bind_top->prev; // nodes are GC-managed
+}
+
+static void lseval_bind_add(const lsstr_t* name, lsthunk_t* thunk) {
+  if (!g_eval_bind_top)
+    lseval_bind_push_empty();
+  lseval_bind_ent_t* e = lsmalloc(sizeof(lseval_bind_ent_t));
+  e->name              = name;
+  e->thunk             = thunk;
+  e->next              = g_eval_bind_top->head;
+  g_eval_bind_top->head = e;
+  const char* dbg = getenv("LAZYSCRIPT_DEBUG_FRAME");
+  if (dbg && *dbg) {
+    lsprintf(stderr, 0, "[frame] add ");
+    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
+    const char* ty = "?";
+    if (thunk) {
+      switch (lsthunk_get_type(thunk)) {
+      case LSTTYPE_INT: ty = "int"; break;
+      case LSTTYPE_STR: ty = "str"; break;
+      case LSTTYPE_SYMBOL: ty = "symbol"; break;
+      case LSTTYPE_ALGE: ty = "alge"; break;
+      case LSTTYPE_APPL: ty = "appl"; break;
+      case LSTTYPE_LAMBDA: ty = "lambda"; break;
+      case LSTTYPE_REF: ty = "ref"; break;
+      case LSTTYPE_CHOICE: ty = "choice"; break;
+      case LSTTYPE_BUILTIN: ty = "builtin"; break;
+      default: ty = "other"; break;
+      }
+    }
+    lsprintf(stderr, 0, " -> %p(%s)\n", (void*)thunk, ty);
+  }
+}
+
+static lsthunk_t* lseval_bind_lookup(const lsstr_t* name) {
+  const char* dbg = getenv("LAZYSCRIPT_DEBUG_FRAME");
+  for (lseval_bind_frame_t* f = g_eval_bind_top; f; f = f->prev) {
+    for (lseval_bind_ent_t* e = f->head; e; e = e->next) {
+      if (lsstrcmp(e->name, name) == 0) {
+        if (dbg && *dbg) {
+          lsprintf(stderr, 0, "[frame] hit ");
+          lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
+          lsprintf(stderr, 0, " -> %p\n", (void*)e->thunk);
+        }
+        return e->thunk;
+      }
+    }
+  }
+  if (dbg && *dbg) {
+    lsprintf(stderr, 0, "[frame] miss ");
+    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
+    lsprintf(stderr, 0, "\n");
+  }
+  return NULL;
+}
+
+static void lseval_bind_collect_from_pat(lstpat_t* pat) {
+  switch (lstpat_get_type(pat)) {
+  case LSPTYPE_ALGE: {
+    lssize_t n = lstpat_get_argc(pat);
+    lstpat_t* const* args = lstpat_get_args(pat);
+    for (lssize_t i = 0; i < n; i++)
+      lseval_bind_collect_from_pat(args[i]);
+    break;
+  }
+  case LSPTYPE_AS:
+    lseval_bind_collect_from_pat(lstpat_get_ref(pat));
+    lseval_bind_collect_from_pat(lstpat_get_aspattern(pat));
+    break;
+  case LSPTYPE_REF: {
+    const lsstr_t* nm = lstpat_get_refname(pat);
+    lsthunk_t*     v  = lstpat_get_refbound(pat);
+    if (nm && v)
+      lseval_bind_add(nm, v);
+    break;
+  }
+  case LSPTYPE_OR:
+    lseval_bind_collect_from_pat(lstpat_get_or_left(pat));
+    lseval_bind_collect_from_pat(lstpat_get_or_right(pat));
+    break;
+  case LSPTYPE_CARET:
+    lseval_bind_collect_from_pat((lstpat_t*)lspat_get_caret_inner((const lspat_t*)pat));
+    break;
+  case LSPTYPE_WILDCARD:
+  case LSPTYPE_INT:
+  case LSPTYPE_STR:
+    break;
+  }
+}
+
 struct lstalge {
   const lsstr_t* lta_constr;
   lssize_t       lta_argc;
@@ -438,13 +551,14 @@ lsthunk_t* lsthunk_new_eclosure(const lseclosure_t* eclosure, lstenv_t* tenv) {
 }
 
 lsthunk_t* lsthunk_new_ref(const lsref_t* ref, lstenv_t* tenv) {
-  lstref_target_t* target  = lstenv_get(tenv, lsref_get_name(ref));
+  // Bind name to target identity at expansion time (no evaluation), per layering
+  lstref_target_t* target  = tenv ? lstenv_get(tenv, lsref_get_name(ref)) : NULL;
   lsthunk_t*       thunk   = lsmalloc(lssizeof(lsthunk_t, lt_ref));
   thunk->lt_type           = LSTTYPE_REF;
   thunk->lt_whnf           = NULL;
   thunk->lt_trace_id       = g_trace_next_id++;
   thunk->lt_ref.ltr_ref    = ref;
-  thunk->lt_ref.ltr_target = target; // may be NULL; resolve lazily at eval
+  thunk->lt_ref.ltr_target = target; // may be NULL if not found yet
   thunk->lt_ref.ltr_env    = tenv;
   // Prefer pending loc; fallback to ref's own loc
   {
@@ -643,6 +757,14 @@ lsmres_t lsthunk_match_alge(lsthunk_t* thunk, lstpat_t* tpat) {
     return LSMATCH_FAILURE; // TODO: match as list or string
   const lsstr_t* tconstr = lsthunk_get_constr(thunk_whnf);
   const lsstr_t* pconstr = lstpat_get_constr(tpat);
+  const char* dbg_match = getenv("LAZYSCRIPT_DEBUG_MATCH");
+  if (dbg_match && *dbg_match) {
+    lsprintf(stderr, 0, "[match] ALGE p=");
+    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, pconstr);
+    lsprintf(stderr, 0, " vs t=");
+    lsstr_print_bare(stderr, LSPREC_LOWEST, 0, tconstr);
+    lsprintf(stderr, 0, " pargc=%ld targc=%ld\n", (long)lstpat_get_argc(tpat), (long)lsthunk_get_argc(thunk_whnf));
+  }
   if (lsstrcmp(pconstr, tconstr) != 0)
     return LSMATCH_FAILURE;
   lssize_t pargc = lstpat_get_argc(tpat);
@@ -707,7 +829,13 @@ lsmres_t lsthunk_match_ref(lsthunk_t* thunk, lstpat_t* tpat) {
   // Bottom does not bind to variables
   if (lsthunk_is_bottom(thunk))
     return LSMATCH_FAILURE;
-  lstpat_set_refbound(tpat, thunk);
+  // Bind to WHNF to avoid capturing indirect refs (e.g., zs bound to xs ref)
+  lsthunk_t* val = lsthunk_eval0(thunk);
+  // Record binding into pattern (legacy) and into eval-time overlay frame (by name)
+  lstpat_set_refbound(tpat, val);
+  const lsstr_t* nm = lstpat_get_refname(tpat);
+  if (nm)
+    lseval_bind_add(nm, val);
   return LSMATCH_SUCCESS;
 }
 
@@ -848,24 +976,29 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
     lsprintf(stderr, 0, "DBG lambda: arg type=%s\n", at);
 #endif
   }
-  // Bind directly on the lambda's original parameter pattern so that
-  // references inside body (which point to the same pattern objects via env)
-  // observe the binding.
+  // Prepare an eval-time frame BEFORE matching so any temporary/ref binds during
+  // matching stay scoped to this application and don't leak into callers.
+  lseval_bind_push_empty();
+  // Match and then expose parameter bindings via the current eval-time frame
+  // (not via mutable pattern state)
   body          = lsthunk_clone(body);
   lsmres_t mres = lsthunk_match_pat(arg, param);
   if (mres != LSMATCH_SUCCESS) {
 #if LS_TRACE
     lsprintf(stderr, 0, "DBG lambda: match failed\n");
 #endif
-    // Pattern mismatch -> bottom (no match), carry arg as related context
-    // Clear bindings established during a failed match attempt to avoid leaking into siblings
+  // Pattern mismatch -> bottom (no match), carry arg as related context
+  // Clear bindings established during a failed match attempt to avoid leaking into siblings
     lstpat_clear_binds(param);
+  // Pop the eval-time frame created for this application
+  lseval_bind_pop();
     lsthunk_t* rels[1] = { arg };
     return lsthunk_new_bottom("lambda match failure", lstrace_take_pending_or_unknown(), 1, rels);
   }
 #if LS_TRACE
   lsprintf(stderr, 0, "DBG lambda: eval body\n");
 #endif
+  // Evaluate lambda body within the same frame containing parameter binds
   lsthunk_t* ret = lsthunk_eval(body, argc - 1, args1);
   if (ret == NULL) {
 #if LS_TRACE
@@ -873,14 +1006,13 @@ static lsthunk_t* lsthunk_eval_lambda(lsthunk_t* thunk, lssize_t argc, lsthunk_t
 #endif
     // Clear parameter bindings before early return
     lstpat_clear_binds(param);
+    // Pop frame on early return
+    lseval_bind_pop();
     return NULL;
   }
-  // Capture current binding of this parameter inside the returned value by
-  // substituting any references to the parameter with the bound thunk. This
-  // prevents subsequent applications of the same lambda from mutating the
-  // shared parameter pattern and affecting already-produced values.
+  // Capture, then pop eval-time frame. Clear pattern binds to avoid cross-apply leakage.
   ret = lsthunk_subst_param(ret, param);
-  // Clear the parameter bindings now that the value has captured them.
+  lseval_bind_pop();
   lstpat_clear_binds(param);
   if (ret) {
 #if LS_TRACE
@@ -986,11 +1118,14 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
 #if LS_TRACE
   lsprintf(stderr, 0, "DBG ref: begin\n");
 #endif
-  lstref_target_t* target = thunk->lt_ref.ltr_target;
+  // First, check eval-time binding frame for a direct value
+  const lsstr_t* rname = lsref_get_name(thunk->lt_ref.ltr_ref);
+  lsthunk_t*     bval  = lseval_bind_lookup(rname);
+  if (bval != NULL)
+    return lsthunk_eval(bval, argc, args);
+  // Then resolve from (captured) environment
+  lstref_target_t* target = lstenv_get(thunk->lt_ref.ltr_env, rname);
   if (target == NULL) {
-    // try lazy lookup in environment captured at construction
-    target = lstenv_get(thunk->lt_ref.ltr_env, lsref_get_name(thunk->lt_ref.ltr_ref));
-    if (target == NULL) {
       lsprintf(stderr, 0, "E: ");
       lsloc_print(stderr, lsref_get_loc(thunk->lt_ref.ltr_ref));
       lsprintf(stderr, 0, "undefined reference: ");
@@ -1010,8 +1145,6 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
         // lstrace_print_stack starts each frame with "\n at ", so no extra newline needed
       }
       return ls_make_err("undefined reference");
-    }
-    thunk->lt_ref.ltr_target = target; // cache
   }
   lstref_target_origin_t* origin = target->lrt_origin;
   assert(origin != NULL);
@@ -1033,7 +1166,27 @@ static lsthunk_t* lsthunk_eval_ref(lsthunk_t* thunk, lssize_t argc, lsthunk_t* c
     // Parameter refs should have been bound during lambda application.
     refbound = lstpat_get_refbound(pat_ref);
     if (refbound == NULL) {
+      // Check eval-time overlay frame by ref-name as a safety-net
+      const lsstr_t* nm = lstpat_get_refname(pat_ref);
+      lsthunk_t*     fv = nm ? lseval_bind_lookup(nm) : NULL;
+      if (fv)
+        return lsthunk_eval(fv, argc, args);
       lsprintf(stderr, 0, "E: unbound lambda parameter reference\n");
+      // Additionally, print the definition location of the unbound variable (from the pattern)
+      const lsref_t* defref = lstpat_get_refref(pat_ref);
+      if (defref) {
+        lsprintf(stderr, 0, "  defined at ");
+        lsloc_print(stderr, lsref_get_loc(defref));
+        lsprintf(stderr, 0, " ");
+        lsref_print(stderr, LSPREC_LOWEST, 0, defref);
+        lsprintf(stderr, 0, "\n");
+      }
+      // Optional extra debug (env-gated) to help diagnose binding lifecycle issues
+      const char* dbg = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+      if (dbg && *dbg) {
+        lsprintf(stderr, 0, "  [dbg] origin.param=%p, pat_ref=%p, target=%p\n",
+                 (void*)origin->lrto_lambda.ltl_param, (void*)pat_ref, (void*)target);
+      }
       return ls_make_err("unbound lambda param");
     }
     return lsthunk_eval(refbound, argc, args);
@@ -1072,15 +1225,93 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
   assert(argc == 0 || args != NULL);
   // Lambda-choice: special stepwise handling for first-arg guard
   if (thunk->lt_choice.ltc_kind == 1 /* LSECHOICE_LAMBDA */ && argc > 0) {
+    const char* dbg_choice = getenv("LAZYSCRIPT_DEBUG_CHOICE");
+  if (dbg_choice && *dbg_choice) {
+      lsprintf(stderr, 0, "[choice] guard arg0 type=");
+      if (!args[0]) {
+        lsprintf(stderr, 0, "<null>\n");
+      } else {
+        switch (lsthunk_get_type(args[0])) {
+        case LSTTYPE_INT: lsprintf(stderr, 0, "int\n"); break;
+        case LSTTYPE_STR: lsprintf(stderr, 0, "str\n"); break;
+        case LSTTYPE_SYMBOL: lsprintf(stderr, 0, "symbol\n"); break;
+        case LSTTYPE_ALGE: {
+          lsprintf(stderr, 0, "alge constr=");
+          lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsthunk_get_constr(args[0]));
+          lsprintf(stderr, 0, " argc=%ld\n", (long)lsthunk_get_argc(args[0]));
+          break; }
+        case LSTTYPE_APPL: lsprintf(stderr, 0, "appl\n"); break;
+        case LSTTYPE_LAMBDA: lsprintf(stderr, 0, "lambda\n"); break;
+        case LSTTYPE_REF: lsprintf(stderr, 0, "ref name=");
+          if (args[0]->lt_ref.ltr_ref)
+            lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(args[0]->lt_ref.ltr_ref));
+          lsprintf(stderr, 0, "\n");
+          break;
+        case LSTTYPE_CHOICE: lsprintf(stderr, 0, "choice\n"); break;
+        case LSTTYPE_BUILTIN: lsprintf(stderr, 0, "builtin\n"); break;
+        default: lsprintf(stderr, 0, "other\n"); break;
+        }
+        // Also inspect WHNF of arg0 for clarity
+        lsthunk_t* w0 = lsthunk_eval0(args[0]);
+        lsprintf(stderr, 0, "[choice] guard arg0 whnf=");
+        if (!w0) {
+          lsprintf(stderr, 0, "<null>\n");
+        } else {
+          switch (lsthunk_get_type(w0)) {
+          case LSTTYPE_ALGE: {
+            lsprintf(stderr, 0, "alge constr=");
+            lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsthunk_get_constr(w0));
+            lsprintf(stderr, 0, " argc=%ld\n", (long)lsthunk_get_argc(w0));
+            break; }
+          case LSTTYPE_REF: {
+            lsprintf(stderr, 0, "ref name=");
+            if (w0->lt_ref.ltr_ref)
+              lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(w0->lt_ref.ltr_ref));
+            lsprintf(stderr, 0, "\n");
+            break; }
+          case LSTTYPE_INT: lsprintf(stderr, 0, "int\n"); break;
+          case LSTTYPE_STR: lsprintf(stderr, 0, "str\n"); break;
+          case LSTTYPE_APPL: lsprintf(stderr, 0, "appl\n"); break;
+          case LSTTYPE_LAMBDA: lsprintf(stderr, 0, "lambda\n"); break;
+          case LSTTYPE_CHOICE: lsprintf(stderr, 0, "choice\n"); break;
+          case LSTTYPE_BUILTIN: lsprintf(stderr, 0, "builtin\n"); break;
+          default: lsprintf(stderr, 0, "other\n"); break;
+          }
+        }
+      }
+    }
     // Apply only the first argument to the left arm
     lsthunk_t* left1 = lsthunk_eval(thunk->lt_choice.ltc_left, 1, &args[0]);
+    if (dbg_choice && *dbg_choice) {
+      const char* ty = "other";
+      if (!left1)
+        ty = "NULL";
+      else if (lsthunk_is_bottom(left1))
+        ty = "<bottom>";
+      else {
+        switch (lsthunk_get_type(left1)) {
+        case LSTTYPE_LAMBDA: ty = "lambda"; break;
+        case LSTTYPE_ALGE: ty = "alge"; break;
+        case LSTTYPE_APPL: ty = "appl"; break;
+        case LSTTYPE_REF: ty = "ref"; break;
+        default: break;
+        }
+      }
+      lsprintf(stderr, 0, "[choice] apply-left argc=%ld -> %s\n", (long)argc, ty);
+    }
     if (left1 == NULL) {
       // Treat as left failure and try right with full args
+      if (dbg_choice && *dbg_choice) {
+        lsprintf(stderr, 0, "[choice] left -> NULL, try-right argc=%ld\n", (long)argc);
+      }
       return lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
     }
     if (lsthunk_is_err(left1)) {
       // Fallback ONLY when the first-parameter match failed
       if (is_lambda_match_failure_err(left1)) {
+        if (dbg_choice && *dbg_choice) {
+          lsprintf(stderr, 0, "[choice] left -> lambda-match-failure, fallback-right\n");
+        }
         lsthunk_t* right = lsthunk_eval(thunk->lt_choice.ltc_right, argc, args);
         if (right == NULL)
           return right;
@@ -1090,9 +1321,15 @@ static lsthunk_t* lsthunk_eval_choice(lsthunk_t* thunk, lssize_t argc, lsthunk_t
         return right;
       }
       // Other bottoms (if any) commit to left; do not fallback
+      if (dbg_choice && *dbg_choice) {
+        lsprintf(stderr, 0, "[choice] left -> bottom(non-match), commit-left\n");
+      }
       return left1;
     }
     // Commit to left: apply remaining args without any further fallback
+    if (dbg_choice && *dbg_choice) {
+      lsprintf(stderr, 0, "[choice] left -> success, apply rest argc=%ld\n", (long)(argc - 1));
+    }
     return lsthunk_eval(left1, argc - 1, args + 1);
   }
   // Catch-choice: left '^|' rightLamChain
@@ -1449,7 +1686,15 @@ static void lsthunk_print_internal(FILE* fp, lsprec_t prec, int indent, lsthunk_
         int              aborted   = 0;
         lsthunk_t**      elems     = lsmalloc(sizeof(lsthunk_t*) * cap);
         const lsthunk_t* cur       = thunk;
-        const lssize_t   max_steps = 4096;
+        lssize_t         max_steps = 4096;
+        {
+          const char* env_ms = getenv("LAZYSCRIPT_LIST_PRINT_MAX_STEPS");
+          if (env_ms && *env_ms) {
+            long v = strtol(env_ms, NULL, 10);
+            if (v > 0 && v < 1000000)
+              max_steps = (lssize_t)v;
+          }
+        }
         lssize_t         steps     = 0;
         while (1) {
           if (steps++ > max_steps) {
@@ -1679,6 +1924,129 @@ typedef struct subst_entry {
   struct subst_entry* next;
 } subst_entry_t;
 
+// Map for inlining bind references (to preserve recursion when cloning RHS)
+typedef struct inline_refmap {
+  const lstref_target_t* target; // identity of the bind being inlined
+  lsthunk_t*             clone;  // cloned thunk placeholder/result
+  struct inline_refmap*  next;
+} inline_refmap_t;
+
+// Lightweight checker: does thunk tree contain a reference to the current lambda parameter?
+// It walks without allocation and stops on first positive hit. We only need to detect
+// existence to decide whether to inline a local BIND for capture.
+static int param_contains_name(lstpat_t* param, const lsstr_t* name) {
+  if (!param || !name)
+    return 0;
+  switch (lstpat_get_type(param)) {
+  case LSPTYPE_REF: {
+    const lsstr_t* nm = lstpat_get_refname(param);
+    return nm && (lsstrcmp(nm, name) == 0);
+  }
+  case LSPTYPE_ALGE: {
+    lssize_t n = lstpat_get_argc(param);
+    lstpat_t* const* xs = lstpat_get_args(param);
+    for (lssize_t i = 0; i < n; i++)
+      if (param_contains_name(xs[i], name))
+        return 1;
+    return 0;
+  }
+  case LSPTYPE_AS:
+    return param_contains_name(lstpat_get_ref(param), name) ||
+           param_contains_name(lstpat_get_aspattern(param), name);
+  case LSPTYPE_OR:
+    // Conservative: either branch may bind the name
+    return param_contains_name(lstpat_get_or_left(param), name) ||
+           param_contains_name(lstpat_get_or_right(param), name);
+  case LSPTYPE_CARET:
+    return param_contains_name((lstpat_t*)lspat_get_caret_inner((const lspat_t*)param), name);
+  default:
+    return 0;
+  }
+}
+
+static lsthunk_t* param_get_bound_by_name(lstpat_t* param, const lsstr_t* name) {
+  if (!param || !name)
+    return NULL;
+  switch (lstpat_get_type(param)) {
+  case LSPTYPE_REF: {
+    const lsstr_t* nm = lstpat_get_refname(param);
+    if (nm && (lsstrcmp(nm, name) == 0))
+      return lstpat_get_refbound(param);
+    return NULL;
+  }
+  case LSPTYPE_ALGE: {
+    lssize_t n = lstpat_get_argc(param);
+    lstpat_t* const* xs = lstpat_get_args(param);
+    for (lssize_t i = 0; i < n; i++) {
+      lsthunk_t* v = param_get_bound_by_name(xs[i], name);
+      if (v)
+        return v;
+    }
+    return NULL;
+  }
+  case LSPTYPE_AS: {
+    lsthunk_t* v = param_get_bound_by_name(lstpat_get_ref(param), name);
+    if (v)
+      return v;
+    return param_get_bound_by_name(lstpat_get_aspattern(param), name);
+  }
+  case LSPTYPE_OR: {
+    // If OR was used, only one branch binds; prefer the one with a bound present
+    lsthunk_t* v = param_get_bound_by_name(lstpat_get_or_left(param), name);
+    if (v)
+      return v;
+    return param_get_bound_by_name(lstpat_get_or_right(param), name);
+  }
+  case LSPTYPE_CARET:
+    return param_get_bound_by_name((lstpat_t*)lspat_get_caret_inner((const lspat_t*)param), name);
+  default:
+    return NULL;
+  }
+}
+
+static int contains_param_ref(lsthunk_t* t, lstpat_t* param) {
+  if (!t)
+    return 0;
+  switch (t->lt_type) {
+  case LSTTYPE_REF: {
+    lstref_target_t* target = t->lt_ref.ltr_target;
+    if (!target && t->lt_ref.ltr_env)
+      target = lstenv_get(t->lt_ref.ltr_env, lsref_get_name(t->lt_ref.ltr_ref));
+    if (target) {
+      lstref_target_origin_t* org = target->lrt_origin;
+      if (org && org->lrto_type == LSTRTYPE_LAMBDA && org->lrto_lambda.ltl_param == param)
+        return 1;
+      return 0;
+    }
+    // Fallback: if target is unresolved, check by name occurrence in the param pattern.
+    const lsstr_t* nm = t->lt_ref.ltr_ref ? lsref_get_name(t->lt_ref.ltr_ref) : NULL;
+    return param_contains_name(param, nm);
+  }
+  case LSTTYPE_ALGE: {
+    for (lssize_t i = 0; i < t->lt_alge.lta_argc; i++)
+      if (contains_param_ref(t->lt_alge.lta_args[i], param))
+        return 1;
+    return 0;
+  }
+  case LSTTYPE_APPL: {
+    if (contains_param_ref(t->lt_appl.lta_func, param))
+      return 1;
+    for (lssize_t i = 0; i < t->lt_appl.lta_argc; i++)
+      if (contains_param_ref(t->lt_appl.lta_args[i], param))
+        return 1;
+    return 0;
+  }
+  case LSTTYPE_CHOICE:
+    return contains_param_ref(t->lt_choice.ltc_left, param) ||
+           contains_param_ref(t->lt_choice.ltc_right, param);
+  case LSTTYPE_LAMBDA:
+    // Refs to the outer parameter can appear inside nested lambdas' bodies
+    return contains_param_ref(t->lt_lambda.ltl_body, param);
+  default:
+    return 0;
+  }
+}
+
 static lsthunk_t* subst_lookup(subst_entry_t* m, const lsthunk_t* k) {
   for (; m; m = m->next)
     if (m->key == k)
@@ -1694,7 +2062,17 @@ static subst_entry_t* subst_bind(subst_entry_t* m, const lsthunk_t* k, lsthunk_t
   return e;
 }
 
-static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_entry_t** pmemo) {
+static inline_refmap_t* inline_refmap_bind(inline_refmap_t* m, const lstref_target_t* target,
+                                           lsthunk_t* clone) {
+  inline_refmap_t* e = lsmalloc(sizeof(inline_refmap_t));
+  e->target          = target;
+  e->clone           = clone;
+  e->next            = m;
+  return e;
+}
+
+static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_entry_t** pmemo,
+                                          inline_refmap_t** prefmap) {
   if (t == NULL)
     return NULL;
   lsthunk_t* memo = subst_lookup(*pmemo, t);
@@ -1708,19 +2086,223 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
     // resolution against the captured environment so we can identify whether
     // this ref points to the current lambda parameter and capture it.
     if (!target && t->lt_ref.ltr_env) {
+      // Resolve on-the-fly from env for capture purposes, but do not cache into the node
       target = lstenv_get(t->lt_ref.ltr_env, lsref_get_name(t->lt_ref.ltr_ref));
-      if (target)
-        t->lt_ref.ltr_target = target;
     }
-    if (target) {
+  if (target) {
       // If this reference belongs to the same lambda parameter (including any subpattern
       // inside the parameter), capture the currently bound thunk for that specific ref.
       lstref_target_origin_t* org = target->lrt_origin;
       if (org && org->lrto_type == LSTRTYPE_LAMBDA && org->lrto_lambda.ltl_param == param) {
         lstpat_t*  pref  = target->lrt_pat; // the concrete ref node within the param pattern
         lsthunk_t* bound = pref ? lstpat_get_refbound(pref) : NULL;
-        if (bound)
+        if (bound) {
+          const char* dbg = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+          if (dbg && *dbg) {
+            lsprintf(stderr, 0, "[capture] ref to param captured: pref=%p -> %p\n",
+                     (void*)pref, (void*)bound);
+          }
           return bound;
+        }
+      }
+      // Inline local bind references (e.g., ~go) only when RHS actually depends on the
+      // current parameter binding; otherwise leave as ref to avoid unnecessary duplication/loops.
+      if (org && org->lrto_type == LSTRTYPE_BIND) {
+        // Optional gate: disable inlining of local BINDs entirely to validate
+        // recursion hypotheses (set LAZYSCRIPT_CAPTURE_INLINE_BINDS=0)
+        {
+          const char* gate = getenv("LAZYSCRIPT_CAPTURE_INLINE_BINDS");
+          if (gate && (gate[0] == '0')) {
+            const char* dbg = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+            if (dbg && *dbg) {
+              lsprintf(stderr, 0, "[capture] inline(bind) disabled by env; keep ref %p (name=",
+                       (void*)t);
+              if (t->lt_ref.ltr_ref)
+                lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(t->lt_ref.ltr_ref));
+              lsprintf(stderr, 0, ")\n");
+            }
+            return t; // keep as reference; no inlining
+          }
+        }
+        // If we are already inlining this bind, return the clone to keep recursion well-founded
+        for (inline_refmap_t* e = *prefmap; e != NULL; e = e->next) {
+          if (e->target == target && e->clone != NULL)
+            return e->clone;
+        }
+        lsthunk_t* rhs = org->lrto_bind.ltb_rhs;
+        // Quick dependency test: skip inlining if RHS has no reference to the current param
+        if (!contains_param_ref(rhs, param)) {
+          const char* dbg = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+          if (dbg && *dbg) {
+            lsprintf(stderr, 0, "[capture] keep bind ref (no param dep) %p name=", (void*)target);
+            if (t->lt_ref.ltr_ref)
+              lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(t->lt_ref.ltr_ref));
+            lsprintf(stderr, 0, "\n");
+          }
+          return t;
+        }
+        if (rhs && rhs->lt_type == LSTTYPE_LAMBDA) {
+          // Create a lambda shell and register it before descending to support self-recursion
+          lsthunk_t* nt           = lsmalloc(sizeof(lsthunk_t));
+          nt->lt_type             = LSTTYPE_LAMBDA;
+          nt->lt_whnf             = nt;
+          nt->lt_trace_id         = -1;
+          nt->lt_lambda.ltl_param = rhs->lt_lambda.ltl_param;
+          *prefmap                = inline_refmap_bind(*prefmap, target, nt);
+          nt->lt_lambda.ltl_body  = lsthunk_subst_param_rec(rhs->lt_lambda.ltl_body, param, pmemo,
+                                                           prefmap);
+          const char* dbg = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+          if (dbg && *dbg) {
+            lsprintf(stderr, 0, "[capture] inline bind lambda %p -> %p\n", (void*)target,
+                     (void*)nt);
+          }
+          return nt;
+        } else if (rhs && rhs->lt_type == LSTTYPE_CHOICE) {
+          // Create a choice shell first to break recursive references to this bind within its RHS
+          lsthunk_t* nt           = lsmalloc(sizeof(lsthunk_t));
+          nt->lt_type             = LSTTYPE_CHOICE;
+          nt->lt_whnf             = NULL;
+          nt->lt_trace_id         = -1;
+          *prefmap                = inline_refmap_bind(*prefmap, target, nt);
+          // Fill children under the mapping so internal refs to this bind resolve to nt
+          nt->lt_choice.ltc_left  = lsthunk_subst_param_rec(rhs->lt_choice.ltc_left, param, pmemo,
+                                                           prefmap);
+          nt->lt_choice.ltc_right = lsthunk_subst_param_rec(rhs->lt_choice.ltc_right, param, pmemo,
+                                                            prefmap);
+          nt->lt_choice.ltc_kind  = rhs->lt_choice.ltc_kind; // preserve operator semantics
+          const char* dbg         = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+          if (dbg && *dbg) {
+            lsprintf(stderr, 0, "[capture] inline bind choice %p -> %p\n", (void*)target,
+                     (void*)nt);
+          }
+          return nt;
+        } else if (rhs) {
+          // Non-lambda RHS: create a shell clone first, register it to break cycles,
+          // then fill it recursively.
+          lsthunk_t* nt = NULL;
+          switch (rhs->lt_type) {
+          case LSTTYPE_ALGE: {
+            lssize_t n = rhs->lt_alge.lta_argc;
+            nt         = lsmalloc(lssizeof(lsthunk_t, lt_alge) + n * sizeof(lsthunk_t*));
+            nt->lt_type            = LSTTYPE_ALGE;
+            nt->lt_whnf            = nt;
+            nt->lt_trace_id        = -1;
+            nt->lt_alge.lta_constr = rhs->lt_alge.lta_constr;
+            nt->lt_alge.lta_argc   = n;
+            // Register before filling to handle self-references
+            *prefmap = inline_refmap_bind(*prefmap, target, nt);
+            for (lssize_t i = 0; i < n; i++)
+              nt->lt_alge.lta_args[i] =
+                  lsthunk_subst_param_rec(rhs->lt_alge.lta_args[i], param, pmemo, prefmap);
+            break;
+          }
+          case LSTTYPE_APPL: {
+            lssize_t n = rhs->lt_appl.lta_argc;
+            nt         = lsmalloc(lssizeof(lsthunk_t, lt_appl) + n * sizeof(lsthunk_t*));
+            nt->lt_type          = LSTTYPE_APPL;
+            nt->lt_whnf          = NULL;
+            nt->lt_trace_id      = -1;
+            // Register before filling
+            *prefmap             = inline_refmap_bind(*prefmap, target, nt);
+            nt->lt_appl.lta_func = lsthunk_subst_param_rec(rhs->lt_appl.lta_func, param, pmemo,
+                                                           prefmap);
+            nt->lt_appl.lta_argc = n;
+            for (lssize_t i = 0; i < n; i++)
+              nt->lt_appl.lta_args[i] =
+                  lsthunk_subst_param_rec(rhs->lt_appl.lta_args[i], param, pmemo, prefmap);
+            break;
+          }
+          case LSTTYPE_CHOICE: {
+            // Handled above, but keep as safety
+            nt                     = lsmalloc(sizeof(lsthunk_t));
+            nt->lt_type            = LSTTYPE_CHOICE;
+            nt->lt_whnf            = NULL;
+            nt->lt_trace_id        = -1;
+            *prefmap               = inline_refmap_bind(*prefmap, target, nt);
+            nt->lt_choice.ltc_left =
+                lsthunk_subst_param_rec(rhs->lt_choice.ltc_left, param, pmemo, prefmap);
+            nt->lt_choice.ltc_right =
+                lsthunk_subst_param_rec(rhs->lt_choice.ltc_right, param, pmemo, prefmap);
+            nt->lt_choice.ltc_kind = rhs->lt_choice.ltc_kind;
+            break;
+          }
+          case LSTTYPE_LAMBDA: {
+            // Handled in lambda branch; fallthrough should not happen
+            nt                     = lsmalloc(sizeof(lsthunk_t));
+            nt->lt_type            = LSTTYPE_LAMBDA;
+            nt->lt_whnf            = nt;
+            nt->lt_trace_id        = -1;
+            nt->lt_lambda.ltl_param = rhs->lt_lambda.ltl_param;
+            *prefmap               = inline_refmap_bind(*prefmap, target, nt);
+            nt->lt_lambda.ltl_body =
+                lsthunk_subst_param_rec(rhs->lt_lambda.ltl_body, param, pmemo, prefmap);
+            break;
+          }
+          case LSTTYPE_REF: {
+            // Register a temporary self-ref to break cycles, then substitute the ref
+            // (which may resolve to param-bound thunk or other inlined binds)
+            nt       = rhs; // use as-is; substitution below will process it
+            *prefmap = inline_refmap_bind(*prefmap, target, nt);
+            nt       = lsthunk_subst_param_rec(rhs, param, pmemo, prefmap);
+            // Update mapping to the resolved clone
+            *prefmap = inline_refmap_bind(*prefmap, target, nt);
+            break;
+          }
+          case LSTTYPE_BOTTOM: {
+            lssize_t rc = rhs->lt_bottom.lt_rel.lbr_argc;
+            nt         = lsthunk_alloc_bottom(rhs->lt_bottom.lt_msg,
+                                              lsthunk_bottom_get_loc(rhs), rc);
+            *prefmap   = inline_refmap_bind(*prefmap, target, nt);
+            for (lssize_t i = 0; i < rc; i++)
+              lsthunk_set_bottom_related(
+                  nt, i,
+                  lsthunk_subst_param_rec(rhs->lt_bottom.lt_rel.lbr_args[i], param, pmemo,
+                                          prefmap));
+            break;
+          }
+          case LSTTYPE_INT:
+          case LSTTYPE_STR:
+          case LSTTYPE_SYMBOL:
+          case LSTTYPE_BUILTIN:
+          default:
+            // Leaf or unsupported: reuse as-is
+            nt       = rhs;
+            *prefmap = inline_refmap_bind(*prefmap, target, nt);
+            break;
+          }
+          const char* dbg = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+          if (dbg && *dbg) {
+            lsprintf(stderr, 0, "[capture] inline bind non-lambda %p -> %p\n", (void*)target,
+                     (void*)nt);
+          }
+          return nt;
+        }
+      }
+    }
+    // Not resolved via target: attempt name-based capture if this ref is a param subpattern
+    {
+      const lsstr_t* nm = t->lt_ref.ltr_ref ? lsref_get_name(t->lt_ref.ltr_ref) : NULL;
+      if (nm && param_contains_name(param, nm)) {
+        lsthunk_t* bound = param_get_bound_by_name(param, nm);
+        if (bound) {
+          const char* dbg = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+          if (dbg && *dbg) {
+            lsprintf(stderr, 0, "[capture] name-based capture %p name=", (void*)t);
+            lsstr_print_bare(stderr, LSPREC_LOWEST, 0, nm);
+            lsprintf(stderr, 0, " -> %p\n", (void*)bound);
+          }
+          return bound;
+        }
+      }
+    }
+    // Not a param ref (or not bound yet): leave as-is
+    {
+      const char* dbg = getenv("LAZYSCRIPT_DEBUG_CAPTURE");
+      if (dbg && *dbg) {
+        lsprintf(stderr, 0, "[capture] skip ref %p (name=", (void*)t);
+        if (t->lt_ref.ltr_ref)
+          lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(t->lt_ref.ltr_ref));
+        lsprintf(stderr, 0, ") target=%p)\n", (void*)target);
       }
     }
     return t;
@@ -1735,7 +2317,8 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
     nt->lt_alge.lta_argc   = n;
     *pmemo                 = subst_bind(*pmemo, t, nt);
     for (lssize_t i = 0; i < n; i++)
-      nt->lt_alge.lta_args[i] = lsthunk_subst_param_rec(t->lt_alge.lta_args[i], param, pmemo);
+      nt->lt_alge.lta_args[i] =
+          lsthunk_subst_param_rec(t->lt_alge.lta_args[i], param, pmemo, prefmap);
     return nt;
   }
   case LSTTYPE_APPL: {
@@ -1744,11 +2327,12 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
     nt->lt_type          = LSTTYPE_APPL;
     nt->lt_whnf          = NULL;
     nt->lt_trace_id      = -1;
-    nt->lt_appl.lta_func = lsthunk_subst_param_rec(t->lt_appl.lta_func, param, pmemo);
+    nt->lt_appl.lta_func = lsthunk_subst_param_rec(t->lt_appl.lta_func, param, pmemo, prefmap);
     nt->lt_appl.lta_argc = n;
     *pmemo               = subst_bind(*pmemo, t, nt);
     for (lssize_t i = 0; i < n; i++)
-      nt->lt_appl.lta_args[i] = lsthunk_subst_param_rec(t->lt_appl.lta_args[i], param, pmemo);
+      nt->lt_appl.lta_args[i] =
+          lsthunk_subst_param_rec(t->lt_appl.lta_args[i], param, pmemo, prefmap);
     return nt;
   }
   case LSTTYPE_CHOICE: {
@@ -1757,8 +2341,9 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
     nt->lt_whnf             = NULL;
     nt->lt_trace_id         = -1;
     *pmemo                  = subst_bind(*pmemo, t, nt);
-    nt->lt_choice.ltc_left  = lsthunk_subst_param_rec(t->lt_choice.ltc_left, param, pmemo);
-    nt->lt_choice.ltc_right = lsthunk_subst_param_rec(t->lt_choice.ltc_right, param, pmemo);
+    nt->lt_choice.ltc_left  = lsthunk_subst_param_rec(t->lt_choice.ltc_left, param, pmemo, prefmap);
+    nt->lt_choice.ltc_right =
+        lsthunk_subst_param_rec(t->lt_choice.ltc_right, param, pmemo, prefmap);
     // Preserve choice operator kind to keep evaluation semantics ('|' vs '||')
     nt->lt_choice.ltc_kind = t->lt_choice.ltc_kind;
     return nt;
@@ -1771,8 +2356,9 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
     nt->lt_whnf             = nt;
     nt->lt_trace_id         = -1;
     nt->lt_lambda.ltl_param = t->lt_lambda.ltl_param;
-    *pmemo                  = subst_bind(*pmemo, t, nt);
-    nt->lt_lambda.ltl_body  = lsthunk_subst_param_rec(t->lt_lambda.ltl_body, param, pmemo);
+  *pmemo                  = subst_bind(*pmemo, t, nt);
+  nt->lt_lambda.ltl_body  =
+    lsthunk_subst_param_rec(t->lt_lambda.ltl_body, param, pmemo, prefmap);
     return nt;
   }
   case LSTTYPE_INT:
@@ -1785,7 +2371,8 @@ static lsthunk_t* lsthunk_subst_param_rec(lsthunk_t* t, lstpat_t* param, subst_e
 
 lsthunk_t* lsthunk_subst_param(lsthunk_t* thunk, lstpat_t* param) {
   subst_entry_t* memo = NULL;
-  return lsthunk_subst_param_rec(thunk, param, &memo);
+  inline_refmap_t* rmap = NULL;
+  return lsthunk_subst_param_rec(thunk, param, &memo, &rmap);
 }
 
 // --- Thunk Binary (LSTB) I/O (subset v0.1) -------------------------------

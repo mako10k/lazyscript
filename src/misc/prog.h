@@ -2,6 +2,7 @@
 
 typedef struct lsprog lsprog_t;
 typedef struct lsscan lsscan_t;
+typedef struct _IO_FILE FILE; // forward decl for FILE
 
 #include "expr/expr.h"
 #include "common/loc.h"
@@ -26,6 +27,23 @@ lsscan_t*        lsscan_new(const char* filename);
 const lsprog_t*  lsscan_get_prog(const lsscan_t* scanner);
 void             lsscan_set_prog(lsscan_t* scanner, const lsprog_t* prog);
 const char*      lsscan_get_filename(const lsscan_t* scanner);
+// Manage current filename (used by lexer to tag tokens); maintained as a stack when includes are used
+void             lsscan_push_filename(lsscan_t* scanner, const char* filename);
+// Pops and returns previous filename; returns NULL if stack empty (caller should not free return value)
+const char*      lsscan_pop_filename(lsscan_t* scanner);
+// Returns non-zero if filename is already in the current include chain (cycle detection)
+int              lsscan_in_include_chain(const lsscan_t* scanner, const char* filename);
+// Include FILE* stack helpers (to close files on EOF pop)
+void             lsscan_push_file_fp(lsscan_t* scanner, FILE* fp);
+FILE*            lsscan_pop_file_fp(lsscan_t* scanner);
+// Include-site stack: remember where include was triggered to print chain on errors
+void             lsscan_push_include_site(lsscan_t* scanner, lsloc_t site);
+void             lsscan_pop_include_site(lsscan_t* scanner);
+// Print include chain like compilers do: from most-recent parent downward
+void             lsscan_print_include_chain(FILE* fp, const lsscan_t* scanner);
+// Error flagging: yyerror will mark scanner errored; parser driver should check
+void             lsscan_mark_error(lsscan_t* scanner);
+int              lsscan_has_error(const lsscan_t* scanner);
 // Sugar namespace for ~~sym desugaring (default: "prelude")
 void        lsscan_set_sugar_ns(lsscan_t* scanner, const char* ns);
 const char* lsscan_get_sugar_ns(const lsscan_t* scanner);

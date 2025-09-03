@@ -84,7 +84,7 @@ jobs:
           LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
         run: |
           # Quick binary smoke to validate build
-          src/lazyscript -v || true
+          src/lsi -v || true
 
       - name: Check lexer token order
         run: |
@@ -107,7 +107,16 @@ jobs:
           LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
         run: |
           # Lightweight end-to-end smoke for LSTI (write→map→validate→materialize)
-          src/lslsti_check
+          src/lsi-lsti
+
+      - name: "Smoke: LSTR roundtrip (semantic equality OK)"
+        env:
+          LAZYSCRIPT_USE_LIBC_ALLOC: ${{ env.LAZYSCRIPT_USE_LIBC_ALLOC }}
+        run: |
+          # Ensure test image exists (lslsti_check writes ./_tmp_test.lsti)
+          test -f _tmp_test.lsti || src/lsi-lsti
+          # Accept byte equality or semantic equality (tool exits 0 in both cases)
+          src/lsi-lstr-rt _tmp_test.lsti
 
       - name: Static analysis (cppcheck/lizard)
         run: |
@@ -166,6 +175,6 @@ jobs:
           name: debug-${{ matrix.alloc }}-san-${{ matrix.sanitizer }}
           if-no-files-found: ignore
           path: |
-            src/lazyscript
-            src/lazyscript_format
+            src/lsi
+            src/lsi-fmt
             src/plugins/.libs/*.so

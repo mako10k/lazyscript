@@ -1,16 +1,54 @@
 #!/usr/bin/env bash
-# Robust test runner: do not use `set -e` to avoid unexpected early exits during conditionals.
-# We handle exit codes manually and aggregate results.
+# Robust test runner with filters, timing, and optional JUnit export.
+# Note: Do not use `set -e` to avoid early exits during conditionals; we aggregate results.
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$DIR/.." && pwd)"
-BIN="$ROOT/src/lazyscript"
-FMT_BIN="$ROOT/src/lazyscript_format"
+BIN="$ROOT/src/lsi"
+FMT_BIN="$ROOT/src/lsi-fmt"
 
 if [[ ! -x "$BIN" ]]; then
-  echo "E: lazyscript binary not found: $BIN" >&2
+  echo "E: lsi binary not found: $BIN" >&2
   exit 1
 fi
+
+# --- CLI options -------------------------------------------------------------
+# -k/--keep REGEX     : include only tests whose name matches REGEX
+# -x/--exclude REGEX  : exclude tests whose name matches REGEX
+# --list              : list matched tests and exit
+# --shuffle [SEED]    : randomize test order (uses shuf); optional numeric seed
+# --junit FILE        : write JUnit XML to FILE
+# -v/--verbose        : verbose logs (echo command, durations)
+
+KEEP_RE=""
+EXCL_RE=""
+DO_LIST=0
+DO_SHUFFLE=0
+SHUF_SEED=""
+JUNIT_FILE=""
+VERBOSE=0
+
+while (( $# )); do
+  case "$1" in
+    -k|--keep)
+      KEEP_RE="$2"; shift 2;;
+    -x|--exclude)
+      EXCL_RE="$2"; shift 2;;
+    --list)
+      DO_LIST=1; shift;;
+    --shuffle)
+      DO_SHUFFLE=1; SHUF_SEED="${2:-}"; if [[ -n "$SHUF_SEED" && ! "$SHUF_SEED" =~ ^[0-9]+$ ]]; then SHUF_SEED=""; fi; if [[ -n "$SHUF_SEED" ]]; then shift 2; else shift; fi;;
+    --junit)
+      JUNIT_FILE="$2"; shift 2;;
+    -v|--verbose)
+      VERBOSE=1; shift;;
+    --)
+      shift; break;;
+    *)
+      # ignore unknown to preserve backward compat
+      shift;;
+  esac
+done
 
 # Ensure runtime module search path defaults to test dir and repo root (so require "lib/..." works)
 # The search order allows tests to override by pre-setting LAZYSCRIPT_PATH.
@@ -37,6 +75,15 @@ run_with_timeout_capture() {
 }
 
 pass=0; fail=0
+
+# Logging: write last run to a stable file for tooling
+LAST_LOG="$DIR/run-tests.last.log"
+: >"$LAST_LOG"  # truncate
+
+logline() {
+  # tee to stdout and last log
+  echo -e "$*" | tee -a "$LAST_LOG"
+}
 
 # Normalize absolute paths in outputs so CI and local paths compare stably
 normalize_stream() {
@@ -67,6 +114,30 @@ for rel in "${case_files[@]}"; do
   fi
 done
 
+# Apply include/exclude filters
+if [[ -n "$KEEP_RE" ]]; then
+  mapfile -t cases < <(printf '%s\n' "${cases[@]}" | grep -E "$KEEP_RE" || true)
+fi
+if [[ -n "$EXCL_RE" ]]; then
+  mapfile -t cases < <(printf '%s\n' "${cases[@]}" | grep -Ev "$EXCL_RE" || true)
+fi
+
+# Shuffle if requested
+if (( DO_SHUFFLE )); then
+  if command -v shuf >/dev/null 2>&1; then
+    if [[ -n "$SHUF_SEED" ]]; then
+      mapfile -t cases < <(printf '%s\n' "${cases[@]}" | shuf --random-source=<(yes "$SHUF_SEED") )
+    else
+      mapfile -t cases < <(printf '%s\n' "${cases[@]}" | shuf)
+    fi
+  fi
+fi
+
+if (( DO_LIST )); then
+  printf '%s\n' "${cases[@]}"
+  exit 0
+fi
+
 # Load skip list if present
 skip=()
 # Support root skip.list and per-directory skip.list with path-aware entries.
@@ -96,10 +167,11 @@ for name in "${cases[@]}"; do
   # Skip known-bad tests
   for s in "${skip[@]}"; do
     if [[ "$name" == "$s" || "$(basename "$name")" == "$s" ]]; then
-      echo "skip - $name"
+    logline "skip - $name"
       continue 2
     fi
   done
+  start_ms=$(date +%s%3N)
   # Optional per-test env file (key=value per line)
   if [[ -f "$base.env" ]]; then
     # shellcheck source=/dev/null
@@ -119,11 +191,13 @@ for name in "${cases[@]}"; do
   fi
   out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" "$src")"
   if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-    echo "ok - $name"
+  dur_ms=$(( $(date +%s%3N) - start_ms ))
+  logline "ok - $name${VERBOSE:+ (${dur_ms}ms)}"
     ((pass++))
   else
-    echo "not ok - $name"
-    echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
+  dur_ms=$(( $(date +%s%3N) - start_ms ))
+  logline "not ok - $name${VERBOSE:+ (${dur_ms}ms)}"
+  logline "--- got"; printf "%s\n" "$out" | normalize_stream | tee -a "$LAST_LOG" >/dev/null; logline "--- exp"; normalize_stream < "$exp" | tee -a "$LAST_LOG" >/dev/null; logline "---"
     ((fail++))
   fi
 done
@@ -139,6 +213,9 @@ done
 
 for name in "${eval_cases[@]}"; do
   [[ -z "$name" ]] && continue
+  # Apply filters on eval cases too
+  if [[ -n "$KEEP_RE" ]]; then [[ "$name" =~ $KEEP_RE ]] || continue; fi
+  if [[ -n "$EXCL_RE" ]]; then [[ "$name" =~ $EXCL_RE ]] && continue; fi
   src="$DIR/$name.ls"
   exp="$DIR/$name.eval.out"
   base="$DIR/$name"
@@ -154,45 +231,15 @@ for name in "${eval_cases[@]}"; do
   fi
   out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" -e "$(cat "$src")")"
   if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-    echo "ok - eval $name"
+  logline "ok - eval $name"
     ((pass++))
   else
-    echo "not ok - eval $name"
-    echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
+  logline "not ok - eval $name"
+  logline "--- got"; printf "%s\n" "$out" | normalize_stream | tee -a "$LAST_LOG" >/dev/null; logline "--- exp"; normalize_stream < "$exp" | tee -a "$LAST_LOG" >/dev/null; logline "---"
     ((fail++))
   fi
 done
 
-# Discover Core IR dump tests: any test/**/*.ls that has a matching .coreir.out
-cir_cases=()
-for rel in "${case_files[@]}"; do
-  base_noext="${rel%.ls}"
-  if [[ -f "$DIR/$base_noext.coreir.out" ]]; then
-    cir_cases+=("$base_noext")
-  fi
-done
-
-for name in "${cir_cases[@]}"; do
-  [[ -z "$name" ]] && continue
-  src="$DIR/$name.ls"
-  exp="$DIR/$name.coreir.out"
-  base="$DIR/$name"
-  # Run program with Core IR dump and capture all output
-  add_args=()
-  if [[ -n "${LAZYSCRIPT_ARGS:-}" ]]; then
-    # shellcheck disable=SC2206
-    add_args=($LAZYSCRIPT_ARGS)
-  fi
-  out="$(run_with_timeout_capture "$BIN" "${add_args[@]}" --dump-coreir "$src")"
-  if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-    echo "ok - coreir $name"
-    ((pass++))
-  else
-    echo "not ok - coreir $name"
-    echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
-    ((fail++))
-  fi
-done
 
 # Optional: formatter smoke test if the binary exists and an expectation file is present
 if [[ -x "$FMT_BIN" ]]; then
@@ -211,94 +258,33 @@ if [[ -x "$FMT_BIN" ]]; then
   fi
 fi
 
-# Optional: Core IR evaluator smoke tests (if available)
-if "$BIN" --help 2>&1 | grep -q -- "--eval-coreir"; then
-  # Reuse existing tests that are evaluator-friendly
-  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/t05_let_without_keyword.ls")"
-  if [[ "$out" == "3"* ]]; then
-    echo "ok - coreir-eval t05_let_without_keyword"
-    ((pass++))
-  else
-    echo "not ok - coreir-eval t05_let_without_keyword"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; echo "3"; echo "---";
-    ((fail++))
-  fi
 
-  # Token-gated effect via chain: should print and return unit under evaluator
-  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/coreir/t08_coreir_chain.ls")"
-  if diff -u <(printf "%s\n" "$out") "$DIR/coreir/t08_coreir_chain.out" >/dev/null; then
-    echo "ok - coreir-eval t08_coreir_chain"
-    ((pass++))
-  else
-    echo "not ok - coreir-eval t08_coreir_chain"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$DIR/t08_coreir_chain.out"; echo "---";
-    ((fail++))
-  fi
 
-  # return should just pass through the value
-  out="$(run_with_timeout_capture "$BIN" --eval-coreir "$DIR/coreir/t09_coreir_return.ls")"
-  if diff -u <(printf "%s\n" "$out") "$DIR/coreir/t09_coreir_return.out" >/dev/null; then
-    echo "ok - coreir-eval t09_coreir_return"
-    ((pass++))
-  else
-    echo "not ok - coreir-eval t09_coreir_return"
-    echo "--- got"; printf "%s\n" "$out"; echo "--- exp"; cat "$DIR/t09_coreir_return.out"; echo "---";
-    ((fail++))
-  fi
+
+# Optional JUnit export
+if [[ -n "$JUNIT_FILE" ]]; then
+  total=$((pass+fail))
+  {
+    echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+    echo "<testsuite name=\"lazyscript\" tests=\"$total\" failures=\"$fail\">"
+    # Derive cases from last log lines
+    # We only encode basic pass/fail without durations for simplicity here
+    grep -E '^(ok|not ok) - ' "$LAST_LOG" | while read -r line; do
+      status=${line%% -*}; rest=${line#*- };
+      name="$rest"
+      if [[ "$status" == "ok" ]]; then
+        echo "  <testcase name=\"$name\"/>"
+      else
+        # Collect the following got/exp blocks for context until next status or EOF
+        echo "  <testcase name=\"$name\">"
+        echo "    <failure><![CDATA["
+        awk -v start="not ok - $name" 'p==1{print} $0==start{p=1} /^ok - |^not ok - |^skip - /{if ($0!=start && p==1){exit}}' "$LAST_LOG"
+        echo "]]></failure>"
+        echo "  </testcase>"
+      fi
+    done
+    echo "</testsuite>"
+  } > "$JUNIT_FILE" || true
 fi
 
-# Optional: Core IR typechecker tests (if available)
-if "$BIN" --help 2>&1 | grep -q -- "--typecheck"; then
-  # Discover any test/*.ls that has a matching .type.out
-  shopt -s nullglob
-  type_cases=()
-  for f in "$DIR"/*.ls; do
-    base="${f%.ls}"
-    if [[ -f "$base.type.out" ]]; then
-      type_cases+=("$(basename "$base")")
-    fi
-  done
-  shopt -u nullglob
-
-  for name in "${type_cases[@]}"; do
-    [[ -z "$name" ]] && continue
-    src="$DIR/$name.ls"
-    exp="$DIR/$name.type.out"
-  out="$(run_with_timeout_capture "$BIN" --typecheck "$src")"
-    if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-      echo "ok - typecheck $name"
-      ((pass++))
-    else
-      echo "not ok - typecheck $name"
-      echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
-      ((fail++))
-    fi
-  done
-fi
-
-# Optional: Core IR pipe tests (lazyscriptc | lscoreir) for marked cases
-COMP="$ROOT/src/lazyscriptc"
-RUNIR="$ROOT/src/lscoreir"
-if [[ -x "$COMP" && -x "$RUNIR" ]]; then
-  mapfile -t pipe_marks < <(find "$DIR" -type f -name '*.pipe.ok' -printf '%P\n' | sort)
-  for mark in "${pipe_marks[@]}"; do
-    base="${mark%.pipe.ok}"
-    src="$DIR/$base.ls"; exp="$DIR/$base.out"
-    [[ -f "$src" && -f "$exp" ]] || continue
-    out="$(run_with_timeout_capture bash -lc "$COMP '$src' | '$RUNIR'")"
-    if diff -u <(printf "%s\n" "$out" | normalize_stream) <(normalize_stream < "$exp") >/dev/null; then
-      echo "ok - pipe $base"
-      ((pass++))
-    else
-      echo "not ok - pipe $base"
-      echo "--- got"; printf "%s\n" "$out" | normalize_stream; echo "--- exp"; normalize_stream < "$exp"; echo "---";
-      ((fail++))
-    fi
-  done
-fi
-
-if [[ $fail -eq 0 ]]; then
-  exit 0
-else
-  exit 1
-fi
+exit $(( fail==0 ? 0 : 1 ))

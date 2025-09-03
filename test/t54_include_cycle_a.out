@@ -1,0 +1,3 @@
+In file included from <ROOT>/test/t54_include_cycle_a.ls:1.45-89: 
+In file included from <ROOT>/test/t54_include_cycle_a.ls:1.1-45: 
+<ROOT>/test/t54_include_cycle_a.ls:1.89-133: error: include cycle detected for 'test/t54_include_cycle_b.ls'

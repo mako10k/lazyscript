@@ -13,7 +13,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <dlfcn.h>
-#include "coreir/coreir.h"
+/* coreir removed */
 #include "common/hash.h"
 #include "common/malloc.h"
 #include "common/ref.h"
@@ -34,6 +34,7 @@ static const char* g_entry_name        = "main"; // entry function name
 static int         g_trace_stack_depth = 1;      // default: print top frame only
 static const char* g_trace_dump_path =
     NULL; // optional: where to emit JSONL in thunk creation order
+static int         g_exit_zero_on_error = 0; // default: non-zero exit on error
 // Global registry for namespaces moved to builtins/ns.c
 
 // effects helpers moved to runtime/effects.{h,c}
@@ -45,15 +46,22 @@ const lsprog_t*    lsparse_stream(const char* filename, FILE* in_str) {
      yyscan_t yyscanner;
      yylex_init(&yyscanner);
      lsscan_t* lsscan = lsscan_new(filename);
-     yyset_in(in_str, yyscanner);
-     yyset_extra(lsscan, yyscanner);
+  yyset_in(in_str, yyscanner);
+  yyset_extra(lsscan, yyscanner);
+  // Current filename is already set in lsscan_new; no push for top-level
      // Apply sugar namespace if configured
      if (g_sugar_ns == NULL)
     g_sugar_ns = getenv("LAZYSCRIPT_SUGAR_NS");
   if (g_sugar_ns && g_sugar_ns[0])
     lsscan_set_sugar_ns(lsscan, g_sugar_ns);
   int             ret  = yyparse(yyscanner);
-     const lsprog_t* prog = ret == 0 ? lsscan_get_prog(lsscan) : NULL;
+     const lsprog_t* prog = NULL;
+     if (ret == 0 && !lsscan_has_error(lsscan)) {
+       prog = lsscan_get_prog(lsscan);
+     } else {
+       // On any scanner/parser error, ensure we do not proceed to evaluation
+       prog = NULL;
+     }
      yylex_destroy(yyscanner);
      return prog;
 }
@@ -338,102 +346,58 @@ int        main(int argc, char** argv) {
   if (!(_ls_use_libc && _ls_use_libc[0] && _ls_use_libc[0] != '0')) {
            GC_init();
   }
-  const char*   prelude_so       = NULL;
-  int           dump_coreir      = 0;
-  int           eval_coreir      = 0;
-  int           typecheck_coreir = 0;
-  int           kind_warn        = 1;    // default warn
-  int           kind_error       = 0;    // default no error
-  const char*   trace_map_path   = NULL; // optional sourcemap for runtime tracing
-  struct option longopts[]       = {
-                 { "eval", required_argument, NULL, 'e' },
-                 { "prelude-so", required_argument, NULL, 'p' },
-                 { "sugar-namespace", required_argument, NULL, 'n' },
-                 { "strict-effects", no_argument, NULL, 's' },
-                 { "run-main", no_argument, NULL, 1003 },
-                 { "entry", required_argument, NULL, 1004 },
-                 { "dump-coreir", no_argument, NULL, 'i' },
-                 { "eval-coreir", no_argument, NULL, 'c' },
-                 { "typecheck", no_argument, NULL, 't' },
-                 { "no-kind-warn", no_argument, NULL, 1000 },
-                 { "kind-error", no_argument, NULL, 1001 },
-                 { "init", required_argument, NULL, 1002 },
-                 { "trace-map", required_argument, NULL, 2000 },
-                 { "trace-stack-depth", required_argument, NULL, 2001 },
-                 { "trace-dump", required_argument, NULL, 2002 },
-                 { "debug", no_argument, NULL, 'd' },
-                 { "help", no_argument, NULL, 'h' },
-                 { "version", no_argument, NULL, 'v' },
-                 { NULL, 0, NULL, 0 },
+  const char*   prelude_so     = NULL;
+  int           kind_warn      = 1;    // (kept for future, no coreir)
+  int           kind_error     = 0;    // (kept for future, no coreir)
+  const char*   trace_map_path = NULL; // optional sourcemap for runtime tracing
+  int           exit_status    = 0;    // accumulate non-zero on any error
+  // Env default for exit behavior (CLI overrides)
+  {
+    const char* ez = getenv("LAZYSCRIPT_EXIT_ZERO_ON_ERROR");
+    if (ez && ez[0] && ez[0] != '0')
+      g_exit_zero_on_error = 1;
+  }
+  struct option longopts[]     = {
+               { "eval", required_argument, NULL, 'e' },
+               { "prelude-so", required_argument, NULL, 'p' },
+               { "sugar-namespace", required_argument, NULL, 'n' },
+               { "strict-effects", no_argument, NULL, 's' },
+               { "run-main", no_argument, NULL, 1003 },
+               { "entry", required_argument, NULL, 1004 },
+               { "init", required_argument, NULL, 1002 },
+               { "trace-map", required_argument, NULL, 2000 },
+               { "trace-stack-depth", required_argument, NULL, 2001 },
+               { "trace-dump", required_argument, NULL, 2002 },
+               { "exit-zero-on-error", no_argument, NULL, 3001 },
+               { "debug", no_argument, NULL, 'd' },
+               { "help", no_argument, NULL, 'h' },
+               { "version", no_argument, NULL, 'v' },
+               { NULL, 0, NULL, 0 },
   };
   int opt;
-  while ((opt = getopt_long(argc, argv, "e:p:n:sictdhv", longopts, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "e:p:n:sdhv", longopts, NULL)) != -1) {
            switch (opt) {
            case 'e': {
-             static int eval_count = 0;
-             char       name[32];
-             snprintf(name, sizeof(name), "<eval:#%d>", ++eval_count);
-             const lsprog_t* prog = lsparse_string(name, optarg);
-             if (prog != NULL) {
-               if (dump_coreir) {
-                 const lscir_prog_t* cir = lscir_lower_prog(prog);
-                 lscir_print(stdout, 0, cir);
-                 if (ls_effects_get_strict()) {
-                   int errs = lscir_validate_effects(stderr, cir);
-                   if (errs > 0) {
-                     fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-                     exit(1);
-            }
-          }
-                 break;
-        }
-               if (g_debug) {
-                 lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
-        }
-               if (typecheck_coreir) {
-                 lscir_typecheck_set_kind_warn(kind_warn);
-                 lscir_typecheck_set_kind_error(kind_error);
-                 const lscir_prog_t* cir = lscir_lower_prog(prog);
-                 if (ls_effects_get_strict()) {
-                   int errs = lscir_validate_effects(stderr, cir);
-                   if (errs > 0) {
-                     fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-                     exit(1);
-            }
-          }
-                 return lscir_typecheck(stdout, cir);
-        }
-               if (eval_coreir) {
-                 const lscir_prog_t* cir = lscir_lower_prog(prog);
-                 if (ls_effects_get_strict()) {
-                   int errs = lscir_validate_effects(stderr, cir);
-                   if (errs > 0) {
-                     fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-                     exit(1);
-            }
-          }
-                 lscir_eval(stdout, cir);
-                 break;
-        }
-               if (ls_effects_get_strict()) {
-                 const lscir_prog_t* cir  = lscir_lower_prog(prog);
-                 int                 errs = lscir_validate_effects(stderr, cir);
-                 if (errs > 0) {
-                   fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-                   exit(1);
-          }
-        }
-               lstenv_t* tenv = lstenv_new(NULL);
+             // Evaluate one-line program
+      const lsprog_t* prog = lsparse_string("<cmd>", optarg);
+  if (prog != NULL) {
+               if (g_debug)
+          lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
+        lstenv_t* tenv = lstenv_new(NULL);
                if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
                  lsprintf(stderr, 0,
                           "E: prelude: plugin not found or failed to load; set --prelude-so or install "
                                  "liblazyscript_prelude.so\n");
                  exit(1);
         }
-               // Plugin registers prelude dispatchers; no host-side MUX
                int saved_run_main = g_run_main;
-               g_run_main         = 0; // -e は従来通り：最終値を出力
-               // Optional: begin trace dump for this evaluation
+               g_run_main         = 0; // -e は最終値を出力
+               // Honor env for trace dump in -e path as well
+               if (g_trace_dump_path == NULL || g_trace_dump_path[0] == '\0') {
+                 const char* env_dump = getenv("LAZYSCRIPT_TRACE_DUMP");
+                 if (env_dump && env_dump[0])
+                   g_trace_dump_path = env_dump;
+               }
                if (g_trace_dump_path && g_trace_dump_path[0])
           lstrace_begin_dump(g_trace_dump_path);
         if (g_debug)
@@ -487,6 +451,7 @@ int        main(int argc, char** argv) {
                    if (g_lstrace_table && g_trace_stack_depth > 0)
               lstrace_print_stack(stderr, g_trace_stack_depth);
             lsprintf(stderr, 0, "\n");
+                    exit_status = 1;
           } else {
                    if (g_debug)
               lsprintf(stderr, 0, "DBG: print ret begin\n");
@@ -499,6 +464,12 @@ int        main(int argc, char** argv) {
                g_run_main = saved_run_main;
                if (g_trace_dump_path && g_trace_dump_path[0])
           lstrace_end_dump();
+      }
+      // When prog is NULL (parse/scan error), skip evaluation silently; yyerror already printed
+      else {
+        // Ensure run-main flag restored in case of early return path
+        // (no change to g_run_main here because we didn't modify it yet if prog==NULL)
+        exit_status = 1; // treat parse/scan error as failure
       }
              break;
     }
@@ -517,21 +488,6 @@ int        main(int argc, char** argv) {
            case 1004: // --entry <name>
       g_entry_name = optarg;
       break;
-           case 'i':
-      dump_coreir = 1;
-      break;
-           case 'c':
-      eval_coreir = 1;
-      break;
-           case 't':
-      typecheck_coreir = 1;
-      break;
-           case 1000: // --no-kind-warn
-      kind_warn = 0;
-      break;
-           case 1001: // --kind-error
-      kind_error = 1;
-      break;
            case 1002: // --init <file>
       g_init_file = optarg;
       break;
@@ -546,6 +502,9 @@ int        main(int argc, char** argv) {
            case 2002: // --trace-dump <file>
       g_trace_dump_path = optarg;
       break;
+      case 3001: // --exit-zero-on-error
+    g_exit_zero_on_error = 1;
+    break;
            case 'd':
       g_debug = 1;
 #if DEBUG
@@ -566,16 +525,12 @@ int        main(int argc, char** argv) {
       printf("      --run-main          run entry function instead of printing top-level value "
              "(off)\n");
       printf("      --entry <name>      set entry function name (default: main)\n");
-      printf("  -i, --dump-coreir  print Core IR after parsing (debug)\n");
-      printf("  -c, --eval-coreir  run via Core IR evaluator (smoke)\n");
-      printf("  -t, --typecheck    run minimal Core IR typechecker and print OK/error\n");
-      printf("      --no-kind-warn  suppress kind (Pure/IO) warnings during --typecheck\n");
-      printf("      --kind-error    treat kind (Pure/IO) issues as errors during --typecheck\n");
       printf("      --init <file>   load and evaluate an init LazyScript before user code (thunk "
              "path)\n");
       printf("      --trace-map <file>   load sourcemap JSONL for runtime trace printing (exp)\n");
       printf("      --trace-stack-depth <n>  print up to N frames on error (default: 1)\n");
       printf("      --trace-dump <file>  write JSONL sourcemap while evaluating (exp)\n");
+  printf("      --exit-zero-on-error  keep legacy exit status 0 even on errors (off)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
       printf("\nDefault prelude: plugin-only (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover).\n");
@@ -589,6 +544,7 @@ int        main(int argc, char** argv) {
       printf(
           "  LAZYSCRIPT_TRACE_STACK_DEPTH  depth to print (used if --trace-stack-depth not set)\n");
       printf("  LAZYSCRIPT_TRACE_DUMP   path to write JSONL (used if --trace-dump not set)\n");
+  printf("  LAZYSCRIPT_EXIT_ZERO_ON_ERROR  when set (non-empty, not '0'), exit 0 even on errors\n");
       exit(0);
     case 'v':
       printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -603,6 +559,12 @@ int        main(int argc, char** argv) {
     const char* env_map = getenv("LAZYSCRIPT_TRACE_MAP");
     if (env_map && env_map[0])
       trace_map_path = env_map;
+  }
+  // Allow enabling trace dump via environment if --trace-dump is not specified
+  if (g_trace_dump_path == NULL || g_trace_dump_path[0] == '\0') {
+    const char* env_dump = getenv("LAZYSCRIPT_TRACE_DUMP");
+    if (env_dump && env_dump[0])
+      g_trace_dump_path = env_dump;
   }
   if (trace_map_path && trace_map_path[0]) {
     if (lstrace_load_jsonl(trace_map_path) != 0) {
@@ -627,59 +589,12 @@ int        main(int argc, char** argv) {
     const char* filename = argv[i];
     if (strcmp(filename, "-") == 0)
       filename = "/dev/stdin";
-    const lsprog_t* prog = lsparse_file(filename);
-    if (prog != NULL) {
-      if (dump_coreir) {
-        const lscir_prog_t* cir = lscir_lower_prog(prog);
-        lscir_print(stdout, 0, cir);
-        if (ls_effects_get_strict()) {
-          int errs = lscir_validate_effects(stderr, cir);
-          if (errs > 0) {
-            fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-            exit(1);
-          }
-        }
-        continue;
-      }
+  const lsprog_t* prog = lsparse_file(filename);
+  if (prog != NULL) {
       if (g_debug) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
       }
-      if (typecheck_coreir) {
-        lscir_typecheck_set_kind_warn(kind_warn);
-        lscir_typecheck_set_kind_error(kind_error);
-        const lscir_prog_t* cir = lscir_lower_prog(prog);
-        if (ls_effects_get_strict()) {
-          int errs = lscir_validate_effects(stderr, cir);
-          if (errs > 0) {
-            fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-            exit(1);
-          }
-        }
-        int rc = lscir_typecheck(stdout, cir);
-        if (rc != 0)
-          return rc;
-        continue;
-      }
-      if (eval_coreir) {
-        const lscir_prog_t* cir = lscir_lower_prog(prog);
-        if (ls_effects_get_strict()) {
-          int errs = lscir_validate_effects(stderr, cir);
-          if (errs > 0) {
-            fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-            exit(1);
-          }
-        }
-        lscir_eval(stdout, cir);
-        continue;
-      }
-      if (ls_effects_get_strict()) {
-        const lscir_prog_t* cir  = lscir_lower_prog(prog);
-        int                 errs = lscir_validate_effects(stderr, cir);
-        if (errs > 0) {
-          fprintf(stderr, "E: strict-effects: %d error(s)\n", errs);
-          exit(1);
-        }
-      }
+      // strict-effects discipline is enforced at runtime; no prevalidation
       lstenv_t* tenv = lstenv_new(NULL);
       if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
         lsprintf(stderr, 0,
@@ -700,6 +615,7 @@ int        main(int argc, char** argv) {
           if (g_lstrace_table && g_trace_stack_depth > 0)
             lstrace_print_stack(stderr, g_trace_stack_depth);
           lsprintf(stderr, 0, "\n");
+          exit_status = 1;
         } else {
           lsthunk_print(stdout, LSPREC_LOWEST, 0, ret);
           lsprintf(stdout, 0, "\n");
@@ -707,9 +623,15 @@ int        main(int argc, char** argv) {
       }
       if (g_trace_dump_path && g_trace_dump_path[0])
         lstrace_end_dump();
-    }
+  }
+  // else: parse/scan error already reported via yyerror; proceed to next file
+  else {
+    exit_status = 1; // parse/scan error
+  }
   }
   // Cleanup
   lstrace_free();
-  return 0;
+  if (g_exit_zero_on_error)
+    return 0;
+  return exit_status;
 }

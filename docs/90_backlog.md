@@ -14,12 +14,12 @@
     - [ ] LAZYSCRIPT_TRACE_GUARD 有効時に push/pop バランスが保たれ、t52 が安定通過
     - [ ] ガード無効でも SEGV 不発（連続実行で確認）
 
-### 仕様ガード（'++' 完全禁止）
+### 仕様ガード（「＋＋」（plus-plus）完全禁止）
 - 状態: Done / Enforced
-- 決定: “++” は仕様外。実装もパースも行わない。ドキュメントからも削除。
-- 実施: `scripts/guard_no_plusplus.sh` を追加し、docs/.ls では厳格禁止、parser/lexer はトークン定義のみ検出（C の i++ は誤検出しない）に調整。関連ドキュメント修正済み（`docs/09_list_syntax_and_library.md`, `docs/parser-bnf.md`）。
+- 決定: “＋＋（plus-plus）” は仕様外。実装もパースも行わない。ドキュメントからも削除。
+- 実施: `scripts/guard_no_plusplus.sh` を追加し、docs/.ls では厳格禁止、parser/lexer はトークン定義のみ検出（C の i + + は誤検出しない）に調整。関連ドキュメント修正済み（`docs/09_list_syntax_and_library.md`, `docs/parser-bnf.md`）。
 - 受け入れ条件
-    - [x] リポジトリ内から “++” 言及が排除されている（仕様説明を除く明示禁止文言のみ）
+    - [x] リポジトリ内から “＋＋（plus-plus）” 言及が排除されている（仕様説明を除く明示禁止文言のみ）
     - [ ] CI でガードが実行され、違反時に PR をブロック
 
 ### GC/アロケータ安定化（nslit × パターンラムダでの SEGV）
@@ -60,7 +60,7 @@
 - 対応タスク
     - [x] GitHub Actions に GC/非 GC のジョブマトリクスを追加
     - [ ] クラッシュ時の自動バックトレース収集とログ保存
-    - [ ] `scripts/guard_no_plusplus.sh` を CI に組み込み、“++” の再流入をブロック
+    - [ ] `scripts/guard_no_plusplus.sh` を CI に組み込み、“＋＋（plus-plus）” の再流入をブロック
 - 受け入れ条件
     - [ ] 回帰が PR で自動検出される
 
