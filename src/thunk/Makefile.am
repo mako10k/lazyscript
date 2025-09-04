@@ -10,4 +10,5 @@ liblsthunk_la_SOURCES = \
     thunk.c \
     thunk.h \
     lsti.c \
-    lsti.h
+    lsti.h \
+    nslit_eval.c

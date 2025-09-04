@@ -646,32 +646,22 @@ lsthunk_t* lsthunk_new_expr(const lsexpr_t* expr, lstenv_t* tenv) {
   case LSETYPE_SYMBOL:
     return lsthunk_new_symbol(lsexpr_get_symbol(expr));
   case LSETYPE_NSLIT: {
-    // Evaluate AST-level nslit by delegating to builtin nslit implementation.
-    // Build (~prelude nslit$2N) '.a a '.b b ... and thunk it in current env.
-    const lsenslit_t* ns = lsexpr_get_nslit(expr);
-    lssize_t          ec = lsenslit_get_count(ns);
-    // Build prelude reference and symbol nslit$2N
-    const lsexpr_t* prelude =
-        lsexpr_new_ref(lsref_new(lsstr_cstr("prelude"), lsexpr_get_loc(expr)));
-    char buf[32];
-    snprintf(buf, sizeof(buf), "nslit$%ld", (long)(ec * 2));
-    const lsexpr_t* sym  = lsexpr_new_alge(lsealge_new(lsstr_cstr(buf), 0, NULL));
-    const lsexpr_t* call = lsexpr_new_appl(lseappl_new(prelude, 1, &sym));
-    // Build args: '.name value pairs ... (value is the original expression thunk)
-    lssize_t         argc = ec * 2;
-    const lsexpr_t** args = argc ? lsmalloc(sizeof(lsexpr_t*) * argc) : NULL;
+    // Core NSLIT: build (key value ...) argv and dispatch to registered evaluator.
+    const lsenslit_t* ns   = lsexpr_get_nslit(expr);
+    lssize_t          ec   = lsenslit_get_count(ns);
+    lssize_t          argc = ec * 2;
+    lsthunk_t**       argv = argc ? lsmalloc(sizeof(lsthunk_t*) * argc) : NULL;
     for (lssize_t i = 0; i < ec; i++) {
-      const lsstr_t*  name = lsenslit_get_name(ns, i);
-      const lsexpr_t* symi = lsexpr_new_symbol(name);
-      args[2 * i]          = symi;
-      // Use the original member expression as the value; wrapping and nsSelf
-      // handling are performed in lsbuiltin_nslit via member wrappers.
-      args[2 * i + 1] = lsenslit_get_expr(ns, i);
+      const lsstr_t* name = lsenslit_get_name(ns, i);
+      argv[2 * i]         = lsthunk_new_symbol(name);
+      const lsexpr_t* v   = lsenslit_get_expr(ns, i);
+      argv[2 * i + 1]     = lsthunk_new_expr(v, tenv);
     }
-    const lsexpr_t* base = lsexpr_new_appl(lseappl_new(call, argc, args));
-    // No implicit closure-binds for member names; rely on explicit (~prelude .nsSelf)
-    // or user-provided closures for mutual references.
-    return lsthunk_new_expr(base, tenv);
+    extern lsthunk_t* ls_call_nslit_eval(lssize_t argc, lsthunk_t* const* args);
+    lsthunk_t* res = ls_call_nslit_eval(argc, (lsthunk_t* const*)argv);
+    if (argv)
+      lsfree(argv);
+    return res;
   }
   case LSETYPE_RAISE: {
     // Evaluate argument; if Bottom, propagate; else construct Bottom with message and payload.

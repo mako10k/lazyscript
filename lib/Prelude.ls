@@ -11,6 +11,7 @@
   .to_str     = (~builtins .to_str);
   .nsMembers  = (~builtins .nsMembers);
   .include    = (~internal .include); # pure include（その場のスコープで評価して値を返す）
+  # namespace literal support: prelude 経由の委譲は廃止（コア実装に委ねる）
   # 標準ライブラリ再エクスポート（後置 let で定義される ~List を公開）
   .List       = ~List;
   .Option     = ~Option;
