@@ -1,13 +1,13 @@
-# Test/init-time binding for the value-namespace Prelude
-# Bind ~prelude-related conveniences so tests can use (~prelude .to_str) etc.
+# Test/init-time binding for value-level prelude and conveniences without !def
 !{
-	# Core のビルトイン名前空間と internal API を事前に公開
-	!def builtins ((~prelude .builtin) "core");
-	!def internal  (~prelude .env);
+	# 互換レイヤは廃止: トップレベルへのコア内蔵関数の一括 import は行わない
 
-		# 互換性のため、主要ビルトイン（add/lt/eq/print 等）をトップレベルにも読み込む
-		((~prelude .env .import) ~builtins);
-
-	# Prelude 値を include で読み込む（Prelude.ls 内で ~builtins/~internal を参照可能）
-	!def Prelude ((~prelude .env .include) "lib/Prelude.ls");
+	# 値としての builtins/internal/prelude を一括で現在環境に公開
+	((~prelude .env .import)
+		{
+			.builtins = ((~prelude .builtin) "core");
+			.internal = (~prelude .env);
+			.prelude  = ((~prelude .env .include) "lib/Prelude.ls");
+		}
+	);
 };

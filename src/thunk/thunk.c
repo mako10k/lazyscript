@@ -1532,6 +1532,25 @@ lstref_target_origin_t* lstref_target_origin_new_builtin(const lsstr_t* name, ls
   return origin;
 }
 
+// Helper: create a value-binding target for a concrete value 'value' under symbol 'name'.
+// It mirrors closure bind targets but for an already-evaluated RHS thunk.
+lstref_target_t* lstref_target_new_value_binding(const lsstr_t* name, lsthunk_t* value) {
+  if (!name || !value)
+    return NULL;
+  // Build a synthetic BIND origin with lhs as REF pattern to 'name' and rhs as the value thunk.
+  lstref_target_origin_t* origin = lsmalloc(sizeof(lstref_target_origin_t));
+  origin->lrto_type              = LSTRTYPE_BIND;
+  // Create lhs pattern and wire into a target so it can be found in env
+  lsloc_t   loc  = lsloc("<value>", 1, 1, 1, 1);
+  const lsref_t* r    = lsref_new(name, loc);
+  lstpat_t*      lhs  = lstpat_new_ref(r);
+  origin->lrto_bind.ltb_lhs = lhs;
+  origin->lrto_bind.ltb_rhs = value;
+  // Create target wrapping this origin and lhs pattern
+  lstref_target_t* target = lstref_target_new(origin, lhs);
+  return target;
+}
+
 int lsthunk_is_builtin(const lsthunk_t* thunk) {
   return thunk && thunk->lt_type == LSTTYPE_BUILTIN;
 }

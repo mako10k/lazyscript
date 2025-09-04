@@ -1,2 +1,5 @@
 # should resolve ~'foo' as ref to name foo
-!{ !def foo 3; !println (~~to_str (~'foo')) };
+!{
+	((~prelude .env .import) { .foo = 3 });
+	!println (~~to_str (~'foo'))
+};

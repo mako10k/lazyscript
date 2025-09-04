@@ -76,12 +76,12 @@ ok
 src/lazyscript --sugar-namespace prelude -e '!{ !println "hi" }'
 ```
 
-## 環境 API の小例（!def）
+## 環境 API の小例（env.import）
 
 ```
 !{
-  !def .x 42;
-  !println (~to_str ~x)
+  ((~prelude .env .import) { .x = 42 });
+  !println (~~to_str ~x)
 };
 ```
 

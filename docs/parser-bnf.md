@@ -10,11 +10,15 @@
 - LSTINT : 整数リテラル
 - LSTSTR : 文字列リテラル
 - LSTSYMBOL : シンボル/識別子（コンストラクタ等）
+- LSTDOTSYMBOL : ドット付きシンボル（`.sym` を第1級のシンボルとして扱う）
 - LSTPRELUDE_SYMBOL : プレリュード糖 (~~symbol のみ)
 - LSTREFSYM : 参照記法トークン（~x 形式）
 - LSTCARET : キャレット '^'（Bottom 関連の構文で使用）
+- LSTCARETBAR : '^|'（Bottom 捕捉の選択子）
+- LSTOROR : '||'（一般式の選択子）
 - LSTLEFTARROW : "<-"
 - LSTARROW : "->"
+- LSTENVOP : 環境 API 糖（`!sym`）
 - LSTWILDCARD : ワイルドカード '_'
 - 記号: ';', ':', '|', '\\', '{','}','(',')','[',']','@','!','=', ',' など
 
@@ -23,6 +27,11 @@
         - サイクルを検出した場合はエラー（早期に停止）。
         - 位置情報 (filename/line) はインクルード先のファイルに切り替わる。
         - これは構文木には現れない（プリプロセッサ扱い）。
+
+糖の展開（概要）
+- `~~sym` は `(~<ns> .sym)` に構文展開される（`<ns>` は糖衣名前空間。既定は `prelude`）。
+- `!sym` は `(~<ns> .env .sym)` に構文展開される（環境操作 API）。
+- `!{ ... }` は do ブロック風の糖で、`(~<ns> return/bind/chain)` を用いた式列にデシュガーされる。
 
 ## 主要文法（BNF 風）
 以下は parser.y から抽出・簡潔化した BNF 形式の規則です。
@@ -71,6 +80,8 @@
          | LSTSTR
          | LSTREFSYM
          | LSTPRELUDE_SYMBOL
+         | LSTCARET '(' <expr> ')'
+         | LSTENVOP
         <efact> ::= LSTINT
          | <etuple>
          | <elist>
@@ -170,7 +181,7 @@
 - 2025-08: `+` は仕様外（削除済み）。`~~` 糖は `~~symbol` のみに統一。
 - 2025-08: 識別子(ident)の許容文字は `[a-zA-Z_][a-zA-Z0-9_]*` に限定。`$` は不可。必要な場合はクォートしたコンストラクタ `'ident$'` を用いる。
 - parser.y 内の多くの規則は semantic action によって "糖" を展開（ns リテラル、do-block、リスト/タプルのデシュガーなど）する。
-- 優先度: expr 系は複数レベルに分かれ、適用 (application), アルゲ (algebraic constructor), 選択 (choice '|' / '||'), cons ':' 等の優先度が分離されている。
+- 優先度: expr 系は複数レベルに分かれ、適用 (application), アルゲ (algebraic constructor), 選択 (choice '|' / '||' / '^|'), cons ':' 等の優先度が分離されている。
 - ラムダ本体は <expr2>（‘|’ の一段上）にしてあるため、`|` はラムダより弱い（`\x -> a | b` は `(\x -> a) | b` とは解釈されない）。
 - このドキュメントは文法の読みやすさ優先で簡潔化しているため、細部の AST 構築/位置情報などは省略している。
 - 2025-08: '^' の導入
@@ -178,6 +189,7 @@
          - 式側: `^(<expr>)` は Bottom を構築する（専用 AST ノードを生成して評価時に構築）。
          - 仕様詳細は `docs/spec/bottom-and-caret.md` を参照。
 - 2025-09: ラムダ選択鎖の括弧によるグルーピングを原子式として扱い、適用可能にした（`( \\x -> a | \\y -> b ) v` など）。
+ - 2025-09: `!sym`（LSTENVOP）を追加（`(~<ns> .env .sym)` に展開）。既定の `<ns>` は値レベル `prelude`（ドライバが `lib/Prelude.ls` を評価してバインド）。
 
 ## 参照
 - 元ソース: `src/parser/parser.y`

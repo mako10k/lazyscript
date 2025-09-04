@@ -408,8 +408,13 @@ efact:
   | LSTSTR { $$ = lsexpr_with_loc(lsexpr_new_str($1), @$); }
   | LSTREFSYM { $$ = lsexpr_with_loc(lsexpr_new_ref(lsref_new($1, @$)), @$); }
   | LSTPRELUDE_SYMBOL {
-    // ~~symbol => (~<ns> symbol) where symbol is a plain name (no leading dot)
-    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_alge(lsealge_new($1, 0, NULL)), @$);
+    // ~~symbol => (~<ns> .symbol) where .symbol is a value-namespace field
+    // Build dot symbol from plain name $1
+    const char* id = lsstr_get_buf($1);
+    char* buf = NULL; size_t bl = 0;
+    if (id) { bl = strlen(id) + 2; buf = lsmalloc(bl); buf[0] = '.'; memcpy(buf + 1, id, strlen(id) + 1); }
+    const lsexpr_t *sym = lsexpr_with_loc(lsexpr_new_symbol(lsstr_new(buf ? buf : ".", (lssize_t)(buf ? (bl - 1) : 1))), @$);
+    if (buf) lsfree(buf);
     $$ = mk_prelude_call1(yyscanner, @$, sym);
       }
     | etuple {

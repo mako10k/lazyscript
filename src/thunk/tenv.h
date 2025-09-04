@@ -18,3 +18,6 @@ lssize_t         lstenv_get_nfatals(const lstenv_t* tenv);
 void             lstenv_print(FILE* fp, const lstenv_t* tenv);
 void lstenv_put_builtin(lstenv_t* tenv, const lsstr_t* name, lssize_t arity, lstbuiltin_func_t func,
                         void* data);
+
+// Convenience: bind a raw value thunk under 'name' in this environment.
+void lstenv_put_value(lstenv_t* tenv, const lsstr_t* name, lsthunk_t* value);

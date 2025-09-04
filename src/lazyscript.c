@@ -602,9 +602,18 @@ int        main(int argc, char** argv) {
                  "liblazyscript_prelude.so\n");
         exit(1);
       }
-      // Plugin registers prelude dispatchers; no host-side MUX
-      // Evaluate init script (if any) into the same environment
-      ls_maybe_eval_init(tenv);
+      // Plugin registers prelude dispatchers; now also bind value-level prelude
+      // by including lib/Prelude.ls into current environment under name 'prelude'
+      {
+        const lsprog_t* prelude_prog = lsparse_file_nullable("lib/Prelude.ls");
+        if (prelude_prog) {
+          lsthunk_t* pv = lsprog_eval(prelude_prog, tenv);
+          if (pv) {
+            // Bind as value: prelude = <record>
+            lstenv_put_value(tenv, lsstr_cstr("prelude"), pv);
+          }
+        }
+      }
       if (g_trace_dump_path && g_trace_dump_path[0])
         lstrace_begin_dump(g_trace_dump_path);
       lsthunk_t* ret = lsprog_eval(prog, tenv);

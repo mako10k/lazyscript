@@ -118,3 +118,12 @@ void lstenv_put_builtin(lstenv_t* tenv, const lsstr_t* name, lssize_t arity, lst
   lstref_target_t*        target = lstref_target_new(origin, tpat);
   lstenv_put(tenv, name, target);
 }
+
+void lstenv_put_value(lstenv_t* tenv, const lsstr_t* name, lsthunk_t* value) {
+  assert(tenv != NULL);
+  assert(name != NULL);
+  assert(value != NULL);
+  lstref_target_t* target = lstref_target_new_value_binding(name, value);
+  if (target)
+    lstenv_put(tenv, name, target);
+}

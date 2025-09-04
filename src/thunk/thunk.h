@@ -328,6 +328,11 @@ lstpat_t*               lstref_target_get_pat(lstref_target_t* target);
 lstref_target_origin_t* lstref_target_origin_new_builtin(const lsstr_t* name, lssize_t arity,
                                                          lstbuiltin_func_t func, void* data);
 
+// Construct a value-binding target for a given name: creates a BIND origin whose lhs is a
+// REF pattern for 'name' and rhs is the provided thunk value. The returned target's pattern is
+// the same lhs, so later matching will populate its bound.
+lstref_target_t*        lstref_target_new_value_binding(const lsstr_t* name, lsthunk_t* value);
+
 lsthunk_t*              lsprog_eval(const lsprog_t* prog, lstenv_t* tenv);
 
 void                    lsthunk_print(FILE* fp, lsprec_t prec, int indent, lsthunk_t* thunk);
