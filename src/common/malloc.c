@@ -11,6 +11,10 @@ static int use_libc_alloc(void) {
   return cached;
 }
 
+int ls_is_using_libc_alloc(void) {
+  return use_libc_alloc();
+}
+
 void* lsmalloc(size_t size) {
   if (use_libc_alloc())
     return malloc(size);

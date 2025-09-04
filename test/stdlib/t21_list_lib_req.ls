@@ -1,5 +1,5 @@
 !{
-	!withImport ((~prelude .env .include) "lib/List.ls") (\ _ -> ());
+	{- #include "lib/List.ls" -}
 	!println (1 : []);
-	!println ((~cons 2) ((~cons 3) ~nil))
+	!println ((List.cons 2) ((List.cons 3) List.nil))
 };

@@ -251,6 +251,8 @@ static inline const lsexpr_t *mk_return_x(yyscan_t yyscanner, lsloc_t loc, const
 %token <strval> LSTENVOP
 %token <strval> LSTREFSYM
 %token <strval> LSTSTR
+%token <strval> LSTINCLUDE_BEGIN
+%token LSTINCLUDE_END
 %token LSTARROW
 %token LSTOROR
 %token LSTCARET /* lexer must return this for '^' */
@@ -460,6 +462,11 @@ efact:
           }
           const lsenslit_t *ns = lsenslit_new(ec, names, exprs);
           $$ = lsexpr_with_loc(lsexpr_new_nslit(ns), @$);
+        }
+  | LSTINCLUDE_BEGIN expr LSTINCLUDE_END {
+          // Wrap included expression and mark include path for formatter round-trip.
+          // Attach include metadata to the inner expr and return it.
+          $$ = lsexpr_with_include($2, $1);
         }
     ;
 

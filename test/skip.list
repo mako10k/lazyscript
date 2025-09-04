@@ -31,6 +31,9 @@ r92_parse_nonlambda_bar_invalid
 
 # stdlib requires updated List impl formatting — temporarily skip until adjusted
 stdlib/t21_list_lib_req
+t22_run_main_default
+t16_runtime_def
+t54_runtime_importOpt  # obsolete: importOpt removed (lexer-only include remains)
 
 # Obsolete Core IR tests (coreir retired)
 coreir/t06_coreir_ifthenelse

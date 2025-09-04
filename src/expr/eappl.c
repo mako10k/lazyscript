@@ -173,7 +173,7 @@ void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eap
   if (lsfmt_is_active()) {
     // Re-sugar env operator: (~prelude .env .sym) => !sym
     const char* sym = NULL;
-    if (match_prelude_env_sym(eappl, &sym)) {
+    if (!lsfmt_is_resugar_disabled() && match_prelude_env_sym(eappl, &sym)) {
       // Print as an atom regardless of precedence
       lsprintf(stream, indent, "!%s", sym ? sym : "");
       return;

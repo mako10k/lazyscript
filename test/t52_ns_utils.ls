@@ -1,5 +1,6 @@
 !{
-  ~N <- (~prelude .env .include) "lib/Ns.ls";
+  {- #include "lib/Ns.ls" -}
+  ~N <- Ns;
   ns <- ({ .a = 1; .b = 2 });
   !println (~~to_str (((~N .nsHas) ~ns) .a));
   !println (~~to_str ((((~N .nsGetOr) ~ns) .c) 99));

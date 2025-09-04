@@ -18,7 +18,7 @@
   - 上記の純粋 API を再エクスポート（`~~sym` で参照可能）。
   - `.env` 名前空間を持ち、環境操作 API をここから露出。
 - internal（環境 API 実体）
-  - require, include, import, withImport, def, nsnew/nsdef/nsnew0/nsdefv など。
+  - require（効果）など。
   - これらは `~internal` として Prelude 評価時のみ利用でき、`Prelude.ls` 内の `.env` にブリッジされます。
 
 ## スコープと可視性
@@ -55,7 +55,7 @@
 ## 代表的なエクスポート一覧（Prelude）
 
 - 純粋: println, print, to_str, eq, lt, add, sub, seq, chain, bind, return, nsMembers, nsSelf, include
-- 環境: `.env` 配下に require, import, withImport, def, nsnew/nsdef/nsnew0/nsdefv など
+- 環境: `.env` 配下に require など（import/withImport は削除）
  
 ### include の注意
 
@@ -65,8 +65,10 @@
 
 ```
 !{
-  A = (~prelude include) "lib/A.ls";
-  B = ((~prelude include) "lib/B.ls"; ~A = A);
+  {- #include "lib/A.ls" -}
+  A = A;
+  {- #include "lib/B.ls" -}
+  B = B;
 }
 ```
 

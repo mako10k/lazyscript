@@ -8,9 +8,11 @@
 #include <string.h>
 #include <getopt.h>
 #include "misc/prog.h"
+#include <gc.h>
 
 // Local parse helper (duplicated from lazyscript.c)
 static const char*     g_sugar_ns = NULL;
+static int format_buffer_to(const char* name, const char* buf, size_t len, FILE* out_fp);
 
 static const lsprog_t* lsparse_stream_local(const char* filename, FILE* in_str) {
   assert(in_str != NULL);
@@ -18,6 +20,8 @@ static const lsprog_t* lsparse_stream_local(const char* filename, FILE* in_str) 
   yylex_init(&yyscanner);
   lsscan_t* lsscan = lsscan_new(filename);
   yyset_in(in_str, yyscanner);
+  // Ensure the scanner buffer is properly initialized for this input stream.
+  yyrestart(in_str, yyscanner);
   yyset_extra(lsscan, yyscanner);
   if (g_sugar_ns == NULL)
     g_sugar_ns = getenv("LAZYSCRIPT_SUGAR_NS");
@@ -30,7 +34,11 @@ static const lsprog_t* lsparse_stream_local(const char* filename, FILE* in_str) 
   } else {
     prog = NULL;
   }
-  yylex_destroy(yyscanner);
+  // NOTE: Temporarily avoid yylex_destroy due to a crash observed when
+  // tearing down buffer stacks after early parse errors. The process is
+  // short-lived and resources are reclaimed by the OS. Re-enable once
+  // the buffer lifecycle is fully audited.
+  // yylex_destroy(yyscanner);
   return prog;
 }
 
@@ -45,31 +53,33 @@ static void print_usage(const char* progname) {
 }
 
 static int format_stream_to(const char* filename, FILE* in_fp, FILE* out_fp) {
-  const lsprog_t* prog = lsparse_stream_local(filename, in_fp);
-  if (!prog) {
-    fprintf(stderr, "Parse error in %s\n", filename);
-    return 2;
+  // Read entire stream into a heap buffer, then parse from memory buffer.
+  // This avoids certain libgc/stdio interactions seen in some environments.
+  size_t cap = 4096, len = 0;
+  char*  buf = (char*)malloc(cap);
+  if (!buf) {
+    perror("malloc");
+    return 1;
   }
-  const char* dbg = getenv("LAZYFMT_DEBUG");
-  if (dbg && dbg[0]) {
-    const lsarray_t* cs = lsprog_get_comments(prog);
-    lssize_t         n  = cs ? lsarray_get_size(cs) : 0;
-    fprintf(stderr, "[lazyscript_format] captured comments: %ld\n", (long)n);
-    if (dbg[0] == '2') {
-      const void* const* pv = cs ? lsarray_get(cs) : NULL;
-      for (lssize_t i = 0; i < n; i++) {
-        const lscomment_t* c  = (const lscomment_t*)pv[i];
-        int                ln = c ? c->lc_loc.first_line : -1;
-        const char*        s  = (c && c->lc_text) ? lsstr_get_buf(c->lc_text) : "";
-        fprintf(stderr, "  [c%ld] line=%d text='%s'\n", (long)i, ln, s);
+  while (1) {
+    if (len == cap) {
+      cap *= 2;
+      char* nbuf = (char*)realloc(buf, cap);
+      if (!nbuf) {
+        free(buf);
+        perror("realloc");
+        return 1;
       }
+      buf = nbuf;
     }
+    size_t n = fread(buf + len, 1, cap - len, in_fp);
+    len += n;
+    if (n == 0)
+      break;
   }
-  // Enable comment weaving so comments are interleaved by source position
-  lsfmt_set_comment_stream(lsprog_get_comments(prog));
-  lsprog_print(out_fp, LSPREC_LOWEST, 0, prog);
-  lsfmt_clear_comment_stream();
-  return 0;
+  int rc = format_buffer_to(filename, buf, len, out_fp);
+  free(buf);
+  return rc;
 }
 
 static int format_buffer_to(const char* name, const char* buf, size_t len, FILE* out_fp) {
@@ -183,6 +193,14 @@ static int format_file(const char* filename, int in_place) {
 }
 
 int main(int argc, char** argv) {
+  // Ensure Boehm GC is initialized early (unless libc alloc is requested),
+  // so that any allocations in scanner/parser paths are safe.
+  {
+    const char* _ls_use_libc = getenv("LAZYSCRIPT_USE_LIBC_ALLOC");
+    if (!(_ls_use_libc && _ls_use_libc[0] && _ls_use_libc[0] != '0')) {
+      GC_init();
+    }
+  }
   int           in_place   = 0;
   struct option longopts[] = {
     { "help", no_argument, NULL, 'h' },

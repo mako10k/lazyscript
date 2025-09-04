@@ -9,4 +9,4 @@
   .getOrElse = (\~d -> \~opt -> (
   (\None -> ~d) || (\(Some ~x) -> ~x)
   ) ~opt)
-};
+}

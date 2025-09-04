@@ -68,6 +68,8 @@ void lsfmt_set_comment_stream(const lsarray_t* comments);
 void lsfmt_flush_comments_up_to(FILE* fp, int line, int indent);
 void lsfmt_clear_comment_stream(void);
 int  lsfmt_is_active(void);
+// Return 1 if resugaring should be disabled for this formatting run.
+int  lsfmt_is_resugar_disabled(void);
 
 // Peek the next comment without consuming; returns NULL if none.
 const lscomment_t* lsfmt_peek_next_comment(void);

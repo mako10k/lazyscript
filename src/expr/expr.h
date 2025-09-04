@@ -86,3 +86,9 @@ lsapi_get lsexpr_type_query_t lsexpr_typeof(const lsexpr_t* expr);
 lsapi_get lsloc_t lsexpr_get_loc(const lsexpr_t* expr);
 // Attach a source location to an expression and return it (same pointer)
 lsapi_nn1 lsapi_wur const lsexpr_t* lsexpr_with_loc(const lsexpr_t* expr, lsloc_t loc);
+// Include metadata: mark this expression as originating from a lexer-level include.
+// When formatter mode is active, such expressions are printed as an include directive
+// instead of expanded content.
+lsapi_nn1 lsapi_wur const lsexpr_t* lsexpr_with_include(const lsexpr_t* expr, const lsstr_t* path);
+// Returns non-NULL when expression is marked as include-root; gives included file path.
+lsapi_get const lsstr_t*             lsexpr_get_include_path(const lsexpr_t* expr);

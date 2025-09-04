@@ -21,6 +21,7 @@ struct lsscan {
   const lsarray_t* ls_file_stack;       // array of const char* (push on include)
   const lsarray_t* ls_fp_stack;         // array of FILE* parallel to filenames
   const lsarray_t* ls_inc_sites;        // array of lsloc_t* include sites (one per push)
+  int              ls_have_inc_sites;   // seen any include-push during this scan
 };
 
 const lsprog_t* lsprog_new(const lsexpr_t* expr, const lsarray_t* comments) {
@@ -46,12 +47,16 @@ const lsexpr_t*  lsprog_get_expr(const lsprog_t* prog) { return prog->lp_expr; }
 const lsarray_t* lsprog_get_comments(const lsprog_t* prog) { return prog->lp_comments; }
 
 void             lsscan_print_include_chain(FILE* fp, const lsscan_t* scanner) {
-  if (!scanner || !scanner->ls_inc_sites) return;
-  lssize_t n = lsarray_get_size(scanner->ls_inc_sites);
-  const void* const* pv = lsarray_get(scanner->ls_inc_sites);
+  if (!scanner || !scanner->ls_have_inc_sites || !scanner->ls_inc_sites)
+    return;
+  lssize_t               n  = lsarray_get_size(scanner->ls_inc_sites);
+  const void* const*     pv = lsarray_get(scanner->ls_inc_sites);
+  if (n <= 0 || pv == NULL)
+    return; // nothing to print or corrupted/empty array
   for (lssize_t i = n; i > 0; --i) {
     const lsloc_t* site = (const lsloc_t*)pv[i - 1];
-    if (!site) continue;
+    if (!site)
+      continue;
     lsprintf(fp, 0, "In file included from ");
     lsloc_print(fp, *site);
     lsprintf(fp, 0, "\n");
@@ -63,7 +68,14 @@ int              lsscan_has_error(const lsscan_t* scanner) { return scanner ? sc
 
 void             yyerror(lsloc_t* loc, lsscan_t* scanner, const char* s) {
   if (scanner) lsscan_mark_error(scanner);
-  lsscan_print_include_chain(stderr, scanner);
+  // Print include chain only if explicitly enabled via env and include was used
+  const char* incdiag = getenv("LAZYFMT_PRINT_INCLUDE_CHAIN");
+  if (incdiag && incdiag[0] && incdiag[0] != '0') {
+    if (scanner && scanner->ls_have_inc_sites && scanner->ls_inc_sites &&
+        lsarray_get(scanner->ls_inc_sites) != NULL && lsarray_get_size(scanner->ls_inc_sites) >= 0) {
+      lsscan_print_include_chain(stderr, scanner);
+    }
+  }
   if (loc) lsloc_print(stderr, *loc);
   lsprintf(stderr, 0, "%s\n", s ? s : "error");
 }
@@ -80,6 +92,7 @@ lsscan_t* lsscan_new(const char* filename) {
   scanner->ls_file_stack       = NULL;
   scanner->ls_fp_stack         = NULL;
   scanner->ls_inc_sites        = NULL;
+  scanner->ls_have_inc_sites   = 0;
   return scanner;
 }
 
@@ -204,12 +217,19 @@ static int              g_fmt_hold_line = 0;
 // Formatter activation flag (decoupled from presence of comments). When true,
 // printers may apply formatter-specific behavior even if there are no comments.
 static int g_fmt_active = 0;
+// Optional: disable resugaring (do-notation, dot-chain fusion, include re-emit)
+// when set to non-empty env LAZYFMT_DISABLE_RESUGAR.
+static int g_fmt_disable_resugar = -1; // lazy-init from env
 
 void       lsfmt_set_comment_stream(const lsarray_t* comments) {
         g_fmt_comments  = comments;
         g_fmt_index     = 0;
         g_fmt_hold_line = 0;
         g_fmt_active    = 1;
+        if (g_fmt_disable_resugar < 0) {
+          const char* v = getenv("LAZYFMT_DISABLE_RESUGAR");
+          g_fmt_disable_resugar = (v && v[0] && v[0] != '0') ? 1 : 0;
+        }
 }
 
 void lsfmt_clear_comment_stream(void) {
@@ -220,6 +240,14 @@ void lsfmt_clear_comment_stream(void) {
 }
 
 int  lsfmt_is_active(void) { return g_fmt_active; }
+
+int  lsfmt_is_resugar_disabled(void) {
+  if (g_fmt_disable_resugar < 0) {
+    const char* v = getenv("LAZYFMT_DISABLE_RESUGAR");
+    g_fmt_disable_resugar = (v && v[0] && v[0] != '0') ? 1 : 0;
+  }
+  return g_fmt_disable_resugar;
+}
 
 void lsfmt_flush_comments_up_to(FILE* fp, int line, int indent) {
   if (!g_fmt_active)
@@ -272,6 +300,7 @@ void lsscan_push_include_site(lsscan_t* scanner, lsloc_t site) {
   lsloc_t* p = lsmalloc(sizeof(lsloc_t));
   *p         = site;
   scanner->ls_inc_sites = lsarray_push(scanner->ls_inc_sites, p);
+  scanner->ls_have_inc_sites = 1;
 }
 
 void lsscan_pop_include_site(lsscan_t* scanner) {

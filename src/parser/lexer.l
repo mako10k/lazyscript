@@ -93,7 +93,6 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 %option extra-type="lsscan_t *"
 
 %x COMMENT
-%x INCLUDE
 
 %%
 [ \t\n]*\{-[ ]*#include[^\n]*-\} {
@@ -122,12 +121,14 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 				lsfree(fname);
 				BEGIN(INITIAL);
 			} else {
+				// Emit include-begin token carrying included path, then push new buffer
+				yylval->strval = lsstr_cstr(fname);
 				YY_BUFFER_STATE buf = yy_create_buffer(f, YY_BUF_SIZE, yyscanner);
 				yypush_buffer_state(buf, yyscanner);
 				lsscan_push_filename(yyget_extra(yyscanner), fname);
 				lsscan_push_file_fp(yyget_extra(yyscanner), f);
 				lsscan_push_include_site(yyget_extra(yyscanner), *yylloc);
-				BEGIN(INITIAL);
+				return LSTINCLUDE_BEGIN;
 			}
 		}
 	}
@@ -190,17 +191,17 @@ static const lsstr_t* lslex_parse_squoted(const char* p, int len) {
 "^"        { return LSTCARET; }
 . { return yytext[0]; }
 <<EOF>> {
-		/* When reaching EOF of an included file, pop buffer and restore previous filename. */
-				FILE* f = lsscan_pop_file_fp(yyget_extra(yyscanner));
-			const char* prev = lsscan_pop_filename(yyget_extra(yyscanner));
+		/* When reaching EOF of an included file, pop buffer and restore previous filename.
+		   Also emit a synthetic end token so the parser can close the include wrapper. */
+		FILE* f = lsscan_pop_file_fp(yyget_extra(yyscanner));
+		const char* prev = lsscan_pop_filename(yyget_extra(yyscanner));
 		if (prev) {
 			yypop_buffer_state(yyscanner);
-				if (f) fclose(f);
-					lsscan_pop_include_site(yyget_extra(yyscanner));
+			if (f) fclose(f);
+			lsscan_pop_include_site(yyget_extra(yyscanner));
 			/* yylloc filename will be updated on next token via YY_USER_ACTION */
-			YY_FLUSH_BUFFER;
 			BEGIN(INITIAL);
-			YY_BREAK;
+			return LSTINCLUDE_END;
 		}
 		return 0; /* true EOF */
 }

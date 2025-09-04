@@ -152,7 +152,10 @@ static const lsstr_t** lsstr_ht_put_raw(lsstr_ht_t* str_ht, const char* buf, lss
     return pstr;
   *pstr = lsstr_new_raw(buf, len);
   str_ht->lsth_size++;
-  GC_REGISTER_FINALIZER((void*)*pstr, lsstr_finalizer, NULL, NULL, NULL);
+  // Register GC finalizer only when GC is in use.
+  if (!ls_is_using_libc_alloc()) {
+    GC_REGISTER_FINALIZER((void*)*pstr, lsstr_finalizer, NULL, NULL, NULL);
+  }
   return pstr;
 }
 
@@ -160,6 +163,9 @@ static const lsstr_t* lsstr_ht_put_raw_resizable(lsstr_ht_t* str_ht, const char*
                                                  lssize_t len) {
   assert(str_ht != NULL);
   assert(buf != NULL);
+  // Always maintain a resizable table. Avoiding resize under libc can fill the
+  // table and cause infinite probing in open addressing. Doubling when load
+  // factor reaches ~0.5 keeps lookups amortized O(1) and prevents hangs.
   lssize_t cap = str_ht->lsth_cap;
   while ((str_ht->lsth_size + 1) * 2 >= cap)
     cap *= 2;

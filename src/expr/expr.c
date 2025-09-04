@@ -303,6 +303,9 @@ static int try_print_do_block(FILE* fp, lsprec_t prec, int indent, const lsexpr_
 struct lsexpr {
   lsetype_t le_type;
   lsloc_t   le_loc;
+  // Optional include metadata: when non-NULL, this expression is the top-level
+  // expansion result of an include file. Formatter should re-emit include directive.
+  const lsstr_t* le_include_path;
   union {
     const lsealge_t*    le_alge;
     const lseappl_t*    le_appl;
@@ -322,6 +325,7 @@ const lsexpr_t* lsexpr_new_alge(const lsealge_t* ealge) {
   lsexpr_t* expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type  = LSETYPE_ALGE;
   expr->le_loc   = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_alge  = ealge;
   return expr;
 }
@@ -330,6 +334,7 @@ const lsexpr_t* lsexpr_new_nslit(const lsenslit_t* ens) {
   lsexpr_t* expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type  = LSETYPE_NSLIT;
   expr->le_loc   = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_nslit = ens;
   return expr;
 }
@@ -337,6 +342,7 @@ const lsexpr_t* lsexpr_new_appl(const lseappl_t* eappl) {
   lsexpr_t* expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type  = LSETYPE_APPL;
   expr->le_loc   = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_appl  = eappl;
   return expr;
 }
@@ -345,6 +351,7 @@ const lsexpr_t* lsexpr_new_ref(const lsref_t* ref) {
   lsexpr_t* expr = lsmalloc(sizeof(lsexpr_t));
   expr->le_type  = LSETYPE_REF;
   expr->le_loc   = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_ref   = ref;
   return expr;
 }
@@ -353,6 +360,7 @@ const lsexpr_t* lsexpr_new_int(const lsint_t* intval) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_INT;
   expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_intval = intval;
   return expr;
 }
@@ -361,6 +369,7 @@ const lsexpr_t* lsexpr_new_str(const lsstr_t* strval) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_STR;
   expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_strval = strval;
   return expr;
 }
@@ -369,6 +378,7 @@ const lsexpr_t* lsexpr_new_lambda(const lselambda_t* lambda) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_LAMBDA;
   expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_lambda = lambda;
   return expr;
 }
@@ -377,6 +387,7 @@ const lsexpr_t* lsexpr_new_choice(const lsechoice_t* echoice) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_CHOICE;
   expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_choice = echoice;
   return expr;
 }
@@ -385,6 +396,7 @@ const lsexpr_t* lsexpr_new_symbol(const lsstr_t* sym) {
   lsexpr_t* expr  = lsmalloc(sizeof(lsexpr_t));
   expr->le_type   = LSETYPE_SYMBOL;
   expr->le_loc    = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_symbol = sym;
   return expr;
 }
@@ -393,6 +405,7 @@ const lsexpr_t* lsexpr_new_closure(const lseclosure_t* closure) {
   lsexpr_t* expr   = lsmalloc(sizeof(lsexpr_t));
   expr->le_type    = LSETYPE_CLOSURE;
   expr->le_loc     = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_closure = closure;
   return expr;
 }
@@ -457,7 +470,14 @@ void lsexpr_print(FILE* fp, lsprec_t prec, int indent, const lsexpr_t* expr) {
   }
   // Re-sugar do-notation when formatting if the expression matches bind/chain/return shapes.
   if (lsfmt_is_active()) {
-    if (try_print_do_block(fp, prec, indent, expr))
+    // If this expression is a top-level include expansion, print include directive.
+    if (!lsfmt_is_resugar_disabled() && expr->le_include_path) {
+      const char* p = lsstr_get_buf(expr->le_include_path);
+      if (!p) p = "";
+      lsprintf(fp, indent, "{- #include \"%s\" -}", p);
+      return;
+    }
+    if (!lsfmt_is_resugar_disabled() && try_print_do_block(fp, prec, indent, expr))
       return;
   }
   switch (expr->le_type) {
@@ -519,6 +539,7 @@ const lsexpr_t* lsexpr_new_raise(const lsexpr_t* arg) {
   lsexpr_t* expr     = lsmalloc(sizeof(lsexpr_t));
   expr->le_type      = LSETYPE_RAISE;
   expr->le_loc       = lsloc("<unknown>", 1, 1, 1, 1);
+  expr->le_include_path = NULL;
   expr->le_raise_arg = arg;
   return expr;
 }
@@ -532,6 +553,17 @@ const lsexpr_t* lsexpr_with_loc(const lsexpr_t* expr_in, lsloc_t loc) {
   lsexpr_t* expr = (lsexpr_t*)expr_in;
   expr->le_loc   = loc;
   return expr_in;
+}
+
+const lsexpr_t* lsexpr_with_include(const lsexpr_t* expr_in, const lsstr_t* path) {
+  lsexpr_t* expr        = (lsexpr_t*)expr_in;
+  expr->le_include_path = path;
+  return expr_in;
+}
+
+const lsstr_t* lsexpr_get_include_path(const lsexpr_t* expr) {
+  assert(expr != NULL);
+  return expr->le_include_path;
 }
 
 lsexpr_type_query_t lsexpr_typeof(const lsexpr_t* expr) {

@@ -10,7 +10,7 @@
   .sub        = (~builtins .sub);
   .to_str     = (~builtins .to_str);
   .nsMembers  = (~builtins .nsMembers);
-  .include    = (~internal .include); # pure include（その場のスコープで評価して値を返す）
+  # .include 廃止（字句レイヤーの {- #include -} を使用）
   # namespace literal support: prelude 経由の委譲は廃止（コア実装に委ねる）
   # 標準ライブラリ再エクスポート（後置 let で定義される ~List を公開）
   .List       = ~List;
@@ -27,20 +27,14 @@
   .env = {
   .require     = (~internal .require);
   .requireOpt  = (~internal .requireOpt);
-  .include     = (~internal .include);
   .println     = (~builtins .println);
-  .print       = (~builtins .print);
-  .import      = (~internal .import);
-  .importOpt   = (~internal .importOpt);
-  .withImport  = (~internal .withImport);
-  # 可変名前空間 API は削除済みのため未公開
-  # .nsMembers/.nsSelf は純粋 API としてトップレベルに公開済み
+  .print       = (~builtins .print)
   };
   }
   ;
-  # 末尾で純粋 include により標準ライブラリを取り込む（前方参照可能）
-  ~List    = ((~internal .include) "lib/List.ls");
-  ~Option  = ((~internal .include) "lib/Option.ls");
-  ~Result  = ((~internal .include) "lib/Result.ls");
-  ~String  = ((~internal .include) "lib/String.ls")
+  # 末尾で純粋 include により標準ライブラリを取り込み（式としてインライン展開し束縛）
+  ~List   = {- #include "lib/List.ls" -};
+  ~Option = {- #include "lib/Option.ls" -};
+  ~Result = {- #include "lib/Result.ls" -};
+  ~String = {- #include "lib/String.ls" -}
 )

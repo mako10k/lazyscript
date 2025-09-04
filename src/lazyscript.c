@@ -29,8 +29,7 @@
 #include "runtime/trace.h"
 
 static int         g_debug             = 0;
-static int         g_run_main          = 1; // default: on (files). -e path will disable temporarily
-static const char* g_entry_name        = "main"; // entry function name
+// run-main/entry support removed: always evaluate and print top-level value
 static int         g_trace_stack_depth = 1;      // default: print top frame only
 static const char* g_trace_dump_path =
     NULL; // optional: where to emit JSONL in thunk creation order
@@ -97,27 +96,7 @@ const lsprog_t* lsparse_file_nullable(const char* filename) {
 // Forward declaration (defined below in Prelude helpers)
 // moved to runtime/unit.h as inline
 
-// Try to run entry function (~g_entry_name) if configured; returns 1 if invoked.
-static int ls_maybe_run_entry(lstenv_t* tenv) {
-  if (!g_run_main || !tenv || !g_entry_name || !g_entry_name[0])
-    return 0;
-  lstref_target_t* target = lstenv_get(tenv, lsstr_cstr(g_entry_name));
-  if (!target)
-    return 0;
-  lsloc_t        loc    = lsloc("<entry>", 1, 1, 1, 1);
-  const lsref_t* r      = lsref_new(lsstr_cstr(g_entry_name), loc);
-  lsthunk_t*     rthunk = lsthunk_new_ref(r, tenv);
-  if (ls_effects_get_strict())
-    ls_effects_begin();
-  lsthunk_t* v = lsthunk_eval0(rthunk);
-  if (v && lsthunk_get_type(v) == LSTTYPE_LAMBDA) {
-    lsthunk_t* unit = ls_make_unit();
-    (void)lsthunk_eval(v, 1, &unit);
-  }
-  if (ls_effects_get_strict())
-    ls_effects_end();
-  return 1;
-}
+// ls_maybe_run_entry: removed
 
 // Load and evaluate an initialization script into the given environment (thunk path)
 static void ls_maybe_eval_init(lstenv_t* tenv) {
@@ -148,8 +127,7 @@ static void ls_maybe_eval_init(lstenv_t* tenv) {
 
 // prelude.require は builtins/require.c に移動
 // Prelude builtins are provided via the prelude plugin only
-// include の実装も require.c にあるため、ここで使用宣言
-lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data);
+// include は字句レイヤーへ移行したため、ホスト側の include ビルトインは廃止
 
 // seq is implemented in builtins/seq.c
 
@@ -181,7 +159,6 @@ extern lsthunk_t* lsbuiltin_nslit(lssize_t argc, lsthunk_t* const* args, void* d
 
 // Forward decls from require/builtin loader
 lsthunk_t* lsbuiltin_prelude_builtin(lssize_t argc, lsthunk_t* const* args, void* data);
-lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void* data);
 
 // --- Ephemeral namespaces for Prelude.ls evaluation ---
 // Helpers to build symbol and builtin thunks
@@ -190,84 +167,8 @@ static inline lsthunk_t* _mk_dotsym(const char* name) {
   return lsthunk_new_symbol(lsstr_cstr(name));
 }
 
-// Internal import helpers (mirrors plugin logic; scoped to Prelude evaluation only)
-static void _internal_import_cb(const lsstr_t* sym, lsthunk_t* value, void* data) {
-  lstenv_t* tenv = (lstenv_t*)data;
-  if (!tenv)
-    return;
-  // Bind original key as-is (may start with '.')
-  // Use 0-arity getter so that symbol access returns the captured thunk lazily
-  extern lsthunk_t* lsbuiltin_getter0_local(lssize_t, lsthunk_t* const*, void*);
-  lstenv_put_builtin(tenv, sym, 0, lsbuiltin_getter0_local, value);
-  // If symbol starts with '.', also bind alias without leading dot
-  const char* s = lsstr_get_buf(sym);
-  lssize_t    n = lsstr_get_len(sym);
-  if (s && n > 1 && s[0] == '.') {
-    const lsstr_t* alias = lsstr_new(s + 1, n - 1);
-    lstenv_put_builtin(tenv, alias, 0, lsbuiltin_getter0_local, value);
-  }
-}
-
 // Forward declarations from ns.c and require.c
-int         lsns_foreach_member(lsthunk_t* ns_thunk, void (*cb)(const lsstr_t*, lsthunk_t*, void*),
-                                void* data);
 lsthunk_t*  lsbuiltin_prelude_require(lssize_t argc, lsthunk_t* const* args, void* data);
-
-// internal.import: import namespace members into current env (effectful)
-static lsthunk_t* _internal_import(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc;
-  lstenv_t* tenv = (lstenv_t*)data;
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: import: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  if (!tenv)
-    return NULL;
-  lsthunk_t* nsv = lsthunk_eval0(args[0]);
-  if (nsv == NULL)
-    return NULL;
-  if (!lsns_foreach_member(nsv, _internal_import_cb, tenv))
-    return ls_make_err("import: invalid namespace");
-  return ls_make_unit();
-}
-
-// internal.importOpt: returns true/false
-static lsthunk_t* _internal_importOpt(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc;
-  lstenv_t* tenv = (lstenv_t*)data;
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: importOpt: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  if (!tenv)
-    return NULL;
-  lsthunk_t* nsv = lsthunk_eval0(args[0]);
-  if (nsv == NULL)
-    return NULL;
-  if (!lsns_foreach_member(nsv, _internal_import_cb, tenv))
-    return lsthunk_new_ealge(lsealge_new(lsstr_cstr("false"), 0, NULL), NULL);
-  return lsthunk_new_ealge(lsealge_new(lsstr_cstr("true"), 0, NULL), NULL);
-}
-
-// internal.withImport: import then call continuation with unit
-static lsthunk_t* _internal_withImport(lssize_t argc, lsthunk_t* const* args, void* data) {
-  (void)argc;
-  lstenv_t* tenv = (lstenv_t*)data;
-  if (!ls_effects_allowed()) {
-    lsprintf(stderr, 0, "E: withImport: effect used in pure context (enable seq/chain)\n");
-    return NULL;
-  }
-  if (!tenv)
-    return NULL;
-  lsthunk_t* nsv = lsthunk_eval0(args[0]);
-  if (nsv == NULL)
-    return NULL;
-  if (!lsns_foreach_member(nsv, _internal_import_cb, tenv))
-    return ls_make_err("withImport: invalid namespace");
-  lsthunk_t* unit = ls_make_unit();
-  lsthunk_t* cont = args[1];
-  return lsthunk_eval(cont, 1, &unit);
-}
 
 // internal.requireOpt: wrap require into Option-like result (Some () | None)
 static lsthunk_t* _internal_requireOpt(lssize_t argc, lsthunk_t* const* args, void* data) {
@@ -300,7 +201,7 @@ extern void       ls_register_nslit_eval(lsthunk_t* (*fn)(lssize_t, lsthunk_t* c
 // Build an ephemeral "internal" namespace value for Prelude.ls evaluation
 static lsthunk_t* _build_internal_ns(lstenv_t* tenv) {
   // Pairs: key, value ...
-  const int      pairs = 6;
+  const int      pairs = 2;
   lsthunk_t**    argv  = (lsthunk_t**)lsmalloc(sizeof(lsthunk_t*) * (size_t)(pairs * 2));
   int            i     = 0;
   // .require
@@ -308,28 +209,12 @@ static lsthunk_t* _build_internal_ns(lstenv_t* tenv) {
   argv[i++] = lsthunk_new_builtin_attr(lsstr_cstr("internal.require"), 1,
                                        lsbuiltin_prelude_require, tenv,
                                        LSBATTR_EFFECT | LSBATTR_ENV_READ);
-  // .include
-  argv[i++] = _mk_dotsym(".include");
-  argv[i++] = lsthunk_new_builtin_attr(lsstr_cstr("internal.include"), 1,
-                                       lsbuiltin_prelude_include, tenv, LSBATTR_ENV_READ);
-  // .import
-  argv[i++] = _mk_dotsym(".import");
-  argv[i++] = lsthunk_new_builtin_attr(lsstr_cstr("internal.import"), 1, _internal_import, tenv,
-                                       LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
-  // .importOpt
-  argv[i++] = _mk_dotsym(".importOpt");
-  argv[i++] = lsthunk_new_builtin_attr(lsstr_cstr("internal.importOpt"), 1, _internal_importOpt,
-                                       tenv, LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
+  // include/import/withImport は廃止
   // .requireOpt
   argv[i++] = _mk_dotsym(".requireOpt");
   argv[i++] = lsthunk_new_builtin_attr(lsstr_cstr("internal.requireOpt"), 1,
                                        _internal_requireOpt, tenv,
                                        LSBATTR_EFFECT | LSBATTR_ENV_READ);
-  // .withImport
-  argv[i++] = _mk_dotsym(".withImport");
-  argv[i++] = lsthunk_new_builtin_attr(lsstr_cstr("internal.withImport"), 2,
-                                       _internal_withImport, tenv,
-                                       LSBATTR_ENV_WRITE | LSBATTR_EFFECT);
   lsthunk_t* ns = lsbuiltin_nslit(pairs * 2, argv, NULL);
   lsfree(argv);
   return ns;
@@ -363,8 +248,6 @@ int        main(int argc, char** argv) {
                { "prelude-so", required_argument, NULL, 'p' },
                { "sugar-namespace", required_argument, NULL, 'n' },
                { "strict-effects", no_argument, NULL, 's' },
-               { "run-main", no_argument, NULL, 1003 },
-               { "entry", required_argument, NULL, 1004 },
                { "init", required_argument, NULL, 1002 },
                { "trace-map", required_argument, NULL, 2000 },
                { "trace-stack-depth", required_argument, NULL, 2001 },
@@ -387,11 +270,17 @@ int        main(int argc, char** argv) {
   lstenv_t* tenv = lstenv_new(NULL);
                // Evaluate lib/Prelude.ls to bind value-prelude, mirroring file-mode path
                {
+                 if (g_debug)
+                   lsprintf(stderr, 0, "DBG: prelude: parse begin (lib/Prelude.ls)\n");
                  const lsprog_t* prelude_prog = lsparse_file_nullable("lib/Prelude.ls");
+                 if (g_debug)
+                   lsprintf(stderr, 0, "DBG: prelude: parse %s\n", prelude_prog ? "ok" : "NULL");
                  if (prelude_prog) {
                    lstenv_t* pe = lstenv_new(tenv);
                    // Bind ~builtins: load core builtins namespace once (dlopen is effectful)
                    {
+                     if (g_debug)
+                       lsprintf(stderr, 0, "DBG: prelude: load builtins(core) begin\n");
                      lsthunk_t* carg     = lsthunk_new_str(lsstr_cstr("core"));
                      lsthunk_t* cargv[1] = { carg };
                      if (ls_effects_get_strict())
@@ -399,24 +288,35 @@ int        main(int argc, char** argv) {
                      lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, pe);
                      if (ls_effects_get_strict())
                        ls_effects_end();
+                     if (g_debug) {
+                       const char* ct = core_ns ? (lsthunk_is_err(core_ns) ? "<bottom>" : "ok") : "NULL";
+                       lsprintf(stderr, 0, "DBG: prelude: load builtins(core) done: %s\n", ct);
+                     }
                      if (core_ns)
                        lstenv_put_value(pe, lsstr_cstr("builtins"), core_ns);
                    }
                    // Bind ~internal namespace
                    {
+                     if (g_debug)
+                       lsprintf(stderr, 0, "DBG: prelude: build ~internal begin\n");
                      lsthunk_t* internal_ns = _build_internal_ns(pe);
+                     if (g_debug)
+                       lsprintf(stderr, 0, "DBG: prelude: build ~internal %s\n", internal_ns ? "ok" : "NULL");
                      if (internal_ns)
                        lstenv_put_value(pe, lsstr_cstr("internal"), internal_ns);
                    }
+                   if (g_debug)
+                     lsprintf(stderr, 0, "DBG: prelude: eval begin\n");
                    lsthunk_t* pv = lsprog_eval(prelude_prog, pe);
+                   if (g_debug)
+                     lsprintf(stderr, 0, "DBG: prelude: eval end pv=%p\n", (void*)pv);
                    if (pv) {
                      // Bind as value: prelude = <record>
                      lstenv_put_value(tenv, lsstr_cstr("prelude"), pv);
                    }
                  }
                }
-               int saved_run_main = g_run_main;
-               g_run_main         = 0; // -e は最終値を出力
+               // -e は常に最終値を出力
                // Honor env for trace dump in -e path as well
                if (g_trace_dump_path == NULL || g_trace_dump_path[0] == '\0') {
                  const char* env_dump = getenv("LAZYSCRIPT_TRACE_DUMP");
@@ -486,16 +386,14 @@ int        main(int argc, char** argv) {
                 lsprintf(stderr, 0, "DBG: print ret end\n");
             }
           }
-               g_run_main = saved_run_main;
+               // no-op
                if (g_trace_dump_path && g_trace_dump_path[0])
                  lstrace_end_dump();
              }
-      // When prog is NULL (parse/scan error), skip evaluation silently; yyerror already printed
+  // When prog is NULL (parse/scan error), skip evaluation silently; yyerror already printed
   else {
-        // Ensure run-main flag restored in case of early return path
-        // (no change to g_run_main here because we didn't modify it yet if prog==NULL)
-        exit_status = 1; // treat parse/scan error as failure
-      }
+    exit_status = 1; // treat parse/scan error as failure
+  }
              break;
     }
            
@@ -504,12 +402,6 @@ int        main(int argc, char** argv) {
       break;
            case 's':
       ls_effects_set_strict(1);
-      break;
-           case 1003: // --run-main
-      g_run_main = 1;
-      break;
-           case 1004: // --entry <name>
-      g_entry_name = optarg;
       break;
            case 1002: // --init <file>
       g_init_file = optarg;
@@ -544,9 +436,6 @@ int        main(int argc, char** argv) {
   printf("  -e, --eval      evaluate a one-line program string\n");
       printf("  -n, --sugar-namespace <ns>  set namespace for ~~sym sugar (default: prelude)\n");
       printf("  -s, --strict-effects  enforce effect discipline (seq/chain required)\n");
-      printf("      --run-main          run entry function instead of printing top-level value "
-             "(off)\n");
-      printf("      --entry <name>      set entry function name (default: main)\n");
       printf("      --init <file>   load and evaluate an init LazyScript before user code (thunk "
              "path)\n");
       printf("      --trace-map <file>   load sourcemap JSONL for runtime trace printing (exp)\n");
@@ -619,11 +508,17 @@ int        main(int argc, char** argv) {
       // child environment with ephemeral ~builtins and ~internal, then bind the
       // resulting value under name 'prelude' in the user environment.
       {
+        if (g_debug)
+          lsprintf(stderr, 0, "DBG: [file] prelude: parse begin (lib/Prelude.ls)\n");
         const lsprog_t* prelude_prog = lsparse_file_nullable("lib/Prelude.ls");
+        if (g_debug)
+          lsprintf(stderr, 0, "DBG: [file] prelude: parse %s\n", prelude_prog ? "ok" : "NULL");
         if (prelude_prog) {
           lstenv_t* pe = lstenv_new(tenv);
           // Bind ~builtins: load core builtins namespace once (dlopen is effectful)
           {
+            if (g_debug)
+              lsprintf(stderr, 0, "DBG: [file] prelude: load builtins(core) begin\n");
             lsthunk_t* carg     = lsthunk_new_str(lsstr_cstr("core"));
             lsthunk_t* cargv[1] = { carg };
             if (ls_effects_get_strict())
@@ -631,16 +526,28 @@ int        main(int argc, char** argv) {
             lsthunk_t* core_ns = lsbuiltin_prelude_builtin(1, cargv, pe);
             if (ls_effects_get_strict())
               ls_effects_end();
+            if (g_debug) {
+              const char* ct = core_ns ? (lsthunk_is_err(core_ns) ? "<bottom>" : "ok") : "NULL";
+              lsprintf(stderr, 0, "DBG: [file] prelude: load builtins(core) done: %s\n", ct);
+            }
             if (core_ns)
               lstenv_put_value(pe, lsstr_cstr("builtins"), core_ns);
           }
           // Bind ~internal namespace
           {
+            if (g_debug)
+              lsprintf(stderr, 0, "DBG: [file] prelude: build ~internal begin\n");
             lsthunk_t* internal_ns = _build_internal_ns(pe);
+            if (g_debug)
+              lsprintf(stderr, 0, "DBG: [file] prelude: build ~internal %s\n", internal_ns ? "ok" : "NULL");
             if (internal_ns)
               lstenv_put_value(pe, lsstr_cstr("internal"), internal_ns);
           }
+          if (g_debug)
+            lsprintf(stderr, 0, "DBG: [file] prelude: eval begin\n");
           lsthunk_t* pv = lsprog_eval(prelude_prog, pe);
+          if (g_debug)
+            lsprintf(stderr, 0, "DBG: [file] prelude: eval end pv=%p\n", (void*)pv);
           if (pv) {
             // Bind as value: prelude = <record>
             lstenv_put_value(tenv, lsstr_cstr("prelude"), pv);
@@ -649,8 +556,8 @@ int        main(int argc, char** argv) {
       }
       if (g_trace_dump_path && g_trace_dump_path[0])
         lstrace_begin_dump(g_trace_dump_path);
-      lsthunk_t* ret = lsprog_eval(prog, tenv);
-      if (ret != NULL && !ls_maybe_run_entry(tenv)) {
+  lsthunk_t* ret = lsprog_eval(prog, tenv);
+  if (ret != NULL) {
         if (lsthunk_is_err(ret)) {
           lsprintf(stderr, 0, "E: ");
           lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
