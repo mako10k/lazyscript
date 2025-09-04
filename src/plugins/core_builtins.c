@@ -4,6 +4,7 @@
 #include "runtime/effects.h"
 #include "runtime/unit.h"
 #include "runtime/error.h"
+#include "plugins/plugin_common.h"
 
 // Reuse existing builtin implementations from the main binary
 // (the main program is linked with -export-dynamic so symbols are visible).
@@ -18,6 +19,15 @@ lsthunk_t* lsbuiltin_lt(lssize_t argc, lsthunk_t* const* args, void* data);
 // namespace helpers from main binary
 lsthunk_t* lsbuiltin_ns_members(lssize_t argc, lsthunk_t* const* args, void* data);
 // Equality: provide a local minimal eq to avoid coupling to prelude module
+static void cb_eq_log_header(const char* tag, lsthunk_t* a, lsthunk_t* b) {
+  if (!plugin_trace_enabled())
+    return;
+  lsprintf(stderr, 0, "[%s] ", tag);
+  lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a);
+  lsprintf(stderr, 0, " == ");
+  lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b);
+}
+
 static lsthunk_t* cb_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
   (void)argc;
   (void)data;
@@ -27,18 +37,11 @@ static lsthunk_t* cb_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
   lsthunk_t* b = lsthunk_eval0(args[1]);
   if (!b)
     return NULL;
-  int do_log = 0;
-  {
-    const char* v = getenv("LAZYSCRIPT_ENABLE_TRACE");
-    do_log        = (v && v[0] && v[0] != '0');
-  }
+  int do_log = plugin_trace_enabled();
   if (lsthunk_get_type(a) == LSTTYPE_INT && lsthunk_get_type(b) == LSTTYPE_INT) {
     int eq = lsint_eq(lsthunk_get_int(a), lsthunk_get_int(b));
     if (do_log) {
-      lsprintf(stderr, 0, "[core.eq:int] ");
-      lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a);
-      lsprintf(stderr, 0, " == ");
-      lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b);
+      cb_eq_log_header("core.eq:int", a, b);
       lsprintf(stderr, 0, " -> %s\n", eq ? "true" : "false");
     }
     return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL),
@@ -49,10 +52,7 @@ static lsthunk_t* cb_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
     const lsstr_t* sb = lsthunk_get_symbol(b);
     int            eq = (lsstrcmp(sa, sb) == 0);
     if (do_log) {
-      lsprintf(stderr, 0, "[core.eq:sym] ");
-      lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a);
-      lsprintf(stderr, 0, " == ");
-      lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b);
+      cb_eq_log_header("core.eq:sym", a, b);
       lsprintf(stderr, 0, " -> %s\n", eq ? "true" : "false");
     }
     return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL),
@@ -64,20 +64,14 @@ static lsthunk_t* cb_eq(lssize_t argc, lsthunk_t* const* args, void* data) {
     const lsstr_t* cb = lsthunk_get_constr(b);
     int            eq = (lsstrcmp(ca, cb) == 0);
     if (do_log) {
-      lsprintf(stderr, 0, "[core.eq:alge0] ");
-      lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a);
-      lsprintf(stderr, 0, " == ");
-      lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b);
+      cb_eq_log_header("core.eq:alge0", a, b);
       lsprintf(stderr, 0, " -> %s\n", eq ? "true" : "false");
     }
     return lsthunk_new_ealge(lsealge_new(eq ? lsstr_cstr("true") : lsstr_cstr("false"), 0, NULL),
                              NULL);
   }
   if (do_log) {
-    lsprintf(stderr, 0, "[core.eq:other] ");
-    lsthunk_dprint(stderr, LSPREC_LOWEST, 0, a);
-    lsprintf(stderr, 0, " == ");
-    lsthunk_dprint(stderr, LSPREC_LOWEST, 0, b);
+    cb_eq_log_header("core.eq:other", a, b);
     lsprintf(stderr, 0, " -> false\n");
   }
   return lsthunk_new_ealge(lsealge_new(lsstr_cstr("false"), 0, NULL), NULL);

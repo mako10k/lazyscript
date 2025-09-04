@@ -52,6 +52,17 @@ static int       lstpat_any_mark_present(const lstpat_t* pat);
 static lstpat_t* lstpat_new_pat_reuse_only(const lspat_t* pat, lstenv_t* tenv,
                                            lstref_target_origin_t* origin);
 static void      lspat_walk_mark_right(const lspat_t* p, lstenv_t* tenv);
+// Unified error for OR-right introducing a new variable
+static lstpat_t* lstpat_or_newvar_error(const lsstr_t* name, lstenv_t* tenv);
+
+static lstpat_t* lstpat_or_newvar_error(const lsstr_t* name, lstenv_t* tenv) {
+  if (tenv)
+    lstenv_incr_nerrors(tenv);
+  lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
+  lsstr_print_bare(stderr, LSPREC_LOWEST, 0, name);
+  lsprintf(stderr, 0, "' (not allowed)\n");
+  return NULL;
+}
 
 static void      lspat_walk_mark_right(const lspat_t* p, lstenv_t* tenv) {
        switch (lspat_get_type(p)) {
@@ -243,18 +254,10 @@ lstpat_t* lstpat_new_pat(const lspat_t* pat, lstenv_t* tenv, lstref_target_origi
     ret->orp.right = r;
     return ret;
   }
-  case LSPTYPE_INT: {
-    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
-    ret->ltp_type = LSPTYPE_INT;
-    ret->intval   = lspat_get_int(pat);
-    return ret;
-  }
-  case LSPTYPE_STR: {
-    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
-    ret->ltp_type = LSPTYPE_STR;
-    ret->strval   = lspat_get_str(pat);
-    return ret;
-  }
+  case LSPTYPE_INT:
+    return lstpat_new_int_raw(lspat_get_int(pat));
+  case LSPTYPE_STR:
+    return lstpat_new_str_raw(lspat_get_str(pat));
   case LSPTYPE_REF: {
     const lsref_t* ref = lspat_get_ref(pat);
     if (tenv != NULL && origin != NULL) {
@@ -649,12 +652,7 @@ static lstpat_t* lstpat_new_pat_reuse_only(const lspat_t* pat, lstenv_t* tenv,
     const lsref_t*   r        = lspas_get_ref(pa);
     lstref_target_t* existing = lstenv_get_self(tenv, lsref_get_name(r));
     if (!existing) {
-      if (tenv)
-        lstenv_incr_nerrors(tenv);
-      lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
-      lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(r));
-      lsprintf(stderr, 0, "' (not allowed)\n");
-      return NULL;
+      return lstpat_or_newvar_error(lsref_get_name(r), tenv);
     }
     lstpat_t* pref = lstref_target_get_pat(existing);
     lstpat_t* ppat = lstpat_new_pat_reuse_only(lspas_get_pat(pa), tenv, origin);
@@ -666,28 +664,15 @@ static lstpat_t* lstpat_new_pat_reuse_only(const lspat_t* pat, lstenv_t* tenv,
     ret->as.aspattern = ppat;
     return ret;
   }
-  case LSPTYPE_INT: {
-    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
-    ret->ltp_type = LSPTYPE_INT;
-    ret->intval   = lspat_get_int(pat);
-    return ret;
-  }
-  case LSPTYPE_STR: {
-    lstpat_t* ret = lsmalloc(sizeof(lstpat_t));
-    ret->ltp_type = LSPTYPE_STR;
-    ret->strval   = lspat_get_str(pat);
-    return ret;
-  }
+  case LSPTYPE_INT:
+    return lstpat_new_int_raw(lspat_get_int(pat));
+  case LSPTYPE_STR:
+    return lstpat_new_str_raw(lspat_get_str(pat));
   case LSPTYPE_REF: {
     const lsref_t*   r        = lspat_get_ref(pat);
     lstref_target_t* existing = lstenv_get_self(tenv, lsref_get_name(r));
     if (!existing) {
-      if (tenv)
-        lstenv_incr_nerrors(tenv);
-      lsprintf(stderr, 0, "E: right side of pattern '|' introduces new variable '");
-      lsstr_print_bare(stderr, LSPREC_LOWEST, 0, lsref_get_name(r));
-      lsprintf(stderr, 0, "' (not allowed)\n");
-      return NULL;
+      return lstpat_or_newvar_error(lsref_get_name(r), tenv);
     }
     return lstref_target_get_pat(existing);
   }

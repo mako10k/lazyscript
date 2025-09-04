@@ -12,7 +12,7 @@
 #include <getopt.h>
 #include <stdarg.h>
 #include <stdlib.h>
-#include <dlfcn.h>
+// #include <dlfcn.h> // removed: prelude plugin loading path deleted
 /* coreir removed */
 #include "common/hash.h"
 #include "common/malloc.h"
@@ -156,161 +156,7 @@ lsthunk_t* lsbuiltin_prelude_include(lssize_t argc, lsthunk_t* const* args, void
 // arithmetic builtins are in builtins/arith.c
 lsthunk_t* lsbuiltin_lt(lssize_t argc, lsthunk_t* const* args, void* data);
 
-// Prelude is provided via plugin: see src/plugins/prelude_plugin.c
-
-typedef int (*ls_prelude_register_fn)(lstenv_t*);
-
-static void get_exe_dir(char* out, size_t outsz) {
-  if (!out || outsz == 0)
-    return;
-  ssize_t n = readlink("/proc/self/exe", out, outsz - 1);
-  if (n <= 0) {
-    out[0] = '\0';
-    return;
-  }
-  out[n] = '\0';
-  for (ssize_t i = n - 1; i >= 0; --i) {
-    if (out[i] == '/') {
-      out[i] = '\0';
-      break;
-    }
-  }
-}
-
-static int file_exists(const char* path) { return access(path, R_OK) == 0; }
-
-// safe join helper to avoid -Wformat-truncation on snprintf
-static int join2(char* out, size_t outsz, const char* a, const char* b) {
-  if (!out || outsz == 0)
-    return 0;
-  size_t al = a ? strnlen(a, outsz) : 0;
-  size_t bl = b ? strlen(b) : 0;
-  if (al + bl >= outsz) {
-    out[0] = '\0';
-    return 0;
-  }
-  if (a && al)
-    memcpy(out, a, al);
-  if (b && bl)
-    memcpy(out + al, b, bl);
-  out[al + bl] = '\0';
-  return 1;
-}
-
-static const char* ls_find_prelude_so(char* buf, size_t bufsz) {
-  if (!buf || bufsz == 0)
-    return NULL;
-  buf[0] = '\0';
-
-  const char* envp = getenv("LAZYSCRIPT_PRELUDE_PATH");
-  if (envp && envp[0]) {
-    const char* p = envp;
-    while (p && *p) {
-      const char* colon = strchr(p, ':');
-      size_t      len   = colon ? (size_t)(colon - p) : strlen(p);
-      char        dir[PATH_MAX];
-      if (len >= sizeof(dir))
-        len = sizeof(dir) - 1;
-      memcpy(dir, p, len);
-      dir[len] = '\0';
-      if (!join2(buf, bufsz, dir, "/liblazyscript_prelude.so")) {
-        buf[0] = '\0';
-      }
-      if (file_exists(buf))
-        return buf;
-      p = colon ? colon + 1 : NULL;
-    }
-  }
-  char exedir[PATH_MAX];
-  exedir[0] = '\0';
-  get_exe_dir(exedir, sizeof(exedir));
-  if (exedir[0]) {
-    if (!join2(buf, bufsz, exedir, "/plugins/liblazyscript_prelude.so")) {
-      buf[0] = '\0';
-    }
-    if (file_exists(buf))
-      return buf;
-    // When running from build tree, plugin resides in .libs/
-    if (!join2(buf, bufsz, exedir, "/plugins/.libs/liblazyscript_prelude.so")) {
-      buf[0] = '\0';
-    }
-    if (file_exists(buf))
-      return buf;
-    // Also try parent dir (exedir is usually src/.libs, plugin is in src/plugins/.libs)
-    char parent[PATH_MAX];
-    memcpy(parent, exedir, sizeof(parent));
-    parent[sizeof(parent) - 1] = '\0';
-    for (ssize_t i = (ssize_t)strlen(parent) - 1; i >= 0; --i) {
-      if (parent[i] == '/') {
-        parent[i] = '\0';
-        break;
-      }
-    }
-    if (!join2(buf, bufsz, parent, "/plugins/.libs/liblazyscript_prelude.so")) {
-      buf[0] = '\0';
-    }
-    if (file_exists(buf))
-      return buf;
-  }
-  snprintf(buf, bufsz, "/usr/local/lib/lazyscript/liblazyscript_prelude.so");
-  if (file_exists(buf))
-    return buf;
-  snprintf(buf, bufsz, "/usr/lib/lazyscript/liblazyscript_prelude.so");
-  if (file_exists(buf))
-    return buf;
-  buf[0] = '\0';
-  return NULL;
-}
-
-static int ls_try_load_prelude_plugin(lstenv_t* tenv, const char* path) {
-  const char* chosen = path;
-  const char* source = NULL; // for logging
-  if (chosen == NULL)
-    chosen = getenv("LAZYSCRIPT_PRELUDE_SO");
-  if (chosen && chosen[0])
-    source = "CLI/ENV";
-  char found[PATH_MAX];
-  if ((chosen == NULL || chosen[0] == '\0')) {
-    // Try to find via LAZYSCRIPT_PRELUDE_PATH / standard locations
-    if (ls_find_prelude_so(found, sizeof(found))) {
-      chosen = found;
-      source = "AUTO";
-    }
-  }
-  if (chosen == NULL || chosen[0] == '\0') {
-    if (g_debug)
-      lsprintf(stderr, 0, "I: prelude: plugin not found (auto-discovery)\n");
-    return 0;
-  }
-  void* handle = dlopen(chosen, RTLD_NOW | RTLD_LOCAL);
-  if (!handle) {
-    const char* err = dlerror();
-    lsprintf(stderr, 0, "W: prelude: dlopen failed: path=%s err=%s\n", chosen,
-             err ? err : "(null)");
-    return 0;
-  }
-  dlerror();
-  ls_prelude_register_fn reg = (ls_prelude_register_fn)dlsym(handle, "ls_prelude_register");
-  const char*            err = dlerror();
-  if (err != NULL || reg == NULL) {
-    lsprintf(stderr, 0, "W: prelude: dlsym(ls_prelude_register) failed: %s\n",
-             err ? err : "(null)");
-    dlclose(handle);
-    return 0;
-  }
-  int rc = reg(tenv);
-  if (rc != 0) {
-    lsprintf(stderr, 0, "W: prelude: plugin returned error: %d\n", rc);
-    // keep handle but report error; fall back
-    return 0;
-  }
-  if (g_debug) {
-    lsprintf(stderr, 0, "I: prelude: plugin loaded: path=%s source=%s\n", chosen,
-             source ? source : "(n/a)");
-  }
-  // Keep handle open for the lifetime of process
-  return 1;
-}
+// Prelude plugin path removed: prelude is bound as a value by evaluating lib/Prelude.ls
 
 // --- Prelude as value setup ---
 // local 0-arity getter: returns captured thunk value
@@ -498,7 +344,7 @@ int        main(int argc, char** argv) {
   if (!(_ls_use_libc && _ls_use_libc[0] && _ls_use_libc[0] != '0')) {
            GC_init();
   }
-  const char*   prelude_so     = NULL;
+  // prelude plugin path removed
   int           kind_warn      = 1;    // (kept for future, no coreir)
   int           kind_error     = 0;    // (kept for future, no coreir)
   const char*   trace_map_path = NULL; // optional sourcemap for runtime tracing
@@ -530,7 +376,7 @@ int        main(int argc, char** argv) {
                { NULL, 0, NULL, 0 },
   };
   int opt;
-  while ((opt = getopt_long(argc, argv, "e:p:n:sdhv", longopts, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "e:n:sdhv", longopts, NULL)) != -1) {
            switch (opt) {
            case 'e': {
              // Evaluate one-line program
@@ -538,13 +384,7 @@ int        main(int argc, char** argv) {
   if (prog != NULL) {
                if (g_debug)
           lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
-        lstenv_t* tenv = lstenv_new(NULL);
-               if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
-                 lsprintf(stderr, 0,
-                          "E: prelude: plugin not found or failed to load; set --prelude-so or install "
-                                 "liblazyscript_prelude.so\n");
-                 exit(1);
-        }
+  lstenv_t* tenv = lstenv_new(NULL);
                // Evaluate lib/Prelude.ls to bind value-prelude, mirroring file-mode path
                {
                  const lsprog_t* prelude_prog = lsparse_file_nullable("lib/Prelude.ls");
@@ -628,8 +468,8 @@ int        main(int argc, char** argv) {
                 rt = "bottom";
                 break;
               }
-              lsprintf(stderr, 0, "DBG: eval(-e) ret-type=%s\n", rt);
-            }
+            lsprintf(stderr, 0, "DBG: eval(-e) ret-type=%s\n", rt);
+          }
             if (lsthunk_is_err(ret)) {
               lsprintf(stderr, 0, "E: ");
               lsthunk_print(stderr, LSPREC_LOWEST, 0, ret);
@@ -658,9 +498,7 @@ int        main(int argc, char** argv) {
       }
              break;
     }
-           case 'p':
-      prelude_so = optarg;
-      break;
+           
            case 'n':
       g_sugar_ns = optarg;
       break;
@@ -699,12 +537,11 @@ int        main(int argc, char** argv) {
       }
 #endif
       break;
-    case 'h':
+  case 'h':
       printf("Usage: %s [OPTION]... [FILE]...\n", argv[0]);
       printf("Options:\n");
       printf("  -d, --debug     print debug information\n");
-      printf("  -e, --eval      evaluate a one-line program string\n");
-      printf("  -p, --prelude-so <path>  load prelude plugin .so (override)\n");
+  printf("  -e, --eval      evaluate a one-line program string\n");
       printf("  -n, --sugar-namespace <ns>  set namespace for ~~sym sugar (default: prelude)\n");
       printf("  -s, --strict-effects  enforce effect discipline (seq/chain required)\n");
       printf("      --run-main          run entry function instead of printing top-level value "
@@ -718,11 +555,8 @@ int        main(int argc, char** argv) {
   printf("      --exit-zero-on-error  keep legacy exit status 0 even on errors (off)\n");
       printf("  -h, --help      display this help and exit\n");
       printf("  -v, --version   output version information and exit\n");
-      printf("\nDefault prelude: plugin-only (CLI -p / LAZYSCRIPT_PRELUDE_SO / auto-discover).\n");
-      printf("\nEnvironment:\n  LAZYSCRIPT_PRELUDE_SO  path to prelude plugin .so (used if -p not "
-             "set)\n");
-      printf("  LAZYSCRIPT_PRELUDE_PATH search paths (:) to find liblazyscript_prelude.so when SO "
-             "not set\n");
+  printf("\nPrelude: evaluated from lib/Prelude.ls and bound as a value (~prelude).\n");
+  printf("\nEnvironment:\n");
       printf("  LAZYSCRIPT_SUGAR_NS     namespace used for ~~sym sugar (if -n not set)\n");
       printf("  LAZYSCRIPT_INIT         path to init LazyScript (used if --init not set)\n");
       printf("  LAZYSCRIPT_TRACE_MAP    path to sourcemap JSONL (used if --trace-map not set)\n");
@@ -780,13 +614,7 @@ int        main(int argc, char** argv) {
         lsprog_print(stdout, LSPREC_LOWEST, 0, prog);
       }
       // strict-effects discipline is enforced at runtime; no prevalidation
-      lstenv_t* tenv = lstenv_new(NULL);
-      if (!ls_try_load_prelude_plugin(tenv, prelude_so)) {
-        lsprintf(stderr, 0,
-                 "E: prelude: plugin not found or failed to load; set --prelude-so or install "
-                 "liblazyscript_prelude.so\n");
-        exit(1);
-      }
+  lstenv_t* tenv = lstenv_new(NULL);
       // Plugin registers prelude dispatchers; now evaluate lib/Prelude.ls in a
       // child environment with ephemeral ~builtins and ~internal, then bind the
       // resulting value under name 'prelude' in the user environment.

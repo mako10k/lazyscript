@@ -14,6 +14,7 @@
 #include <assert.h>
 #include "runtime/error.h"
 #include "runtime/trace.h"
+#include "plugins/plugin_common.h"
 #include "runtime/unit.h"
 
 // forward decls used by pl_internal_dispatch
@@ -105,14 +106,7 @@ static lsthunk_t* pl_trace(lssize_t argc, lsthunk_t* const* args, void* data) {
   // Prepare message: evaluate first arg to WHNF to allow strings/symbols/etc.
   lsthunk_t* msgv = lsthunk_eval0(args[0]);
   // Obtain current source location from trace system
-  int tid = lstrace_current();
-  if (tid >= 0) {
-    lstrace_span_t s = lstrace_lookup(tid);
-    lsprintf(stderr, 0, "[trace] %s:%d:%d-: ", s.filename ? s.filename : "<unknown>", s.first_line,
-             s.first_column);
-  } else {
-    lsprintf(stderr, 0, "[trace] <no-loc>: ");
-  }
+  plugin_trace_prefix("trace");
   // Print message
   if (msgv && lsthunk_get_type(msgv) == LSTTYPE_STR) {
     const lsstr_t* str = lsthunk_get_str(msgv);
@@ -154,14 +148,7 @@ static lsthunk_t* pl_trace_force(lssize_t argc, lsthunk_t* const* args, void* da
   // Evaluate message and expr
   lsthunk_t* msgv = lsthunk_eval0(args[0]);
   lsthunk_t* val  = lsthunk_eval0(expr);
-  int        tid  = lstrace_current();
-  if (tid >= 0) {
-    lstrace_span_t s = lstrace_lookup(tid);
-    lsprintf(stderr, 0, "[traceForce] %s:%d:%d-: ", s.filename ? s.filename : "<unknown>",
-             s.first_line, s.first_column);
-  } else {
-    lsprintf(stderr, 0, "[traceForce] <no-loc>: ");
-  }
+  plugin_trace_prefix("traceForce");
   if (msgv && lsthunk_get_type(msgv) == LSTTYPE_STR) {
     const lsstr_t* str = lsthunk_get_str(msgv);
     lsstr_print_bare(stderr, LSPREC_LOWEST, 0, str);

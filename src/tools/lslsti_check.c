@@ -13,6 +13,34 @@
 #include <getopt.h>
 #include "lazyscript.h"
 #include "tools/cli_common.h"
+// Local test-only copies of on-disk structs (must match lsti.c layout)
+typedef struct {
+  uint32_t magic;
+  uint16_t vmaj, vmin;
+  uint16_t sect_cnt;
+  uint16_t align_log2;
+  uint32_t flags;
+} test_lsti_hdr_t;
+typedef struct {
+  uint32_t kind;
+  uint32_t reserved;
+  uint64_t file_off;
+  uint64_t size;
+} test_lsti_sect_t;
+
+// Duplicate the image buffer and locate section table pointer and count
+static uint8_t* dup_and_find_sections(const lsti_image_t* src, const test_lsti_sect_t** out_sects,
+                                      uint16_t* out_cnt) {
+  uint8_t* dup = (uint8_t*)malloc((size_t)src->size);
+  memcpy(dup, src->base, (size_t)src->size);
+  const test_lsti_hdr_t*  hdr  = (const test_lsti_hdr_t*)dup;
+  const test_lsti_sect_t* sect = (const test_lsti_sect_t*)(dup + sizeof(test_lsti_hdr_t));
+  if (out_sects)
+    *out_sects = sect;
+  if (out_cnt)
+    *out_cnt = hdr->sect_cnt;
+  return dup;
+}
 // Note: We don't need real runtime builtins here; provide a local dummy.
 
 // Local dummy builtin function (never actually evaluated in this smoke)
@@ -210,32 +238,16 @@ int main(int argc, char** argv) {
   (void)env; // quiet unused for now
   printf("ok: %s\n", path);
   // Minimal negative tests: mutate a few bytes to trigger validator failures.
-  // Local copies of on-disk structs (must match lsti.c layout)
-  typedef struct {
-    uint32_t magic;
-    uint16_t vmaj, vmin;
-    uint16_t sect_cnt;
-    uint16_t align_log2;
-    uint32_t flags;
-  } test_lsti_hdr_t;
-  typedef struct {
-    uint32_t kind;
-    uint32_t reserved;
-    uint64_t file_off;
-    uint64_t size;
-  } test_lsti_sect_t;
   // 1) Corrupt ROOTS count to exceed ncnt
   {
-    lsti_image_t bad = img;
-    // duplicate buffer to mutate safely
-    uint8_t* dup = (uint8_t*)malloc((size_t)img.size);
-    memcpy(dup, img.base, (size_t)img.size);
-    bad.base                          = dup;
-    const test_lsti_hdr_t*  hdr       = (const test_lsti_hdr_t*)dup;
-    const test_lsti_sect_t* sect      = (const test_lsti_sect_t*)(dup + sizeof(test_lsti_hdr_t));
+    lsti_image_t            bad = img;
+    const test_lsti_sect_t* sect;
+    uint16_t                scnt;
+    uint8_t*                dup = dup_and_find_sections(&img, &sect, &scnt);
+    bad.base                     = dup;
     const test_lsti_sect_t* thunk_tab = NULL;
     const test_lsti_sect_t* roots     = NULL;
-    for (uint16_t i = 0; i < hdr->sect_cnt; ++i) {
+    for (uint16_t i = 0; i < scnt; ++i) {
       if (sect[i].kind == (uint32_t)LSTI_SECT_THUNK_TAB)
         thunk_tab = &sect[i];
       if (sect[i].kind == (uint32_t)LSTI_SECT_ROOTS)
@@ -255,15 +267,14 @@ int main(int argc, char** argv) {
   }
   // 2) If STRING_BLOB present, set STR node's len to exceed payload
   {
-    lsti_image_t bad = img;
-    uint8_t*     dup = (uint8_t*)malloc((size_t)img.size);
-    memcpy(dup, img.base, (size_t)img.size);
-    bad.base                          = dup;
-    const test_lsti_hdr_t*  hdr       = (const test_lsti_hdr_t*)dup;
-    const test_lsti_sect_t* sect      = (const test_lsti_sect_t*)(dup + sizeof(test_lsti_hdr_t));
+    lsti_image_t            bad = img;
+    const test_lsti_sect_t* sect;
+    uint16_t                scnt;
+    uint8_t*                dup = dup_and_find_sections(&img, &sect, &scnt);
+    bad.base                     = dup;
     const test_lsti_sect_t* thunk_tab = NULL;
     const test_lsti_sect_t* sblob     = NULL;
-    for (uint16_t i = 0; i < hdr->sect_cnt; ++i) {
+    for (uint16_t i = 0; i < scnt; ++i) {
       if (sect[i].kind == (uint32_t)LSTI_SECT_THUNK_TAB)
         thunk_tab = &sect[i];
       if (sect[i].kind == (uint32_t)LSTI_SECT_STRING_BLOB)
