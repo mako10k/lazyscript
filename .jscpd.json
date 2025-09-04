@@ -1,0 +1,27 @@
+{
+  "threshold": 0,
+  "minTokens": 40,
+  "reporters": ["console", "json", "html"],
+  "output": "logs/jscpd-report",
+  "format": [
+    "c",
+    "h",
+    "ls"
+  ],
+  "ignore": [
+    "**/.git/**",
+    "**/.libs/**",
+    "**/node_modules/**",
+    "**/*.o",
+    "**/*.lo",
+    "src/parser/parser.c",
+    "src/parser/lexer.c",
+    "src/parser/parser.h",
+    "src/parser/lexer.h"
+  ],
+  "path": [
+    "src",
+    "lib",
+    "test"
+  ]
+}

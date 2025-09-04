@@ -1,0 +1,26 @@
+{
+  "name": "lazyscript",
+  "version": "1.0.0",
+  "description": "実験的な遅延評価スクリプト系言語の処理系です。Autotools でビルドできます。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mako10k/lazyscript.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mako10k/lazyscript/issues"
+  },
+  "homepage": "https://github.com/mako10k/lazyscript#readme"
+}

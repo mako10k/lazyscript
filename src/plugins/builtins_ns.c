@@ -489,11 +489,11 @@ static lsthunk_t* pl_dispatch(lssize_t argc, lsthunk_t* const* args, void* data)
   return ls_make_err("prelude: unknown symbol");
 }
 
+// Deprecated: user-facing prelude registration is disabled. Keep symbol for legacy loaders,
+// but do not register names when called accidentally.
 int ls_prelude_register(lstenv_t* tenv) {
   if (!tenv)
     return -1;
-  lstenv_put_builtin(tenv, lsstr_cstr("prelude"), 1, pl_dispatch, tenv);
-  // Stable alias kept as builtin even after prelude is rebound to a value
-  lstenv_put_builtin(tenv, lsstr_cstr("prelude$builtin"), 1, pl_dispatch, tenv);
-  return 0;
+  (void)tenv;
+  return 0; // no-op
 }

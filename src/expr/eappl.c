@@ -165,6 +165,7 @@ static int try_print_pure_dot_chain_arg(FILE* stream, int indent, const lsexpr_t
   }
   return 1;
 }
+// (note) try_print_pure_dot_chain_arg is currently unused; printing logic is inlined below.
 
 void lseappl_print(FILE* stream, lsprec_t prec, int indent, const lseappl_t* eappl) {
   lssize_t        argc = eappl->lea_argc;

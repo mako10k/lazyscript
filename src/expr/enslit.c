@@ -14,7 +14,8 @@ struct lsenslit {
 const lsenslit_t* lsenslit_new(lssize_t n, const lsstr_t* const* names,
                                const lsexpr_t* const* exprs) {
   lsenslit_t* ns = lsmalloc(sizeof(lsenslit_t));
-  ns->count      = n < 0 ? 0 : n;
+  // lssize_t is unsigned in this project; assign directly to avoid -Wtype-limits.
+  ns->count = n;
   if (ns->count == 0) {
     ns->names = NULL;
     ns->exprs = NULL;

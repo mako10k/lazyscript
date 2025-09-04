@@ -41,3 +41,6 @@ coreir/t11_coreir_match_no_case
 # Top-level legacy coreir tests
 t10_coreir_nslit
 t84_choice_coreir_dump
+
+# Backward-compat removed: prelude plugin autodiscovery is no longer supported
+t59_prelude_autodiscover

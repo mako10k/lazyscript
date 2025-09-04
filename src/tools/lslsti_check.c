@@ -12,6 +12,7 @@
 #include "runtime/trace.h"
 #include <getopt.h>
 #include "lazyscript.h"
+#include "tools/cli_common.h"
 // Note: We don't need real runtime builtins here; provide a local dummy.
 
 // Local dummy builtin function (never actually evaluated in this smoke)
@@ -23,35 +24,26 @@ static lsthunk_t* lsdummy_builtin(lssize_t argc, lsthunk_t* const* args, void* d
 }
 
 int main(int argc, char** argv) {
-  const char*   path = "./_tmp_test.lsti";
-  int           cli_opt;
-  struct option longopts[] = {
-    { "output", required_argument, NULL, 'o' },
-    { "help", no_argument, NULL, 'h' },
-    { "version", no_argument, NULL, 'v' },
-    { NULL, 0, NULL, 0 },
-  };
-  while ((cli_opt = getopt_long(argc, argv, "o:hv", longopts, NULL)) != -1) {
-    switch (cli_opt) {
-    case 'o':
-      path = optarg;
-      break;
-    case 'h':
-      printf("Usage: %s [-o FILE]\n", argv[0]);
-      printf("  -o, --output FILE   output LSTI path (default: ./_tmp_test.lsti)\n");
-      printf("  -h, --help          show this help and exit\n");
-      printf("  -v, --version       print version and exit\n");
-      return 0;
-    case 'v':
-      printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
-      return 0;
-    default:
-      fprintf(stderr, "Try --help for usage.\n");
-      return 1;
-    }
+  const char* path = "./_tmp_test.lsti";
+  lscli_io_t  io;
+  lscli_io_init(&io, NULL);
+  int cli_opt;
+  // reuse: treat as io+hv but ignore input in this tool
+  while ((cli_opt = getopt_long(argc, argv, lscli_short_io_hv(), lscli_longopts_io_hv(), NULL)) != -1) {
+    if (lscli_io_handle_opt(cli_opt, optarg, &io))
+      continue;
+    fprintf(stderr, "Try --help for usage.\n");
+    return 1;
   }
   if (optind < argc)
     path = argv[optind++];
+  if (io.output_path)
+    path = io.output_path;
+  if (lscli_maybe_handle_hv(argv[0], &io, /*has_input*/0, /*has_output*/1)) {
+    if (io.want_help)
+      printf("  (default output: ./_tmp_test.lsti)\n");
+    return 0;
+  }
   // Build a tiny graph: INT 42, STR "hello", SYMBOL ".Ok", ALGE (.Ok 42), BOTTOM("boom",
   // related=[INT 42])
   lstenv_t*      env     = lstenv_new(NULL);

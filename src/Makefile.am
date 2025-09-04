@@ -67,6 +67,7 @@ lsi_lsti_LDADD = \
     $(GC_LIBS)
 lsi_lsti_SOURCES = \
     tools/lslsti_check.c \
+    tools/cli_common.c \
     runtime/trace.c \
     runtime/effects.c \
     lazyscript.h \
@@ -84,6 +85,8 @@ lsi_lstr_dump_LDADD = \
     $(GC_LIBS)
 lsi_lstr_dump_SOURCES = \
     tools/lslstr_dump.c \
+    tools/lstr_prog_common.c \
+    tools/cli_common.c \
     runtime/trace.c \
     runtime/effects.c \
     lazyscript.h \
@@ -101,6 +104,8 @@ lsi_lstr_rt_LDADD = \
     $(GC_LIBS)
 lsi_lstr_rt_SOURCES = \
     tools/lslstr_roundtrip.c \
+    tools/cli_common.c \
+    tools/lstr_prog_common.c \
     runtime/trace.c \
     runtime/effects.c \
     lazyscript.h \
@@ -118,6 +123,9 @@ lsi_emit_llvm_LDADD = \
     $(GC_LIBS)
 lsi_emit_llvm_SOURCES = \
     tools/lstr_to_llvmir.c \
+    tools/llvm_emit_common.c \
+    tools/lstr_prog_common.c \
+    tools/cli_common.c \
     runtime/trace.c \
     runtime/effects.c \
     lazyscript.h \

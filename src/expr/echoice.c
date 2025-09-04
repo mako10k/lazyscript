@@ -28,14 +28,14 @@ const lsexpr_t*  lsechoice_get_right(const lsechoice_t* echoice) { return echoic
 lsechoice_kind_t lsechoice_get_kind(const lsechoice_t* echoice) { return echoice->lec_kind; }
 
 // Helpers to inspect nested choice chains
-static const lsexpr_t* choice_leftmost_term(const lsechoice_t* ch) {
+__attribute__((unused)) static const lsexpr_t* choice_leftmost_term(const lsechoice_t* ch) {
   // Follow left spine until non-choice
   while (lsexpr_get_type(ch->lec_left) == LSETYPE_CHOICE)
     ch = lsexpr_get_choice(ch->lec_left);
   return ch->lec_left;
 }
 
-static const lsexpr_t* choice_rightmost_term(const lsechoice_t* ch) {
+__attribute__((unused)) static const lsexpr_t* choice_rightmost_term(const lsechoice_t* ch) {
   // Follow right spine until non-choice
   while (lsexpr_get_type(ch->lec_right) == LSETYPE_CHOICE)
     ch = lsexpr_get_choice(ch->lec_right);
